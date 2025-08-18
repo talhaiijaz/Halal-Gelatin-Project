@@ -1,5 +1,86 @@
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+
+async function logInvoiceEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
+  try {
+    await ctx.db.insert("logs", {
+      entityTable: "invoices",
+      entityId: params.entityId,
+      action: params.action,
+      message: params.message,
+      metadata: params.metadata,
+      userId: params.userId as any,
+      createdAt: Date.now(),
+    });
+  } catch {}
+}
 import { v } from "convex/values";
+
+// Generate unique invoice number with fiscal year
+const generateInvoiceNumber = async (ctx: any) => {
+  const now = new Date();
+  const fiscalYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const fiscalYearStart = new Date(fiscalYear, 6, 1).getTime(); // July 1
+  
+  // Format fiscal year as FY25-26
+  const fiscalYearStartShort = fiscalYear;
+  const fiscalYearEndShort = fiscalYear + 1;
+  const fiscalYearLabel = `FY${fiscalYearStartShort.toString().slice(-2)}-${fiscalYearEndShort.toString().slice(-2)}`;
+  
+  const invoices = await ctx.db
+    .query("invoices")
+    .filter((q: any) => q.gte(q.field("issueDate"), fiscalYearStart))
+    .collect();
+  
+  const nextNumber = invoices.length + 1;
+  return `INV-${fiscalYearLabel}-${nextNumber.toString().padStart(3, '0')}`;
+};
+
+// Create invoice for order
+export const createForOrder = mutation({
+  args: {
+    orderId: v.id("orders"),
+    issueDate: v.optional(v.number()),
+    dueDate: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const order = await ctx.db.get(args.orderId);
+    if (!order) throw new Error("Order not found");
+
+    // Check if invoice already exists
+    const existingInvoice = await ctx.db
+      .query("invoices")
+      .withIndex("by_order", q => q.eq("orderId", args.orderId))
+      .first();
+    
+    if (existingInvoice) {
+      throw new Error("Invoice already exists for this order");
+    }
+
+    const invoiceNumber = await generateInvoiceNumber(ctx);
+    const issueDate = args.issueDate || Date.now();
+    const dueDate = args.dueDate || (issueDate + (30 * 24 * 60 * 60 * 1000)); // 30 days default
+
+    const invoiceId = await ctx.db.insert("invoices", {
+      invoiceNumber,
+      orderId: args.orderId,
+      clientId: order.clientId,
+      issueDate,
+      dueDate,
+      status: "unpaid",
+      amount: order.totalAmount,
+      currency: order.currency,
+      totalPaid: 0,
+      outstandingBalance: order.totalAmount,
+      notes: "",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    await logInvoiceEvent(ctx, { entityId: String(invoiceId), action: "create", message: `Invoice created for order ${order.orderNumber}` });
+    return invoiceId;
+  },
+});
 
 // List invoices with filters
 export const list = query({
@@ -9,6 +90,7 @@ export const list = query({
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
     search: v.optional(v.string()),
+    fiscalYear: v.optional(v.number()), // Add fiscal year filter
   },
   handler: async (ctx, args) => {
     let invoices = await ctx.db.query("invoices").order("desc").collect();
@@ -30,10 +112,20 @@ export const list = query({
       invoices = invoices.filter(i => i.issueDate <= args.endDate!);
     }
 
+    if (args.fiscalYear) {
+      // Filter invoices by the fiscal year of their associated order
+      const allOrders = await ctx.db.query("orders").collect();
+      invoices = invoices.filter(invoice => {
+        const order = allOrders.find(o => o._id === invoice.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
     if (args.search) {
       const searchLower = args.search.toLowerCase();
-      invoices = invoices.filter(i => 
-        i.invoiceNumber.toLowerCase().includes(searchLower)
+      invoices = invoices.filter(i =>
+        i.invoiceNumber?.toLowerCase().includes(searchLower) ||
+        i.orderId?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -82,69 +174,36 @@ export const get = query({
 
     const client = await ctx.db.get(invoice.clientId);
     const order = await ctx.db.get(invoice.orderId);
+    const orderItems = await ctx.db
+      .query("orderItems")
+      .withIndex("by_order", q => q.eq("orderId", invoice.orderId))
+      .collect();
     const payments = await ctx.db
       .query("payments")
       .withIndex("by_invoice", (q) => q.eq("invoiceId", args.id))
       .collect();
 
+    // Populate bank account data for each payment
+    const paymentsWithBankAccounts = await Promise.all(
+      payments.map(async (payment) => {
+        let bankAccount = null;
+        if (payment.bankAccountId) {
+          bankAccount = await ctx.db.get(payment.bankAccountId);
+        }
+        return {
+          ...payment,
+          bankAccount,
+        };
+      })
+    );
+
     return {
       ...invoice,
       client,
       order,
-      payments,
+      orderItems,
+      payments: paymentsWithBankAccounts,
     };
-  },
-});
-
-// Record payment for invoice
-export const recordPayment = mutation({
-  args: {
-    invoiceId: v.id("invoices"),
-    amount: v.number(),
-    paymentMethod: v.string(),
-    referenceNumber: v.optional(v.string()),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const invoice = await ctx.db.get(args.invoiceId);
-    if (!invoice) throw new Error("Invoice not found");
-
-    // Validate payment amount
-    if (args.amount <= 0) {
-      throw new Error("Payment amount must be greater than 0");
-    }
-
-    if (args.amount > invoice.outstandingBalance) {
-      throw new Error(`Payment amount cannot exceed outstanding balance of ${invoice.outstandingBalance}`);
-    }
-
-    // Create payment record
-    const paymentId = await ctx.db.insert("payments", {
-      invoiceId: args.invoiceId,
-      amount: args.amount,
-      paymentDate: Date.now(),
-      paymentMethod: args.paymentMethod,
-      referenceNumber: args.referenceNumber,
-      notes: args.notes,
-      createdAt: Date.now(),
-      createdBy: "system" as any,
-    });
-
-    // Update invoice
-    const newTotalPaid = invoice.totalPaid + args.amount;
-    const newBalance = invoice.amount - newTotalPaid;
-    const newStatus = newBalance === 0 ? "paid" : 
-                      newTotalPaid > 0 ? "partially_paid" : 
-                      invoice.status;
-
-    await ctx.db.patch(args.invoiceId, {
-      totalPaid: newTotalPaid,
-      outstandingBalance: newBalance,
-      status: newStatus,
-      updatedAt: Date.now(),
-    });
-
-    return { success: true, paymentId };
   },
 });
 
@@ -153,13 +212,9 @@ export const updateStatus = mutation({
   args: {
     id: v.id("invoices"),
     status: v.union(
-      v.literal("draft"),
-      v.literal("sent"),
-      v.literal("due"),
-      v.literal("overdue"),
+      v.literal("unpaid"),
       v.literal("partially_paid"),
-      v.literal("paid"),
-      v.literal("cancelled")
+      v.literal("paid")
     ),
   },
   handler: async (ctx, args) => {
@@ -167,7 +222,7 @@ export const updateStatus = mutation({
       status: args.status,
       updatedAt: Date.now(),
     });
-
+    await logInvoiceEvent(ctx, { entityId: String(args.id), action: "update", message: `Invoice status changed to ${args.status}` });
     return { success: true };
   },
 });
@@ -181,13 +236,9 @@ export const sendReminder = mutation({
     const invoice = await ctx.db.get(args.id);
     if (!invoice) throw new Error("Invoice not found");
 
-    // In a real app, this would send an email
-    // For now, just update the status
-    if (invoice.status === "draft") {
-      await ctx.db.patch(args.id, {
-        status: "sent",
-        updatedAt: Date.now(),
-      });
+    // Update status to unpaid if it's not already set
+    if (invoice.status === "unpaid") {
+      // Already set to unpaid, no need to update
     }
 
     return { success: true };
@@ -205,17 +256,13 @@ export const getStats = query({
       totalPaid: 0,
       totalOutstanding: 0,
       byStatus: {
-        draft: 0,
-        sent: 0,
-        due: 0,
-        overdue: 0,
+        unpaid: 0,
         partially_paid: 0,
         paid: 0,
-        cancelled: 0,
       },
     };
 
-    // Check for overdue invoices and update their status
+    // Check for overdue invoices (read-only in query)
     const now = Date.now();
     
     for (const invoice of invoices) {
@@ -223,17 +270,107 @@ export const getStats = query({
       stats.totalPaid += invoice.totalPaid;
       stats.totalOutstanding += invoice.outstandingBalance;
       
-      // Check if invoice is overdue
-      let status = invoice.status;
-      if (invoice.status === "due" && invoice.dueDate < now) {
-        status = "overdue";
-        // Update the status in the database
-        await ctx.db.patch(invoice._id, { status: "overdue" });
+      // Categorize invoices by payment status
+      if (invoice.outstandingBalance === 0) {
+        stats.byStatus.paid++;
+      } else if (invoice.totalPaid > 0) {
+        stats.byStatus.partially_paid++;
+      } else {
+        stats.byStatus.unpaid++;
       }
-      
-      stats.byStatus[status as keyof typeof stats.byStatus]++;
     }
 
     return stats;
+  },
+});
+
+// Get aging report
+export const getAgingReport = query({
+  handler: async (ctx) => {
+    const invoices = await ctx.db.query("invoices").collect();
+    const now = Date.now();
+    
+    const aging = {
+      current: 0,      // 0-30 days
+      days31to60: 0,   // 31-60 days
+      days61to90: 0,   // 61-90 days
+      over90: 0,       // Over 90 days
+      total: 0,
+    };
+
+    for (const invoice of invoices) {
+      if (invoice.outstandingBalance > 0) {
+        const daysOverdue = Math.floor((now - invoice.dueDate) / (1000 * 60 * 60 * 24));
+        
+        if (daysOverdue <= 0) {
+          aging.current += invoice.outstandingBalance;
+        } else if (daysOverdue <= 30) {
+          aging.days31to60 += invoice.outstandingBalance;
+        } else if (daysOverdue <= 60) {
+          aging.days61to90 += invoice.outstandingBalance;
+        } else {
+          aging.over90 += invoice.outstandingBalance;
+        }
+        
+        aging.total += invoice.outstandingBalance;
+      }
+    }
+
+    return aging;
+  },
+});
+
+// Separate mutation to update overdue invoices
+export const updateOverdueInvoices = mutation({
+  handler: async (ctx) => {
+    const invoices = await ctx.db.query("invoices").collect();
+    const now = Date.now();
+    let updatedCount = 0;
+    
+    for (const invoice of invoices) {
+      if (invoice.status === "unpaid" && invoice.dueDate < now) {
+        await ctx.db.patch(invoice._id, { 
+          status: "unpaid", // Keep as unpaid even if overdue
+          updatedAt: Date.now(),
+        });
+        updatedCount++;
+      }
+    }
+    
+    return { updatedCount };
+  },
+});
+
+// Delete invoice (only if no payments recorded)
+export const deleteInvoice = mutation({
+  args: {
+    id: v.id("invoices"),
+  },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.id);
+    if (!invoice) throw new Error("Invoice not found");
+
+    // Check if payments exist
+    const payments = await ctx.db
+      .query("payments")
+      .withIndex("by_invoice", q => q.eq("invoiceId", args.id))
+      .collect();
+
+    if (payments.length > 0) {
+      throw new Error("Cannot delete invoice with recorded payments");
+    }
+
+    // Get invoice details before deletion for logging
+    const client = await ctx.db.get(invoice.clientId);
+    
+    await ctx.db.delete(args.id);
+    
+    // Create detailed log message
+    const invoiceDetails = `${invoice.invoiceNumber || 'INV-' + String(args.id).slice(-6)} - ${invoice.amount} ${invoice.currency}`;
+    const clientName = client ? ` for ${client.name}` : '';
+    const logMessage = `Invoice deleted: ${invoiceDetails}${clientName}`;
+    
+    await logInvoiceEvent(ctx, { entityId: String(args.id), action: "delete", message: logMessage });
+    return { success: true };
   },
 });

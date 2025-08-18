@@ -1,0 +1,306 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { X } from "lucide-react";
+import { Id } from "@/convex/_generated/dataModel";
+
+interface Client {
+  _id: Id<"clients">;
+  name: string;
+  contactPerson: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  taxId: string;
+  type: "local" | "international";
+  status: "active" | "inactive";
+}
+
+interface EditCustomerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  client: Client | null;
+}
+
+export default function EditCustomerModal({ isOpen, onClose, client }: EditCustomerModalProps) {
+  const updateClient = useMutation(api.clients.update);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    contactPerson: "",
+    email: "",
+    phone: "",
+    address: "",
+    city: "",
+    country: "",
+    taxId: "",
+    status: "active" as "active" | "inactive",
+  });
+
+  // Update form data when client changes
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        name: client.name || "",
+        contactPerson: client.contactPerson || "",
+        email: client.email || "",
+        phone: client.phone || "",
+        address: client.address || "",
+        city: client.city || "",
+        country: client.country || "",
+        taxId: client.taxId || "",
+        status: client.status || "active",
+      });
+    }
+  }, [client]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!client) return;
+
+    setIsSubmitting(true);
+    try {
+      await updateClient({
+        id: client._id,
+        ...formData,
+      });
+      onClose();
+    } catch (error) {
+      console.error("Failed to update client:", error);
+      
+      // Provide more specific error messages based on the error type
+      let errorMessage = "Failed to update client. Please try again.";
+      
+      if (error instanceof Error) {
+        const errorStr = error.message.toLowerCase();
+        
+        if (errorStr.includes("validation") || errorStr.includes("invalid")) {
+          errorMessage = "Invalid client data. Please check all required fields and try again.";
+        } else if (errorStr.includes("duplicate") || errorStr.includes("already exists")) {
+          errorMessage = "A client with this name or contact information already exists. Please use a different name or contact details.";
+        } else if (errorStr.includes("name") || errorStr.includes("company")) {
+          errorMessage = "Company name is invalid or missing. Please provide a valid company name.";
+        } else if (errorStr.includes("email") || errorStr.includes("contact")) {
+          errorMessage = "Contact information is invalid. Please check email and phone number format.";
+        } else if (errorStr.includes("network") || errorStr.includes("connection")) {
+          errorMessage = "Network connection error. Please check your internet connection and try again.";
+        } else if (errorStr.includes("permission") || errorStr.includes("unauthorized")) {
+          errorMessage = "You don't have permission to update clients. Please contact your administrator.";
+        } else if (errorStr.includes("not found") || errorStr.includes("doesn't exist")) {
+          errorMessage = "Client not found. The client may have been deleted or you don't have access to it.";
+        } else {
+          // For other errors, show the actual error message if it's not too technical
+          const cleanMessage = error.message.replace(/^Error: /, '').replace(/^ConvexError: /, '');
+          if (cleanMessage.length < 100 && !cleanMessage.includes('internal') && !cleanMessage.includes('server')) {
+            errorMessage = `Error: ${cleanMessage}`;
+          }
+        }
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  if (!isOpen || !client) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
+        
+        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+          <div className="border-b border-gray-200 px-6 py-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Edit {client.type === "local" ? "Local" : "International"} Customer
+              </h2>
+              <button
+                onClick={onClose}
+                className="rounded-lg p-1 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5 text-gray-500" />
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-6">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Company Name
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="Enter company name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contact Person
+                </label>
+                <input
+                  type="text"
+                  name="contactPerson"
+                  value={formData.contactPerson}
+                  onChange={handleChange}
+                  placeholder="Enter contact person name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter email address"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    placeholder="Enter phone number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  placeholder="Enter street address"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleChange}
+                    placeholder="Enter city name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Country
+                  </label>
+                  {client.type === "local" ? (
+                    <input
+                      type="text"
+                      name="country"
+                      value="Pakistan"
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      name="country"
+                      value={formData.country}
+                      onChange={handleChange}
+                      placeholder="Enter country name"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tax ID
+                  </label>
+                  <input
+                    type="text"
+                    name="taxId"
+                    value={formData.taxId}
+                    onChange={handleChange}
+                    placeholder="Enter tax identification number"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Status
+                  </label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? "Updating..." : "Update Customer"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}

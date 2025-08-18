@@ -20,44 +20,45 @@ interface OrderItem {
   discountType?: "amount" | "percentage";
   discountValue?: number;
   discountAmount?: number;
-  // New product specs
+  // New fields
   bloom?: number;
   mesh?: number;
   lotNumbers?: string[];
 }
 
-interface CreateOrderModalProps {
+interface EditOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
-  preselectedClientId?: Id<"clients">;
+  orderId: Id<"orders"> | null;
 }
 
-export default function CreateOrderModal({
+export default function EditOrderModal({
   isOpen,
   onClose,
   onSuccess,
-  preselectedClientId,
-}: CreateOrderModalProps) {
+  orderId,
+}: EditOrderModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedClientId, setSelectedClientId] = useState<Id<"clients"> | null>(preselectedClientId || null);
+  const [selectedClientId, setSelectedClientId] = useState<Id<"clients"> | null>(null);
   const [orderItem, setOrderItem] = useState<OrderItem>({
     product: "",
     quantityKg: 0,
     unitPrice: 0,
     exclusiveValue: 0,
-    gstRate: 0, // Default to 0 instead of undefined
+    gstRate: 18, // Default 18% GST
     gstAmount: 0,
     inclusiveTotal: 0,
     // Discount fields
     discountType: undefined,
     discountValue: undefined,
     discountAmount: 0,
+    // New
     bloom: undefined,
     mesh: undefined,
     lotNumbers: [],
   });
-  const [gstRateInput, setGstRateInput] = useState("0"); // Track GST rate input as string
+  const [gstRateInput, setGstRateInput] = useState("18"); // Track GST rate input as string
   const [selectedFiscalYear, setSelectedFiscalYear] = useState(getCurrentFiscalYear()); // Default to current fiscal year
   // Timeline fields
   const [orderCreationDate, setOrderCreationDate] = useState("");
@@ -71,23 +72,48 @@ export default function CreateOrderModal({
   const [shippingOrderNumber, setShippingOrderNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [freightCost, setFreightCost] = useState(0);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createdOrderId, setCreatedOrderId] = useState<Id<"orders"> | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
-  const [orderCreationAttempted, setOrderCreationAttempted] = useState(false);
-  const [invoiceNumber, setInvoiceNumber] = useState("");
 
+  const order = useQuery(api.orders.get, orderId ? { id: orderId } : "skip");
   const clients = useQuery(api.clients.list, {});
   const bankAccounts = useQuery(api.banks.list);
-  const createOrder = useMutation(api.orders.create);
+  const updateOrder = useMutation(api.orders.update);
 
-  // Handle preselected client changes
+  // Populate form with existing order data
   useEffect(() => {
-    if (preselectedClientId) {
-      setSelectedClientId(preselectedClientId);
-      setCurrentStep(2); // Skip client selection step
+    if (order && order.items && order.items.length > 0) {
+      const item = order.items[0]; // Assuming single item for now
+      setSelectedClientId(order.clientId);
+      setOrderItem({
+        product: item.product,
+        quantityKg: item.quantityKg,
+        unitPrice: item.unitPrice,
+        exclusiveValue: item.exclusiveValue || 0,
+        gstRate: item.gstRate || 18,
+        gstAmount: item.gstAmount || 0,
+        inclusiveTotal: item.inclusiveTotal || 0,
+        // Discount fields
+        discountType: item.discountType,
+        discountValue: item.discountValue,
+        discountAmount: item.discountAmount || 0,
+        // New
+        bloom: (item as any).bloom,
+        mesh: (item as any).mesh,
+        lotNumbers: (item as any).lotNumbers || [],
+      });
+      setOrderCreationDate(order.orderCreationDate ? new Date(order.orderCreationDate).toISOString().split('T')[0] : "");
+      setFactoryDepartureDate(order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toISOString().split('T')[0] : "");
+      setEstimatedDepartureDate(order.estimatedDepartureDate ? new Date(order.estimatedDepartureDate).toISOString().split('T')[0] : "");
+      setEstimatedArrivalDate(order.estimatedArrivalDate ? new Date(order.estimatedArrivalDate).toISOString().split('T')[0] : "");
+      setTimelineNotes(order.timelineNotes || "");
+      setShipmentMethod(order.shipmentMethod || "");
+      setShippingCompany(order.shippingCompany || "");
+      setShippingOrderNumber(order.shippingOrderNumber || "");
+      setNotes(order.notes || "");
+      setFreightCost(order.freightCost || 0);
     }
-  }, [preselectedClientId]);
+  }, [order]);
 
   // Calculate order total
   const orderTotal = (orderItem.inclusiveTotal || 0) + freightCost;
@@ -106,42 +132,24 @@ export default function CreateOrderModal({
       setOrderItem(updatedItem);
       return;
     } else {
-      // Handle GST rate specially to avoid string concatenation issues
-      if (field === "gstRate") {
-        const stringValue = value.toString();
-        setGstRateInput(stringValue); // Update the input string
-        
-        // If the value is empty or just a decimal point, set to 0
-        if (stringValue === "" || stringValue === ".") {
-          updatedItem.gstRate = 0;
-        } else {
-          const numValue = parseFloat(stringValue);
-          // Allow any valid number (including over 100) for input, but validate later
-          if (!isNaN(numValue) && numValue >= 0) {
-            updatedItem.gstRate = numValue;
-          } else {
-            // If invalid, keep the current value but don't update the number
-            return;
-          }
-        }
-      } else {
-        const numValue = typeof value === "string" ? parseFloat(value) || 0 : value;
-        
-        // Update the specific field
-        if (field === "quantityKg") {
-          updatedItem.quantityKg = numValue;
-        } else if (field === "unitPrice") {
-          updatedItem.unitPrice = numValue;
-        } else if (field === "discountType") {
-          updatedItem.discountType = value === "" ? undefined : (value as "amount" | "percentage");
-        } else if (field === "discountValue") {
-          updatedItem.discountValue = numValue;
-        }
+      const numValue = typeof value === "string" ? parseFloat(value) || 0 : value;
+      
+      // Update the specific field
+      if (field === "quantityKg") {
+        updatedItem.quantityKg = numValue;
+      } else if (field === "unitPrice") {
+        updatedItem.unitPrice = numValue;
+      } else if (field === "gstRate") {
+        updatedItem.gstRate = numValue;
+      } else if (field === "discountType") {
+        updatedItem.discountType = value === "" ? undefined : (value as "amount" | "percentage");
+      } else if (field === "discountValue") {
+        updatedItem.discountValue = numValue;
       }
       
       // Recalculate all values
       updatedItem.exclusiveValue = updatedItem.quantityKg * updatedItem.unitPrice;
-      updatedItem.gstAmount = updatedItem.gstRate ? (updatedItem.exclusiveValue * updatedItem.gstRate) / 100 : 0;
+      updatedItem.gstAmount = (updatedItem.exclusiveValue * updatedItem.gstRate) / 100;
       const totalBeforeDiscount = updatedItem.exclusiveValue + updatedItem.gstAmount;
       
       // Calculate discount on total (after GST)
@@ -163,43 +171,26 @@ export default function CreateOrderModal({
   };
 
   const handleNext = async () => {
-    if (isCreating) return; // Prevent multiple calls while creating
+    if (isUpdating) return; // Prevent multiple calls while updating
     
     if (currentStep === 1 && !selectedClientId) {
       alert("Please select a client");
       return;
     }
-    if (currentStep === 2) {
-      if (!orderItem.product || orderItem.quantityKg <= 0 || orderItem.unitPrice <= 0) {
-        alert("Please fill in all order details with valid values");
-        return;
-      }
-      if (orderItem.gstRate < 0) {
-        alert("GST rate cannot be negative");
-        return;
-      }
-      if (orderItem.gstRate > 100) {
-        alert("GST rate cannot be more than 100%");
-        return;
-      }
+    
+    if (currentStep === 2 && (!orderItem.product || orderItem.quantityKg <= 0 || orderItem.unitPrice <= 0)) {
+      alert("Please fill in all required fields");
+      return;
     }
     if (currentStep === 3) {
       // Timeline step - no validation needed
     }
-    if (currentStep === 4) {
-      // Review step - create the order
-      console.log('Moving from step 4 (review) to submit, creating order...', { createdOrderId, isCreating, orderCreationAttempted });
-      setOrderCreationAttempted(true);
-      try {
-        await handleSubmit(true); // Create order and close modal
-      } catch (error) {
-        console.error('Failed to create order during step transition:', error);
-        setOrderCreationAttempted(false);
-      }
-      return;
+    
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    } else if (currentStep === 4) {
+      await handleSubmit();
     }
-
-    setCurrentStep(currentStep + 1);
   };
 
   const handleBack = () => {
@@ -207,26 +198,25 @@ export default function CreateOrderModal({
   };
 
   const resetForm = () => {
-    setCurrentStep(preselectedClientId ? 2 : 1);
-    setSelectedClientId(preselectedClientId || null);
+    setCurrentStep(1);
+    setSelectedClientId(null);
     setOrderItem({
       product: "",
       quantityKg: 0,
       unitPrice: 0,
       exclusiveValue: 0,
-      gstRate: 0, // Default to 0 instead of undefined
+      gstRate: 18,
       gstAmount: 0,
       inclusiveTotal: 0,
       // Discount fields
       discountType: undefined,
       discountValue: undefined,
       discountAmount: 0,
+      // New
       bloom: undefined,
       mesh: undefined,
       lotNumbers: [],
     });
-    setGstRateInput("0"); // Reset the GST rate input string
-    setSelectedFiscalYear(getCurrentFiscalYear()); // Reset to current fiscal year
     setOrderCreationDate("");
     setFactoryDepartureDate("");
     setEstimatedDepartureDate("");
@@ -238,10 +228,7 @@ export default function CreateOrderModal({
     setShippingOrderNumber("");
     setNotes("");
     setFreightCost(0);
-    setCreatedOrderId(null);
-    setOrderCreationAttempted(false);
     setClientSearchQuery("");
-    setInvoiceNumber("");
   };
 
   const handleClose = () => {
@@ -249,16 +236,15 @@ export default function CreateOrderModal({
     onClose();
   };
 
-  const handleSubmit = async (shouldClose: boolean = true) => {
-    if (!selectedClientId || isCreating) return;
+  const handleSubmit = async () => {
+    if (!selectedClientId || !orderId || isUpdating) return;
 
-    console.log('Creating order...', { shouldClose, currentStep, createdOrderId });
-    setIsCreating(true);
+    console.log('Updating order...', { orderId, currentStep });
+    setIsUpdating(true);
     try {
-      const result = await createOrder({
+      await updateOrder({
+        orderId,
         clientId: selectedClientId,
-        invoiceNumber: invoiceNumber.trim() || undefined,
-        fiscalYear: selectedFiscalYear,
         currency: "USD",
         notes,
         freightCost: freightCost || 0,
@@ -274,9 +260,6 @@ export default function CreateOrderModal({
         shippingOrderNumber: shippingOrderNumber || undefined,
         items: [{
           product: orderItem.product,
-          bloom: orderItem.bloom,
-          mesh: orderItem.mesh,
-          lotNumbers: orderItem.lotNumbers && orderItem.lotNumbers.length ? orderItem.lotNumbers : undefined,
           quantityKg: orderItem.quantityKg,
           unitPrice: orderItem.unitPrice,
           exclusiveValue: orderItem.exclusiveValue,
@@ -287,28 +270,23 @@ export default function CreateOrderModal({
           discountType: orderItem.discountType,
           discountValue: orderItem.discountValue,
           discountAmount: orderItem.discountAmount,
+          // New
+          bloom: orderItem.bloom,
+          mesh: orderItem.mesh,
+          lotNumbers: orderItem.lotNumbers && orderItem.lotNumbers.length ? orderItem.lotNumbers : undefined,
         }],
       });
 
-      const orderId = (result as any).orderId;
-      const invoiceId = (result as any).invoiceId;
+      console.log('Order updated successfully');
 
-      console.log('Order created successfully:', orderId);
-      setCreatedOrderId(orderId);
-      setOrderCreationAttempted(false); // Reset the flag after successful creation
-
-      // Always call onSuccess when order is created, regardless of shouldClose
       onSuccess?.();
-
-      if (shouldClose) {
-        resetForm();
-        onClose();
-      }
+      resetForm();
+      onClose();
     } catch (error) {
-      console.error("Failed to create order:", error);
+      console.error("Failed to update order:", error);
       
       // Provide more specific error messages based on the error type
-      let errorMessage = "Failed to create order. Please try again.";
+      let errorMessage = "Failed to update order. Please try again.";
       
       if (error instanceof Error) {
         const errorStr = error.message.toLowerCase();
@@ -324,9 +302,9 @@ export default function CreateOrderModal({
         } else if (errorStr.includes("network") || errorStr.includes("connection")) {
           errorMessage = "Network connection error. Please check your internet connection and try again.";
         } else if (errorStr.includes("permission") || errorStr.includes("unauthorized")) {
-          errorMessage = "You don't have permission to create orders. Please contact your administrator.";
-        } else if (errorStr.includes("duplicate") || errorStr.includes("already exists")) {
-          errorMessage = "An order with similar details already exists. Please check and modify the order details.";
+          errorMessage = "You don't have permission to update orders. Please contact your administrator.";
+        } else if (errorStr.includes("not found") || errorStr.includes("doesn't exist")) {
+          errorMessage = "Order not found. The order may have been deleted or you don't have access to it.";
         } else if (errorStr.includes("fiscal year") || errorStr.includes("year")) {
           errorMessage = "Fiscal year information is invalid. Please select a valid fiscal year.";
         } else {
@@ -340,28 +318,25 @@ export default function CreateOrderModal({
       
       alert(errorMessage);
     } finally {
-      setIsCreating(false);
+      setIsUpdating(false);
     }
   };
 
   // Filter and sort clients
   const filteredAndSortedClients = clients
     ? clients
-        .filter(client => {
-          const q = clientSearchQuery.toLowerCase();
-          return (
-            (client.name || "").toLowerCase().includes(q) ||
-            (client.contactPerson || "").toLowerCase().includes(q) ||
-            (client.city || "").toLowerCase().includes(q) ||
-            (client.country || "").toLowerCase().includes(q)
-          );
-        })
-        .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+        .filter(client => 
+          client.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+          client.contactPerson?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+          client.city?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+          client.country?.toLowerCase().includes(clientSearchQuery.toLowerCase())
+        )
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     : [];
 
   const selectedClient = clients?.find(c => c._id === selectedClientId);
 
-  if (!isOpen) return null;
+  if (!isOpen || !orderId) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -372,7 +347,7 @@ export default function CreateOrderModal({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Create New Order</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Edit Order</h2>
                               <p className="mt-1 text-sm text-gray-600">
                   Step {currentStep} of 4
                 </p>
@@ -387,154 +362,72 @@ export default function CreateOrderModal({
 
           {/* Progress Bar */}
           <div className="px-6 py-3 border-b">
-                          <div className="flex items-center justify-between">
-                {[1, 2, 3, 4].map((step) => (
-                  <div
-                    key={step}
-                    className={`flex-1 h-2 mx-1 rounded ${
-                      step <= currentStep ? "bg-primary" : "bg-gray-200"
-                    }`}
-                  />
-                ))}
-              </div>
-              <div className="flex items-center justify-between mt-2">
-                <span className="text-xs text-gray-600">Select Client</span>
-                <span className="text-xs text-gray-600">Order Details</span>
-                <span className="text-xs text-gray-600">Timeline & Shipment</span>
-                <span className="text-xs text-gray-600">Review</span>
-              </div>
+            <div className="flex items-center justify-between">
+              {[1, 2, 3, 4].map((step) => (
+                <div
+                  key={step}
+                  className={`flex-1 h-2 mx-1 rounded ${
+                    step <= currentStep ? "bg-primary" : "bg-gray-200"
+                  }`}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between text-xs text-gray-500 mt-2">
+              <span>Client</span>
+              <span>Order Details</span>
+              <span>Timeline</span>
+              <span>Review</span>
+            </div>
           </div>
 
           {/* Content */}
-          <div className="p-6" style={{ minHeight: "400px" }}>
-            {/* Step 1: Select Client */}
+          <div className="p-6">
+            {/* Step 1: Client Selection */}
             {currentStep === 1 && (
-              <div>
+              <div className="space-y-4">
                 <h3 className="text-lg font-medium mb-4">Select Client</h3>
                 
-                {/* Search Bar */}
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
+                    placeholder="Search clients..."
                     value={clientSearchQuery}
                     onChange={(e) => setClientSearchQuery(e.target.value)}
-                    placeholder="Search clients by name, contact person, city, or country..."
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-primary focus:border-primary"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                   />
                 </div>
 
-                {/* Client List */}
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {filteredAndSortedClients.length > 0 ? (
-                    filteredAndSortedClients.map((client) => (
-                      <label
-                        key={client._id}
-                        className={`flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
-                          selectedClientId === client._id
-                            ? "border-primary bg-primary/5"
-                            : "border-gray-200"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="client"
-                          value={client._id}
-                          checked={selectedClientId === client._id}
-                          onChange={() => setSelectedClientId(client._id)}
-                          className="mr-3 text-primary focus:ring-primary"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{client.name}</p>
-                          <p className="text-sm text-gray-600 truncate">
-                            {client.contactPerson}
-                          </p>
-                          <p className="text-sm text-gray-500 truncate">
-                            {client.city}, {client.country} • {client.type}
-                          </p>
-                        </div>
-                        <div className="flex-shrink-0">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              client.status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}
-                          >
-                            {client.status}
-                          </span>
-                        </div>
-                      </label>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <p className="text-gray-500">
-                        {clientSearchQuery ? "No clients found matching your search." : "No clients available."}
-                      </p>
-                      {clientSearchQuery && (
-                        <button
-                          onClick={() => setClientSearchQuery("")}
-                          className="mt-2 text-sm text-primary hover:text-primary-dark"
-                        >
-                          Clear search
-                        </button>
-                      )}
-                    </div>
-                  )}
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {filteredAndSortedClients.map((client) => (
+                    <button
+                      key={client._id}
+                      onClick={() => setSelectedClientId(client._id)}
+                      className={`w-full text-left p-3 rounded-md border transition-colors ${
+                        selectedClientId === client._id
+                          ? "border-primary bg-primary/5"
+                          : "border-gray-200 hover:border-gray-300"
+                      }`}
+                    >
+                      <div className="font-medium">{client.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {client.contactPerson} • {client.city}, {client.country}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-
-                {/* Results count */}
-                {filteredAndSortedClients.length > 0 && (
-                  <div className="mt-3 text-sm text-gray-600 text-center">
-                    Showing {filteredAndSortedClients.length} of {clients?.length || 0} clients
-                  </div>
-                )}
               </div>
             )}
 
             {/* Step 2: Order Details */}
             {currentStep === 2 && (
-              <div>
+              <div className="space-y-4">
                 <h3 className="text-lg font-medium mb-4">Order Details</h3>
-
-                <div className="border rounded-lg p-4">
-                  {/* Invoice Number */}
-                  <div className="mb-4">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Invoice Number <span className="text-gray-500">(Optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="Enter invoice number (e.g., INV-2025-0001) or leave blank for auto-generation"
-                    />
-                  </div>
-
-                  {/* Fiscal Year */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Fiscal Year <span className="text-gray-500">(For Order Number)</span>
-                    </label>
-                    <select
-                      value={selectedFiscalYear}
-                      onChange={(e) => setSelectedFiscalYear(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                    >
-                      {getFiscalYearOptions().map(option => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Order number will be generated as: ORD-{getFiscalYearLabel(selectedFiscalYear).replace('FY ', '')}-001
-                    </p>
-                  </div>
-
-                  {/* Product Name */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Product Name
+                      Product Name *
                     </label>
                     <input
                       type="text"
@@ -544,211 +437,198 @@ export default function CreateOrderModal({
                       placeholder="Enter product name"
                     />
                   </div>
-                  {/* Product specs: Bloom, Mesh */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
-                      <input
-                        type="number"
-                        value={orderItem.bloom ?? ""}
-                        onChange={(e) => handleUpdateItem("bloom", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        placeholder="e.g., 250"
-                        min="0"
-                        step="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>
-                      <input
-                        type="number"
-                        value={orderItem.mesh ?? ""}
-                        onChange={(e) => handleUpdateItem("mesh", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        placeholder="e.g., 80"
-                        min="0"
-                        step="1"
-                      />
-                    </div>
-                  </div>
-                  {/* Lot numbers */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Lot Numbers (comma-separated)</label>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
                     <input
-                      type="text"
-                      value={(orderItem.lotNumbers || []).join(", ")}
-                      onChange={(e) => setOrderItem({ ...orderItem, lotNumbers: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })}
+                      type="number"
+                      value={orderItem.bloom ?? ""}
+                      onChange={(e) => handleUpdateItem("bloom", e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="e.g., 12345, 67890"
+                      placeholder="e.g., 250"
+                      min={0}
+                      step={1}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>
+                    <input
+                      type="number"
+                      value={orderItem.mesh ?? ""}
+                      onChange={(e) => handleUpdateItem("mesh", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      placeholder="e.g., 80"
+                      min={0}
+                      step={1}
                     />
                   </div>
 
-                  {/* Quantity and Rate */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantity (kg) *
+                    </label>
+                    <input
+                      type="number"
+                      value={orderItem.quantityKg}
+                      onChange={(e) => handleUpdateItem("quantityKg", parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      placeholder="0"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Unit Price (per kg) *
+                    </label>
+                    <input
+                      type="number"
+                      value={orderItem.unitPrice}
+                      onChange={(e) => handleUpdateItem("unitPrice", parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      placeholder="0"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      GST Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      value={gstRateInput}
+                      onChange={(e) => {
+                        setGstRateInput(e.target.value);
+                        const numValue = parseFloat(e.target.value) || 0;
+                        if (numValue >= 0) {
+                          handleUpdateItem("gstRate", numValue);
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      placeholder="18"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+
+                </div>
+
+                {/* Discount Section */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Quantity (kg)
+                        Discount Type
                       </label>
-                      <input
-                        type="number"
-                        value={orderItem.quantityKg || ""}
-                        onChange={(e) => handleUpdateItem("quantityKg", e.target.value)}
+                      <select
+                        value={orderItem.discountType || ""}
+                        onChange={(e) => handleUpdateItem("discountType", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        placeholder="0.00"
-                        min="0"
-                        step="0.01"
-                      />
+                      >
+                        <option value="">No discount</option>
+                        <option value="amount">Fixed Amount</option>
+                        <option value="percentage">Percentage</option>
+                      </select>
                     </div>
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Rate ($ per kg)
+                        {orderItem.discountType === "amount" ? "Discount Amount ($)" : 
+                         orderItem.discountType === "percentage" ? "Discount Percentage (%)" : 
+                         "Discount Value"}
                       </label>
                       <input
                         type="number"
-                        value={orderItem.unitPrice || ""}
-                        onChange={(e) => handleUpdateItem("unitPrice", e.target.value)}
+                        value={orderItem.discountValue || ""}
+                        onChange={(e) => handleUpdateItem("discountValue", parseFloat(e.target.value) || 0)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        placeholder="0.00"
+                        placeholder={orderItem.discountType === "amount" ? "0.00" : 
+                                    orderItem.discountType === "percentage" ? "0" : ""}
                         min="0"
-                        step="0.01"
+                        step={orderItem.discountType === "amount" ? "0.01" : "0.1"}
+                        disabled={!orderItem.discountType}
                       />
                     </div>
                   </div>
 
-                  {/* Calculations */}
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
+                  {orderItem.discountType && orderItem.discountValue && (
+                    <div className="mb-4">
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Ex. Value (Before GST)
+                        Total Before Discount
                       </label>
-                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                        ${orderItem.exclusiveValue.toFixed(2)}
+                      <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
+                        ${(orderItem.exclusiveValue + orderItem.gstAmount).toFixed(2)}
+                      </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
+                        Calculated Discount Amount
+                      </label>
+                      <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
+                        ${orderItem.discountAmount?.toFixed(2) || "0.00"}
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Calculation Summary */}
+                <div className="bg-gray-50 p-4 rounded-md">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Calculation Summary</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        GST Rate (%)
-                      </label>
-                      <input
-                        type="number"
-                        value={gstRateInput}
-                        onChange={(e) => handleUpdateItem("gstRate", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        placeholder="0"
-                        min="0"
-                        step="0.1"
-                      />
+                      <span className="text-gray-600">Exclusive Value:</span>
+                      <div className="font-medium">${orderItem.exclusiveValue.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">GST Amount:</span>
+                      <div className="font-medium">${orderItem.gstAmount.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">GST Rate:</span>
+                      <div className="font-medium">{orderItem.gstRate}%</div>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Total:</span>
+                      <div className="font-medium text-primary">${orderItem.inclusiveTotal.toFixed(2)}</div>
                     </div>
                   </div>
+                </div>
 
-                  {/* Discount Section */}
-                  <div className="border-t pt-4 mt-4">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
-                    
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Discount Type
-                        </label>
-                        <select
-                          value={orderItem.discountType || ""}
-                          onChange={(e) => handleUpdateItem("discountType", e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        >
-                          <option value="">No discount</option>
-                          <option value="amount">Fixed Amount</option>
-                          <option value="percentage">Percentage</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {orderItem.discountType === "amount" ? "Discount Amount ($)" : 
-                           orderItem.discountType === "percentage" ? "Discount Percentage (%)" : 
-                           "Discount Value"}
-                        </label>
-                        <input
-                          type="number"
-                          value={orderItem.discountValue || ""}
-                          onChange={(e) => handleUpdateItem("discountValue", e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                          placeholder={orderItem.discountType === "amount" ? "0.00" : 
-                                      orderItem.discountType === "percentage" ? "0" : ""}
-                          min="0"
-                          step={(orderItem.discountType === "amount" ? "0.01" : "0.1") as any}
-                          disabled={!orderItem.discountType}
-                        />
-                      </div>
-                    </div>
-
-                    {orderItem.discountType && orderItem.discountValue && (
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Total Before Discount
-                        </label>
-                        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
-                          ${(orderItem.exclusiveValue + orderItem.gstAmount).toFixed(2)}
-                        </div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
-                          Calculated Discount Amount
-                        </label>
-                        <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
-                          ${orderItem.discountAmount?.toFixed(2) || "0.00"}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* GST Amount and Total */}
+                {/* Freight Cost */}
+                <div className="border-t pt-4 mt-4">
+                  <h4 className="text-sm font-medium text-gray-700 mb-3">Freight Cost</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        GST Amount
+                        Freight Cost ($)
                       </label>
-                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                        ${orderItem.gstAmount.toFixed(2)}
-                      </div>
+                      <input
+                        type="number"
+                        value={freightCost || ""}
+                        onChange={(e) => setFreightCost(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Inclusive Total (Including GST)
+                        Product Total
                       </label>
-                      <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
+                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
                         ${orderItem.inclusiveTotal.toFixed(2)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Freight Cost */}
-                  <div className="mt-4 pt-4 border-t">
-                    <h4 className="text-sm font-medium text-gray-700 mb-3">Freight Cost</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Freight Cost ($)
-                        </label>
-                        <input
-                          type="number"
-                          value={freightCost || ""}
-                          onChange={(e) => setFreightCost(parseFloat(e.target.value) || 0)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                          placeholder="0.00"
-                          min="0"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Product Total
-                        </label>
-                        <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                          ${orderItem.inclusiveTotal.toFixed(2)}
-                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-4 border-t">
+                {/* Order Total Summary */}
+                <div className="bg-primary/5 p-4 rounded-md border border-primary/20">
+                  <h4 className="text-sm font-medium text-gray-700 mb-2">Order Total</h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Product Total:</span>
@@ -908,7 +788,7 @@ export default function CreateOrderModal({
             {/* Step 4: Review & Confirm */}
             {currentStep === 4 && (
               <div>
-                <h3 className="text-lg font-medium mb-4">Review Order</h3>
+                <h3 className="text-lg font-medium mb-4">Review Order Changes</h3>
 
                 <div className="space-y-4">
                   {/* Client Info */}
@@ -1035,6 +915,8 @@ export default function CreateOrderModal({
                 </div>
               </div>
             )}
+
+
           </div>
 
           {/* Footer */}
@@ -1055,16 +937,15 @@ export default function CreateOrderModal({
                 Next
                 <ChevronRight className="h-4 w-4 ml-1" />
               </button>
-            ) : currentStep === 4 ? (
+            ) : (
               <button
-                onClick={() => handleSubmit()}
-                disabled={isCreating}
+                onClick={handleSubmit}
+                disabled={isUpdating}
                 className="flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isCreating ? "Creating..." : "Create Order"}
-                <ChevronRight className="h-4 w-4 ml-1" />
+                {isUpdating ? "Updating..." : "Update Order"}
               </button>
-            ) : null}
+            )}
           </div>
         </div>
       </div>

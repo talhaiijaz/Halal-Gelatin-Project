@@ -1,11 +1,38 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
+// Helper function to format currency
+function formatCurrency(amount: number, currency: string = "USD"): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency,
+  }).format(amount);
+}
+
+async function logEvent(ctx: any, params: { entityTable: string; entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
+  try {
+    await ctx.db.insert("logs", {
+      entityTable: params.entityTable,
+      entityId: params.entityId,
+      action: params.action,
+      message: params.message,
+      metadata: params.metadata,
+      userId: params.userId as any,
+      createdAt: Date.now(),
+    });
+  } catch (e) {
+    // Never throw from logging; best-effort
+  }
+}
 
 // Record a new payment
 export const recordPayment = mutation({
   args: {
-    invoiceId: v.id("invoices"),
+    type: v.optional(v.union(v.literal("invoice"), v.literal("advance"))),
+    // If invoiceId is provided -> invoice payment; otherwise requires clientId and is an advance payment
+    invoiceId: v.optional(v.id("invoices")),
+    clientId: v.optional(v.id("clients")),
     amount: v.number(),
     method: v.union(
       v.literal("bank_transfer"),
@@ -17,59 +44,126 @@ export const recordPayment = mutation({
     reference: v.string(),
     paymentDate: v.optional(v.number()),
     notes: v.optional(v.string()),
+    bankAccountId: v.optional(v.id("bankAccounts")), // Add bank account integration
+    // Withholding fields (optional; apply to local clients only)
+    withheldTaxRate: v.optional(v.number()), // e.g., 4, 5 or custom
   },
   handler: async (ctx, args) => {
-    
-    
-
-    // Get the invoice
-    const invoice = await ctx.db.get(args.invoiceId);
-    if (!invoice) throw new Error("Invoice not found");
-
-    // Validate payment amount
+    // Validate amount
     if (args.amount <= 0) {
       throw new Error("Payment amount must be greater than 0");
     }
 
-    if (args.amount > invoice.outstandingBalance) {
-      throw new Error(`Payment amount exceeds outstanding balance of ${invoice.outstandingBalance}`);
+    let currency = "USD";
+    let clientId;
+    let paymentType: "invoice" | "advance" = (args.type as any) || "invoice";
+
+    if (args.invoiceId) {
+      const invoice = await ctx.db.get(args.invoiceId);
+      if (!invoice) throw new Error("Invoice not found");
+
+      // Validate against outstanding balance for invoice payments
+      if (args.amount > invoice.outstandingBalance) {
+        throw new Error(`Payment amount (${args.amount}) exceeds outstanding balance (${invoice.outstandingBalance})`);
+      }
+
+      currency = invoice.currency;
+      clientId = invoice.clientId;
+
+      // Determine if client is local and withholding applies
+      const clientOfInvoice = await ctx.db.get(invoice.clientId);
+      const isLocalClient = clientOfInvoice?.type === "local";
+      const rate = isLocalClient && args.withheldTaxRate ? Math.max(0, args.withheldTaxRate) : 0;
+      const withheldAmount = rate > 0 ? Math.round((args.amount * rate) / 100) : 0;
+      const netCash = Math.max(0, args.amount - withheldAmount);
+
+      // Create payment record (respect requested type; default to 'invoice')
+      const paymentId = await ctx.db.insert("payments", {
+        type: paymentType,
+        invoiceId: args.invoiceId,
+        clientId,
+        amount: args.amount,
+        currency,
+        paymentDate: args.paymentDate || Date.now(),
+        method: args.method,
+        reference: args.reference,
+        notes: args.notes,
+        bankAccountId: args.bankAccountId,
+        cashReceived: netCash,
+        withheldTaxRate: rate > 0 ? rate : undefined,
+        withheldTaxAmount: rate > 0 ? withheldAmount : undefined,
+        recordedBy: undefined as any,
+        createdAt: Date.now(),
+      });
+      await logEvent(ctx, {
+        entityTable: "payments",
+        entityId: String(paymentId),
+        action: "create",
+        message: `Payment recorded for invoice ${invoice.invoiceNumber || String(invoice._id)}: ${args.amount}`,
+        metadata: { invoiceId: args.invoiceId, clientId, netCash, withheldAmount, rate },
+      });
+
+
+
+      // Update invoice aggregates
+      const newTotalPaid = invoice.totalPaid + args.amount; // invoice credited by gross amount
+      const newOutstandingBalance = Math.max(0, invoice.amount - newTotalPaid);
+      let newStatus: "unpaid" | "partially_paid" | "paid";
+      if (newOutstandingBalance === 0) newStatus = "paid";
+      else if (newTotalPaid > 0) newStatus = "partially_paid";
+      else newStatus = "unpaid";
+
+      await ctx.db.patch(args.invoiceId, {
+        totalPaid: newTotalPaid,
+        outstandingBalance: newOutstandingBalance,
+        status: newStatus,
+        updatedAt: Date.now(),
+      });
+
+      return paymentId;
     }
 
-    // Create payment record
+    // Advance payment path
+    if (!args.clientId) {
+      throw new Error("For advance payments, clientId is required");
+    }
+    const client = await ctx.db.get(args.clientId);
+    if (!client) throw new Error("Client not found");
+
+    // Use a default currency for advances; could be improved by client default
+    currency = "USD";
+    clientId = args.clientId;
+    paymentType = "advance";
+
+    const rateForAdvance = client.type === "local" && args.withheldTaxRate ? Math.max(0, args.withheldTaxRate) : 0;
+    const withheldForAdvance = rateForAdvance > 0 ? Math.round((args.amount * rateForAdvance) / 100) : 0;
+    const netCashAdvance = Math.max(0, args.amount - withheldForAdvance);
+
     const paymentId = await ctx.db.insert("payments", {
-      invoiceId: args.invoiceId,
+      type: paymentType,
+      clientId,
       amount: args.amount,
-      currency: invoice.currency,
+      currency,
       paymentDate: args.paymentDate || Date.now(),
       method: args.method,
       reference: args.reference,
       notes: args.notes,
-      recordedBy: "system" as any, // Removed auth
+      bankAccountId: args.bankAccountId,
+      cashReceived: netCashAdvance,
+      withheldTaxRate: rateForAdvance > 0 ? rateForAdvance : undefined,
+      withheldTaxAmount: rateForAdvance > 0 ? withheldForAdvance : undefined,
+      recordedBy: undefined as any,
       createdAt: Date.now(),
     });
-
-    // Update invoice
-    const newTotalPaid = invoice.totalPaid + args.amount;
-    const newOutstandingBalance = invoice.amount - newTotalPaid;
-    
-    // Determine new status
-    let newStatus: "draft" | "sent" | "due" | "partially_paid" | "paid" | "overdue";
-    if (newOutstandingBalance === 0) {
-      newStatus = "paid";
-    } else if (newTotalPaid > 0) {
-      newStatus = "partially_paid";
-    } else if (invoice.dueDate < Date.now()) {
-      newStatus = "overdue";
-    } else {
-      newStatus = invoice.status;
-    }
-
-    await ctx.db.patch(args.invoiceId, {
-      totalPaid: newTotalPaid,
-      outstandingBalance: newOutstandingBalance,
-      status: newStatus,
-      updatedAt: Date.now(),
+    await logEvent(ctx, {
+      entityTable: "payments",
+      entityId: String(paymentId),
+      action: "create",
+      message: `Advance payment recorded for client ${client.name || String(client._id)}: ${args.amount}`,
+      metadata: { clientId, netCashAdvance, withheldForAdvance, rateForAdvance },
     });
+
+
 
     return paymentId;
   },
@@ -83,11 +177,9 @@ export const list = query({
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
     method: v.optional(v.string()),
+    fiscalYear: v.optional(v.number()), // Add fiscal year filter
   },
   handler: async (ctx, args) => {
-    
-    
-
     let payments = await ctx.db.query("payments").order("desc").collect();
 
     // Filter by invoice
@@ -102,7 +194,7 @@ export const list = query({
         .withIndex("by_client", q => q.eq("clientId", args.clientId!))
         .collect();
       const invoiceIds = clientInvoices.map(i => i._id);
-      payments = payments.filter(p => invoiceIds.includes(p.invoiceId));
+      payments = payments.filter(p => p.invoiceId && invoiceIds.includes(p.invoiceId));
     }
 
     // Filter by date range
@@ -118,19 +210,29 @@ export const list = query({
       payments = payments.filter(p => p.method === args.method);
     }
 
+    // Filter by fiscal year (through orders)
+    if (args.fiscalYear) {
+      const allOrders = await ctx.db.query("orders").collect();
+      const allInvoices = await ctx.db.query("invoices").collect();
+      
+      payments = payments.filter(payment => {
+        const invoice = payment.invoiceId ? allInvoices.find(inv => inv._id === payment.invoiceId) : null;
+        if (!invoice) return false; // only invoice-linked payments participate in FY filter
+        const order = allOrders.find(o => o._id === invoice.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
     // Enrich with invoice and client data
     const enrichedPayments = await Promise.all(
       payments.map(async (payment) => {
-        const invoice = await ctx.db.get(payment.invoiceId);
-        let client = null;
+        const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
+        const client = await ctx.db.get(payment.clientId);
         let order = null;
+        if (invoice) order = await ctx.db.get(invoice.orderId);
 
-        if (invoice) {
-          client = await ctx.db.get(invoice.clientId);
-          order = await ctx.db.get(invoice.orderId);
-        }
-
-        const recordedBy = await ctx.db.get(payment.recordedBy);
+        const recordedBy = payment.recordedBy ? await ctx.db.get(payment.recordedBy) : null;
+        const bankAccount = payment.bankAccountId ? await ctx.db.get(payment.bankAccountId) : null;
 
         return {
           ...payment,
@@ -148,6 +250,12 @@ export const list = query({
           order: order ? {
             _id: order._id,
             orderNumber: order.orderNumber,
+          } : null,
+          bankAccount: bankAccount ? {
+            _id: bankAccount._id,
+            accountName: bankAccount.accountName,
+            bankName: bankAccount.bankName,
+            accountNumber: bankAccount.accountNumber,
           } : null,
           recordedByUser: recordedBy ? {
             _id: recordedBy._id,
@@ -167,23 +275,34 @@ export const getStats = query({
   args: {
     startDate: v.optional(v.number()),
     endDate: v.optional(v.number()),
+    fiscalYear: v.optional(v.number()), // Add fiscal year filter
   },
   handler: async (ctx, args) => {
-    
-    
-
-    const startDate = args.startDate || new Date(new Date().getFullYear(), 0, 1).getTime();
+    // Default to current fiscal year if no start date provided
+    const now = new Date();
+    const fiscalYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const startDate = args.startDate || new Date(fiscalYear, 6, 1).getTime(); // July 1
     const endDate = args.endDate || Date.now();
 
-    const payments = await ctx.db
-      .query("payments")
-      .filter(q => 
-        q.and(
-          q.gte(q.field("paymentDate"), startDate),
-          q.lte(q.field("paymentDate"), endDate)
-        )
-      )
-      .collect();
+    let payments = await ctx.db.query("payments").collect();
+
+    // Filter by fiscal year if provided
+    if (args.fiscalYear) {
+      const allOrders = await ctx.db.query("orders").collect();
+      const allInvoices = await ctx.db.query("invoices").collect();
+      
+      payments = payments.filter(payment => {
+        const invoice = allInvoices.find(inv => inv._id === payment.invoiceId);
+        if (!invoice) return false;
+        const order = allOrders.find(o => o._id === invoice.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
+    // Filter by date range
+    payments = payments.filter(p => 
+      p.paymentDate >= startDate && p.paymentDate <= endDate
+    );
 
     // Calculate statistics by method
     const methodStats = {
@@ -226,21 +345,16 @@ export const getUnpaidInvoices = query({
     clientId: v.optional(v.id("clients")),
   },
   handler: async (ctx, args) => {
-    
-    
-
-    let query = ctx.db
+    let baseQuery = ctx.db
       .query("invoices")
       .filter(q => q.neq(q.field("status"), "paid"));
 
+    let invoices = await baseQuery.collect();
     if (args.clientId) {
-      const invoices = await query.collect();
-      return invoices.filter(inv => inv.clientId === args.clientId);
+      invoices = invoices.filter(inv => inv.clientId === args.clientId);
     }
 
-    const invoices = await query.collect();
-
-    // Enrich with client and order data
+    // Enrich with client and order data consistently
     const enrichedInvoices = await Promise.all(
       invoices.map(async (invoice) => {
         const client = await ctx.db.get(invoice.clientId);
@@ -265,15 +379,39 @@ export const getUnpaidInvoices = query({
   },
 });
 
+// Get payment receipt
+export const getPaymentReceipt = query({
+  args: {
+    paymentId: v.id("payments"),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) return null;
+
+    if (!payment.invoiceId) return null;
+    const invoice = await ctx.db.get(payment.invoiceId);
+    if (!invoice) return null;
+
+    const client = await ctx.db.get(invoice.clientId);
+    const order = await ctx.db.get(invoice.orderId);
+    const recordedBy = payment.recordedBy ? await ctx.db.get(payment.recordedBy) : null;
+
+    return {
+      payment,
+      invoice,
+      client,
+      order,
+      recordedBy,
+    };
+  },
+});
+
 // Delete a payment (admin only)
 export const deletePayment = mutation({
   args: {
     paymentId: v.id("payments"),
   },
   handler: async (ctx, args) => {
-    
-    
-
     // Auth removed - allow all delete operations
     // In production, implement proper access control
 
@@ -281,38 +419,196 @@ export const deletePayment = mutation({
     const payment = await ctx.db.get(args.paymentId);
     if (!payment) throw new Error("Payment not found");
 
+    // If this payment is advance, just delete it
+    if (!payment.invoiceId) {
+      await ctx.db.delete(args.paymentId);
+      return { success: true };
+    }
+
     // Get the invoice to update
     const invoice = await ctx.db.get(payment.invoiceId);
     if (!invoice) throw new Error("Invoice not found");
 
     // Update invoice
-    const newTotalPaid = invoice.totalPaid - payment.amount;
+    const newTotalPaid = Math.max(0, invoice.totalPaid - payment.amount);
     const newOutstandingBalance = invoice.amount - newTotalPaid;
     
     // Determine new status
-    let newStatus: "draft" | "sent" | "due" | "partially_paid" | "paid" | "overdue";
+    let newStatus: "unpaid" | "partially_paid" | "paid";
     if (newTotalPaid === 0) {
-      if (invoice.dueDate < Date.now()) {
-        newStatus = "overdue";
-      } else {
-        newStatus = "due";
-      }
+      newStatus = "unpaid";
     } else if (newOutstandingBalance > 0) {
       newStatus = "partially_paid";
     } else {
-      newStatus = invoice.status;
+      newStatus = "paid";
     }
 
-    await ctx.db.patch(payment.invoiceId, {
+    await ctx.db.patch(payment.invoiceId!, {
       totalPaid: newTotalPaid,
       outstandingBalance: newOutstandingBalance,
       status: newStatus,
       updatedAt: Date.now(),
     });
 
+
+
+    // Get additional details for logging
+    const client = invoice ? await ctx.db.get(invoice.clientId) : null;
+    
     // Delete the payment
     await ctx.db.delete(args.paymentId);
+    
+    // Create detailed log message
+    const paymentDetails = `${formatCurrency(payment.amount, payment.currency || 'USD')} - ${payment.reference}`;
+    const clientName = client ? ` from ${client.name}` : '';
+    const logMessage = `Payment deleted: ${paymentDetails}${clientName}`;
+    
+    await logEvent(ctx, {
+      entityTable: "payments",
+      entityId: String(args.paymentId),
+      action: "delete",
+      message: logMessage,
+      metadata: { invoiceLinked: !!payment.invoiceId },
+    });
 
     return { success: true };
+  },
+});
+
+// Update an existing payment
+export const updatePayment = mutation({
+  args: {
+    paymentId: v.id("payments"),
+    amount: v.number(),
+    reference: v.string(),
+    paymentDate: v.number(),
+    notes: v.optional(v.string()),
+    bankAccountId: v.optional(v.id("bankAccounts")),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db.get(args.paymentId);
+    if (!existing) throw new Error("Payment not found");
+
+
+
+    // Update invoice aggregates if linked to invoice
+    if (existing.invoiceId) {
+      const invoice = await ctx.db.get(existing.invoiceId);
+      if (!invoice) throw new Error("Invoice not found");
+      const newTotalPaid = Math.max(0, invoice.totalPaid - existing.amount + args.amount);
+      const newOutstanding = Math.max(0, invoice.amount - newTotalPaid);
+      await ctx.db.patch(existing.invoiceId, {
+        totalPaid: newTotalPaid,
+        outstandingBalance: newOutstanding,
+        status: newOutstanding === 0 ? "paid" : "partially_paid",
+        updatedAt: Date.now(),
+      });
+    }
+
+    // Finally update payment record
+    await ctx.db.patch(args.paymentId, {
+      amount: args.amount,
+      reference: args.reference,
+      paymentDate: args.paymentDate,
+      notes: args.notes,
+      bankAccountId: args.bankAccountId,
+    });
+    // Get related information for meaningful logging
+    const client = await ctx.db.get(existing.clientId);
+    const invoice = existing.invoiceId ? await ctx.db.get(existing.invoiceId) : null;
+    const bankAccount = args.bankAccountId ? await ctx.db.get(args.bankAccountId) : null;
+    
+    const clientName = client?.name || "Unknown Client";
+    const invoiceNumber = invoice?.invoiceNumber || "N/A";
+    const bankName = bankAccount?.accountName || "N/A";
+    
+    await logEvent(ctx, {
+      entityTable: "payments",
+      entityId: String(args.paymentId),
+      action: "update",
+      message: `Payment updated: ${invoiceNumber} - $${args.amount} (${clientName})`,
+      metadata: { 
+        previous: { amount: existing.amount, bankAccountId: existing.bankAccountId }, 
+        next: { amount: args.amount, bankAccountId: args.bankAccountId },
+        clientName: clientName,
+        invoiceNumber: invoiceNumber,
+        bankName: bankName
+      },
+    });
+
+    return { success: true };
+  },
+});
+
+// Get payment history for a client
+export const getClientPaymentHistory = query({
+  args: {
+    clientId: v.id("clients"),
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Get all invoices for the client
+    const clientInvoices = await ctx.db
+      .query("invoices")
+      .withIndex("by_client", q => q.eq("clientId", args.clientId))
+      .collect();
+
+    const invoiceIds = clientInvoices.map(i => i._id);
+
+    // Get all payments for these invoices
+    let payments = await ctx.db.query("payments").collect();
+    payments = payments.filter(p => p.invoiceId && invoiceIds.includes(p.invoiceId));
+
+    // Apply date filter if provided
+    if (args.startDate) {
+      payments = payments.filter(p => p.paymentDate >= args.startDate!);
+    }
+    if (args.endDate) {
+      payments = payments.filter(p => p.paymentDate <= args.endDate!);
+    }
+
+    // Sort by payment date (newest first)
+    payments.sort((a, b) => b.paymentDate - a.paymentDate);
+
+    // Enrich with invoice data
+    const enrichedPayments = await Promise.all(
+      payments.map(async (payment) => {
+        const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
+        return {
+          ...payment,
+          invoice: invoice ? {
+            _id: invoice._id,
+            invoiceNumber: invoice.invoiceNumber,
+            amount: invoice.amount,
+          } : null,
+        };
+      })
+    );
+
+    return enrichedPayments;
+  },
+});
+
+// Get individual payment with related data
+export const get = query({
+  args: {
+    id: v.id("payments"),
+  },
+  handler: async (ctx, args) => {
+    const payment = await ctx.db.get(args.id);
+    if (!payment) return null;
+
+    // Get related data
+    const client = await ctx.db.get(payment.clientId);
+    const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
+    const bankAccount = payment.bankAccountId ? await ctx.db.get(payment.bankAccountId) : null;
+
+    return {
+      ...payment,
+      client,
+      invoice,
+      bankAccount,
+    };
   },
 });

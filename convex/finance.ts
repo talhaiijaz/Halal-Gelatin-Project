@@ -1,26 +1,23 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
-
 // Get dashboard statistics
 export const getDashboardStats = query({
   args: {
     year: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    
-    
-
-    const currentYear = args.year || new Date().getFullYear();
-    const startOfYear = new Date(currentYear, 0, 1).getTime();
-    const endOfYear = new Date(currentYear, 11, 31, 23, 59, 59).getTime();
+    const year = args.year || new Date().getFullYear();
+    // Convert to fiscal year: July 1 to June 30
+    const startOfYear = new Date(year, 6, 1).getTime(); // July 1
+    const endOfYear = new Date(year + 1, 5, 30, 23, 59, 59, 999).getTime(); // June 30
     const now = Date.now();
     const endDate = Math.min(endOfYear, now);
 
     // Get all orders
     const allOrders = await ctx.db.query("orders").collect();
     const yearOrders = allOrders.filter(
-      order => order.createdAt >= startOfYear && order.createdAt <= endDate
+      order => order.fiscalYear === year
     );
 
     // Get all order items for quantity calculation
@@ -46,39 +43,42 @@ export const getDashboardStats = query({
       ? totalRevenue / activeYearOrders.length 
       : 0;
 
-    // Get all-time statistics
-    const allActiveOrders = allOrders.filter(o => o.status !== "cancelled");
-    const allTimeRevenue = allActiveOrders.reduce((sum, order) => sum + order.totalAmount, 0);
-    
-    // Get all-time quantity
-    const allOrderItemsPromises = allActiveOrders.map(order =>
-      ctx.db
-        .query("orderItems")
-        .withIndex("by_order", q => q.eq("orderId", order._id))
-        .collect()
-    );
-    const allOrderItemsGroups = await Promise.all(allOrderItemsPromises);
-    const allTimeQuantity = allOrderItemsGroups.reduce((sum, items) => 
-      sum + items.reduce((itemSum, item) => itemSum + item.quantityKg, 0), 0
-    );
-
     // Get invoices for payment statistics
     const invoices = await ctx.db.query("invoices").collect();
     const yearInvoices = invoices.filter(
-      inv => inv.createdAt >= startOfYear && inv.createdAt <= endDate
+      inv => {
+        // Get the order for this invoice to check its fiscal year
+        const order = allOrders.find(o => o._id === inv.orderId);
+        return order && order.fiscalYear === year;
+      }
     );
 
     const totalPaid = yearInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     const totalOutstanding = yearInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
 
-    // Count overdue invoices
-    const overdueInvoices = yearInvoices.filter(
-      inv => inv.status === "overdue" || (inv.dueDate < now && inv.status !== "paid")
+    // No due/overdue concept in this system
+    const overdueInvoices: any[] = [];
+
+    // Get payment statistics for the year
+    const payments = await ctx.db.query("payments").collect();
+    const yearPayments = payments.filter(
+      payment => {
+        // Get the invoice for this payment, then get the order to check fiscal year
+        const invoice = invoices.find(inv => inv._id === payment.invoiceId);
+        if (!invoice) return false;
+        const order = allOrders.find(o => o._id === invoice.orderId);
+        return order && order.fiscalYear === year;
+      }
     );
+
+    const totalPaymentsReceived = yearPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const averagePaymentAmount = yearPayments.length > 0 
+      ? totalPaymentsReceived / yearPayments.length 
+      : 0;
 
     return {
       // This year's statistics
-      year: currentYear,
+      year: year,
       numberOfOrders: yearOrders.length,
       activeOrders: yearOrders.filter(o => 
         ["pending", "confirmed", "in_production", "shipped"].includes(o.status)
@@ -89,16 +89,10 @@ export const getDashboardStats = query({
       totalPaid,
       totalOutstanding,
       overdueInvoices: overdueInvoices.length,
-      
-      // All-time statistics
-      allTime: {
-        totalOrders: allOrders.length,
-        totalRevenue: allTimeRevenue,
-        totalQuantityKg: Math.round(allTimeQuantity),
-        averageOrderValue: allActiveOrders.length > 0 
-          ? allTimeRevenue / allActiveOrders.length 
-          : 0,
-      }
+      // Payment statistics
+      totalPaymentsReceived,
+      averagePaymentAmount,
+      paymentCount: yearPayments.length,
     };
   },
 });
@@ -109,42 +103,60 @@ export const getMonthlyOrderStats = query({
     year: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    
-    
-
     const year = args.year || new Date().getFullYear();
-    const startOfYear = new Date(year, 0, 1).getTime();
-    const endOfYear = new Date(year, 11, 31, 23, 59, 59).getTime();
+    // Convert to fiscal year: July 1 to June 30
+    const startOfYear = new Date(year, 6, 1).getTime(); // July 1
+    const endOfYear = new Date(year + 1, 5, 30, 23, 59, 59, 999).getTime(); // June 30
 
     // Get all orders for the year
     const orders = await ctx.db
       .query("orders")
-      .filter(q => 
-        q.and(
-          q.gte(q.field("createdAt"), startOfYear),
-          q.lte(q.field("createdAt"), endOfYear)
-        )
-      )
+      .filter(q => q.eq(q.field("fiscalYear"), year))
       .collect();
 
-    // Group by month
+    // Get all payments for the year
+    const allInvoices = await ctx.db.query("invoices").collect();
+    const allOrders = await ctx.db.query("orders").collect();
+    
+    const payments = await ctx.db.query("payments").collect();
+    const yearPayments = payments.filter(payment => {
+      const invoice = allInvoices.find(inv => inv._id === payment.invoiceId);
+      if (!invoice) return false;
+      const order = allOrders.find(o => o._id === invoice.orderId);
+      return order && order.fiscalYear === year;
+    });
+
+    // Group by month (fiscal year: July to June)
     const monthlyStats = Array.from({ length: 12 }, (_, i) => {
-      const monthStart = new Date(year, i, 1).getTime();
-      const monthEnd = new Date(year, i + 1, 0, 23, 59, 59).getTime();
+      const fiscalMonth = i + 6; // July = 0, August = 1, ..., June = 11
+      const monthYear = fiscalMonth >= 12 ? year + 1 : year;
+      const monthIndex = fiscalMonth >= 12 ? fiscalMonth - 12 : fiscalMonth;
       
-      const monthOrders = orders.filter(
-        order => order.createdAt >= monthStart && order.createdAt <= monthEnd
+      const monthStart = new Date(monthYear, monthIndex, 1).getTime();
+      const monthEnd = new Date(monthYear, monthIndex + 1, 0, 23, 59, 59).getTime();
+      
+      // Use explicit orderCreationDate when available; fall back to createdAt
+      // This ensures backdated orders (entered later) are counted in the correct month
+      const monthOrders = orders.filter(order => {
+        const orderTimestamp = (order as any).orderCreationDate ?? order.createdAt;
+        return orderTimestamp >= monthStart && orderTimestamp <= monthEnd;
+      });
+
+      const monthPayments = yearPayments.filter(
+        payment => payment.paymentDate >= monthStart && payment.paymentDate <= monthEnd
       );
 
       const activeOrders = monthOrders.filter(o => o.status !== "cancelled");
       const revenue = activeOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+      const paymentsReceived = monthPayments.reduce((sum, payment) => sum + payment.amount, 0);
 
       return {
-        month: new Date(year, i, 1).toLocaleDateString("en-US", { month: "short" }),
+        month: new Date(monthYear, monthIndex, 1).toLocaleDateString("en-US", { month: "short" }),
         monthIndex: i,
         orders: monthOrders.length,
         activeOrders: activeOrders.length,
         revenue,
+        paymentsReceived,
         cancelled: monthOrders.filter(o => o.status === "cancelled").length,
       };
     });
@@ -156,32 +168,20 @@ export const getMonthlyOrderStats = query({
 // Get revenue by customer type
 export const getRevenueByCustomerType = query({
   args: {
-    startDate: v.optional(v.number()),
-    endDate: v.optional(v.number()),
+    fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    
-    
-
-    const startDate = args.startDate || new Date(new Date().getFullYear(), 0, 1).getTime();
-    const endDate = args.endDate || Date.now();
-
     // Get all clients
     const clients = await ctx.db.query("clients").collect();
     const localClients = clients.filter(c => c.type === "local");
     const internationalClients = clients.filter(c => c.type === "international");
 
-    // Get orders in date range
-    const orders = await ctx.db
-      .query("orders")
-      .filter(q => 
-        q.and(
-          q.gte(q.field("createdAt"), startDate),
-          q.lte(q.field("createdAt"), endDate),
-          q.neq(q.field("status"), "cancelled")
-        )
-      )
-      .collect();
+    // Get orders filtered by fiscal year (and not cancelled)
+    let orders = await ctx.db.query("orders").collect();
+    orders = orders.filter(o => o.status !== "cancelled");
+    if (args.fiscalYear) {
+      orders = orders.filter(o => o.fiscalYear === args.fiscalYear);
+    }
 
     // Calculate revenue by type
     const localRevenue = orders
@@ -212,35 +212,62 @@ export const getRevenueByCustomerType = query({
   },
 });
 
+// Get invoice statistics
+export const getInvoiceStats = query({
+  args: {
+    fiscalYear: v.optional(v.number()), // Add fiscal year filter
+  },
+  returns: v.object({
+    totalOutstanding: v.number(),
+    totalPaid: v.number(),
+    overdueCount: v.number(),
+    totalCount: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    let invoices = await ctx.db.query("invoices").collect();
+    const now = Date.now();
+
+    // Filter by fiscal year if provided
+    if (args.fiscalYear) {
+      const allOrders = await ctx.db.query("orders").collect();
+      invoices = invoices.filter(invoice => {
+        const order = allOrders.find(o => o._id === invoice.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
+    const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+    const overdueCount = 0;
+    const totalCount = invoices.length;
+
+    return {
+      totalOutstanding,
+      totalPaid,
+      overdueCount,
+      totalCount,
+    };
+  },
+});
+
 // Get top customers by revenue
 export const getTopCustomers = query({
   args: {
     limit: v.optional(v.number()),
-    startDate: v.optional(v.number()),
-    endDate: v.optional(v.number()),
+    fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    
-    
-
     const limit = args.limit || 5;
-    const startDate = args.startDate || new Date(new Date().getFullYear(), 0, 1).getTime();
-    const endDate = args.endDate || Date.now();
 
     // Get all clients
     const clients = await ctx.db.query("clients").collect();
 
-    // Get orders in date range
-    const orders = await ctx.db
-      .query("orders")
-      .filter(q => 
-        q.and(
-          q.gte(q.field("createdAt"), startDate),
-          q.lte(q.field("createdAt"), endDate),
-          q.neq(q.field("status"), "cancelled")
-        )
-      )
-      .collect();
+    // Get orders filtered by fiscal year (and not cancelled)
+    let orders = await ctx.db.query("orders").collect();
+    orders = orders.filter(o => o.status !== "cancelled");
+    if (args.fiscalYear) {
+      orders = orders.filter(o => o.fiscalYear === args.fiscalYear);
+    }
 
     // Calculate revenue per customer
     const customerRevenue = clients.map(client => {
@@ -263,5 +290,182 @@ export const getTopCustomers = query({
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, limit)
       .filter(c => c.revenue > 0);
+  },
+});
+
+// Get cash flow analysis
+export const getCashFlowAnalysis = query({
+  args: {
+    startDate: v.optional(v.number()),
+    endDate: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // Default to current fiscal year if no dates provided
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth();
+    const fiscalYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+    const startDate = args.startDate || new Date(fiscalYear, 6, 1).getTime(); // July 1
+    const endDate = args.endDate || Date.now();
+
+    // Get invoices in date range
+    const invoices = await ctx.db.query("invoices").collect();
+    const periodInvoices = invoices.filter(
+      inv => inv.issueDate >= startDate && inv.issueDate <= endDate
+    );
+
+    // Get payments in date range
+    const payments = await ctx.db.query("payments").collect();
+    const periodPayments = payments.filter(
+      payment => payment.paymentDate >= startDate && payment.paymentDate <= endDate
+    );
+
+    // Calculate cash flow metrics
+    const totalInvoiced = periodInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const totalReceived = periodPayments.reduce((sum, payment) => sum + payment.amount, 0);
+    const outstandingReceivables = periodInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+
+    // Calculate payment methods breakdown
+    const paymentMethods = {
+      bank_transfer: 0,
+      check: 0,
+      cash: 0,
+      credit_card: 0,
+      other: 0,
+    };
+
+    periodPayments.forEach(payment => {
+      if (payment.method in paymentMethods) {
+        paymentMethods[payment.method as keyof typeof paymentMethods] += payment.amount;
+      }
+    });
+
+    return {
+      totalInvoiced,
+      totalReceived,
+      outstandingReceivables,
+      cashFlow: totalReceived - totalInvoiced,
+      paymentMethods,
+      invoiceCount: periodInvoices.length,
+      paymentCount: periodPayments.length,
+      averageInvoiceAmount: periodInvoices.length > 0 ? totalInvoiced / periodInvoices.length : 0,
+      averagePaymentAmount: periodPayments.length > 0 ? totalReceived / periodPayments.length : 0,
+    };
+  },
+});
+
+// Get overdue invoices summary
+export const getOverdueInvoicesSummary = query({
+  handler: async (ctx) => {
+    const invoices = await ctx.db.query("invoices").collect();
+    const now = Date.now();
+
+    const overdueInvoices = invoices.filter(inv => 
+      inv.outstandingBalance > 0 && inv.dueDate < now
+    );
+
+    const overdueSummary = {
+      count: overdueInvoices.length,
+      totalAmount: overdueInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0),
+      averageDaysOverdue: 0,
+      byAge: {
+        days30to60: { count: 0, amount: 0 },
+        days61to90: { count: 0, amount: 0 },
+        over90: { count: 0, amount: 0 },
+      },
+    };
+
+    let totalDaysOverdue = 0;
+    overdueInvoices.forEach(invoice => {
+      const daysOverdue = Math.floor((now - invoice.dueDate) / (1000 * 60 * 60 * 24));
+      totalDaysOverdue += daysOverdue;
+
+      if (daysOverdue <= 60) {
+        overdueSummary.byAge.days30to60.count++;
+        overdueSummary.byAge.days30to60.amount += invoice.outstandingBalance;
+      } else if (daysOverdue <= 90) {
+        overdueSummary.byAge.days61to90.count++;
+        overdueSummary.byAge.days61to90.amount += invoice.outstandingBalance;
+      } else {
+        overdueSummary.byAge.over90.count++;
+        overdueSummary.byAge.over90.amount += invoice.outstandingBalance;
+      }
+    });
+
+    if (overdueInvoices.length > 0) {
+      overdueSummary.averageDaysOverdue = Math.round(totalDaysOverdue / overdueInvoices.length);
+    }
+
+    return overdueSummary;
+  },
+});
+
+// Get payment trends
+export const getPaymentTrends = query({
+  args: {
+    months: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const months = args.months || 12;
+    const endDate = Date.now();
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - months);
+    const startTimestamp = startDate.getTime();
+
+    const payments = await ctx.db.query("payments").collect();
+    const periodPayments = payments.filter(
+      payment => payment.paymentDate >= startTimestamp && payment.paymentDate <= endDate
+    );
+
+    // Group by month
+    const monthlyPayments = Array.from({ length: months }, (_, i) => {
+      const monthStart = new Date();
+      monthStart.setMonth(monthStart.getMonth() - months + i + 1);
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+
+      const monthEnd = new Date(monthStart);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+      monthEnd.setDate(0);
+      monthEnd.setHours(23, 59, 59, 999);
+
+      const monthPayments = periodPayments.filter(
+        payment => payment.paymentDate >= monthStart.getTime() && payment.paymentDate <= monthEnd.getTime()
+      );
+
+      return {
+        month: monthStart.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+        amount: monthPayments.reduce((sum, payment) => sum + payment.amount, 0),
+        count: monthPayments.length,
+      };
+    });
+
+    return monthlyPayments;
+  },
+});
+
+// Get finance statistics for reports
+export const getFinanceStats = query({
+  args: {},
+  handler: async (ctx, args) => {
+    const invoices = await ctx.db.query("invoices").collect();
+    const orders = await ctx.db.query("orders").collect();
+    const payments = await ctx.db.query("payments").collect();
+    
+    const totalInvoices = invoices.length;
+    const totalOrders = orders.length;
+    const totalPayments = payments.length;
+    
+    const totalAmount = invoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+    const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    
+    return {
+      totalInvoices,
+      totalOrders,
+      totalPayments,
+      totalAmount,
+      totalPaid,
+      totalOutstanding,
+    };
   },
 });

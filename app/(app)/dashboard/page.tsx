@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { 
   Users, 
   Package, 
@@ -16,70 +18,72 @@ import { useRouter } from "next/navigation";
 import AddCustomerModal from "@/app/components/clients/AddCustomerModal";
 import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import toast from "react-hot-toast";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 
 export default function DashboardPage() {
+  console.log("DashboardPage rendering...");
   const router = useRouter();
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
+  const [clientType, setClientType] = useState<"local" | "international">("local");
 
-  const stats = [
+  // Fetch real data from Convex
+  const dashboardStats = useQuery(api.dashboard.getStats);
+  const recentOrdersData = useQuery(api.dashboard.getRecentOrders, { limit: 5 });
+  const recentActivity = useQuery(api.dashboard.getRecentActivity, { limit: 5 });
+
+  console.log("Dashboard data:", { dashboardStats, recentOrdersData, recentActivity });
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  // Create stats array with real data
+  const stats = dashboardStats ? [
     {
       name: "Total Clients",
-      value: "48",
-      change: "+12%",
+      value: dashboardStats.totalClients.value.toString(),
       icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
     },
     {
       name: "Active Orders",
-      value: "23",
-      change: "+5%",
+      value: dashboardStats.activeOrders.value.toString(),
       icon: Package,
       color: "text-green-600",
       bgColor: "bg-green-100",
+      subtitle: `Total Orders: ${dashboardStats.totalOrders?.value?.toString() || "0"}`,
     },
     {
-      name: "Revenue (Month)",
-      value: "$124,500",
-      change: "+18%",
+      name: "Revenue (Current Fiscal Year)",
+      value: formatCurrency(dashboardStats.currentYearRevenue.value),
       icon: DollarSign,
       color: "text-primary",
       bgColor: "bg-orange-100",
     },
     {
       name: "Outstanding",
-      value: "$45,200",
-      change: "-8%",
+      value: formatCurrency(dashboardStats.outstandingAmount.value),
       icon: TrendingUp,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
-  ];
+  ] : [];
 
-  const recentOrders = [
-    {
-      id: "ORD-2024-001",
-      client: "Al Safi Foods",
-      amount: "$12,500",
-      status: "in_production",
-      date: "2024-01-15",
-    },
-    {
-      id: "ORD-2024-002",
-      client: "Noor Enterprises",
-      amount: "$8,300",
-      status: "shipped",
-      date: "2024-01-14",
-    },
-    {
-      id: "ORD-2024-003",
-      client: "Halal Co Ltd",
-      amount: "$15,750",
-      status: "pending",
-      date: "2024-01-13",
-    },
-  ];
+  // Format recent orders data
+  const recentOrders = recentOrdersData ? recentOrdersData.map(order => ({
+    id: order.orderNumber,
+    client: order.client?.name || "Unknown Client",
+    amount: formatCurrency(order.totalAmount),
+    status: order.status,
+    date: new Date(order.createdAt).toLocaleDateString(),
+  })) : [];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -114,25 +118,37 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.name} className="card p-6">
+        {!dashboardStats ? (
+          // Loading skeletons
+          [...Array(4)].map((_, i) => (
+            <div key={i} className="card p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                  <Icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
-                <span className={`text-sm font-medium ${
-                  stat.change.startsWith("+") ? "text-green-600" : "text-red-600"
-                }`}>
-                  {stat.change}
-                </span>
+                <Skeleton width={40} height={40} />
+                <Skeleton width={40} height={20} />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
-              <p className="text-sm text-gray-600 mt-1">{stat.name}</p>
+              <Skeleton width={80} height={32} />
+              <Skeleton width={120} height={16} className="mt-1" />
             </div>
-          );
-        })}
+          ))
+        ) : (
+          stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div key={stat.name} className="card p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                    <Icon className={`h-6 w-6 ${stat.color}`} />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
+                <p className="text-sm text-gray-600 mt-1">{stat.name}</p>
+                {stat.subtitle && (
+                  <p className="text-xs text-gray-500 mt-1">{stat.subtitle}</p>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Content Grid */}
@@ -150,30 +166,59 @@ export default function DashboardPage() {
             </Link>
           </div>
           <div className="space-y-3">
-            {recentOrders.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-              >
-                <div className="flex items-center space-x-3">
-                  {getStatusIcon(order.status)}
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {order.id}
-                    </p>
-                    <p className="text-xs text-gray-500">{order.client}</p>
+            {!recentOrdersData ? (
+              // Loading skeletons
+              [...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    <Skeleton width={16} height={16} />
+                    <div className="min-w-0 flex-1">
+                      <Skeleton width={100} height={16} />
+                      <Skeleton width={80} height={12} className="mt-1" />
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-3">
+                    <Skeleton width={60} height={16} />
+                    <Skeleton width={50} height={12} className="mt-1" />
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">
-                    {order.amount}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {getStatusLabel(order.status)}
-                  </p>
-                </div>
+              ))
+            ) : recentOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No recent orders</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Start by creating your first order.
+                </p>
               </div>
-            ))}
+            ) : (
+              recentOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex items-center space-x-3 min-w-0 flex-1">
+                    {getStatusIcon(order.status)}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {order.id}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate" title={order.client}>
+                        {order.client}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-3">
+                    <p className="text-sm font-medium text-gray-900">
+                      {order.amount}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {getStatusLabel(order.status)}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -184,10 +229,24 @@ export default function DashboardPage() {
           </h2>
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => setIsAddClientOpen(true)}
+              onClick={() => {
+                setIsAddClientOpen(true);
+                // Set client type to local
+                setClientType("local");
+              }}
               className="btn-primary text-center py-3"
             >
-              New Client
+              New Local Client
+            </button>
+            <button
+              onClick={() => {
+                setIsAddClientOpen(true);
+                // Set client type to international
+                setClientType("international");
+              }}
+              className="btn-primary text-center py-3"
+            >
+              New International Client
             </button>
             <button
               onClick={() => setIsCreateOrderOpen(true)}
@@ -196,17 +255,11 @@ export default function DashboardPage() {
               New Order
             </button>
             <button
-              onClick={() => router.push("/finance/invoices")}
+              onClick={() => router.push("/finance")}
               className="btn-secondary text-center py-3"
             >
               Record Payment
             </button>
-            <Link
-              href="/finance/reports"
-              className="btn-secondary text-center py-3"
-            >
-              View Reports
-            </Link>
           </div>
         </div>
       </div>
@@ -217,46 +270,55 @@ export default function DashboardPage() {
           Recent Activity
         </h2>
         <div className="space-y-3">
-          <div className="flex items-start space-x-3">
-            <div className="w-2 h-2 mt-1.5 rounded-full bg-green-500"></div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">
-                Payment received from <span className="font-medium">Al Safi Foods</span>
+          {!recentActivity ? (
+            // Loading skeletons
+            [...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-start space-x-3">
+                <Skeleton width={8} height={8} className="mt-1.5 rounded-full" />
+                <div className="flex-1">
+                  <Skeleton width={200} height={16} />
+                  <Skeleton width={80} height={12} className="mt-1" />
+                </div>
+              </div>
+            ))
+          ) : recentActivity.length === 0 ? (
+            <div className="text-center py-8">
+              <TrendingUp className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No recent activity</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Activity will appear here as you use the system.
               </p>
-              <p className="text-xs text-gray-500">2 hours ago</p>
             </div>
-          </div>
-          <div className="flex items-start space-x-3">
-            <div className="w-2 h-2 mt-1.5 rounded-full bg-blue-500"></div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">
-                Order <span className="font-medium">#ORD-2024-004</span> moved to production
-              </p>
-              <p className="text-xs text-gray-500">5 hours ago</p>
-            </div>
-          </div>
-          <div className="flex items-start space-x-3">
-            <div className="w-2 h-2 mt-1.5 rounded-full bg-purple-500"></div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">
-                New client <span className="font-medium">Global Halal Inc</span> added
-              </p>
-              <p className="text-xs text-gray-500">Yesterday</p>
-            </div>
-          </div>
+          ) : (
+            recentActivity.map((activity) => (
+              <div key={activity.id} className="flex items-start space-x-3">
+                <div className={`w-2 h-2 mt-1.5 rounded-full ${activity.color}`}></div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-900">
+                    {activity.message}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(activity.timestamp).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
+
+
 
       {/* Add Client Modal */}
       <AddCustomerModal
         isOpen={isAddClientOpen}
         onClose={() => setIsAddClientOpen(false)}
-        type="local"
-        onSuccess={() => {
-          setIsAddClientOpen(false);
-          toast.success("Client added successfully");
-          router.push("/clients");
-        }}
+        type={clientType}
       />
 
       {/* Create Order Modal */}

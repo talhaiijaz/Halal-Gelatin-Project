@@ -1,4 +1,19 @@
 import { query, mutation } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+
+async function logClientEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
+  try {
+    await ctx.db.insert("logs", {
+      entityTable: "clients",
+      entityId: params.entityId,
+      action: params.action,
+      message: params.message,
+      metadata: params.metadata,
+      userId: params.userId as any,
+      createdAt: Date.now(),
+    });
+  } catch {}
+}
 import { v } from "convex/values";
 
 // List all clients with optional filtering
@@ -25,9 +40,9 @@ export const list = query({
     if (args.search) {
       const searchLower = args.search.toLowerCase();
       filtered = filtered.filter(client => 
-        client.name.toLowerCase().includes(searchLower) ||
-        client.city.toLowerCase().includes(searchLower) ||
-        client.country.toLowerCase().includes(searchLower)
+        (client.name || "").toLowerCase().includes(searchLower) ||
+        (client.city || "").toLowerCase().includes(searchLower) ||
+        (client.country || "").toLowerCase().includes(searchLower)
       );
     }
 
@@ -75,35 +90,46 @@ export const get = query({
 // Create a new client
 export const create = mutation({
   args: {
-    name: v.string(),
-    contactPerson: v.string(),
-    email: v.string(),
-    phone: v.string(),
-    address: v.string(),
-    city: v.string(),
-    country: v.string(),
-    taxId: v.string(),
+    name: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    address: v.optional(v.string()),
+    city: v.optional(v.string()),
+    country: v.optional(v.string()),
+    taxId: v.optional(v.string()),
     type: v.union(v.literal("local"), v.literal("international")),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
   },
   handler: async (ctx, args) => {
-    // Check for duplicate email
-    const existing = await ctx.db
-      .query("clients")
-      .filter((q) => q.eq(q.field("email"), args.email))
-      .first();
+    // Check for duplicate email only if email is provided
+    if (args.email) {
+      const existing = await ctx.db
+        .query("clients")
+        .filter((q) => q.eq(q.field("email"), args.email))
+        .first();
 
-    if (existing) {
-      throw new Error("A client with this email already exists");
+      if (existing) {
+        throw new Error("A client with this email already exists");
+      }
     }
 
     const clientId = await ctx.db.insert("clients", {
-      ...args,
+      name: args.name || "",
+      contactPerson: args.contactPerson || "",
+      email: args.email || "",
+      phone: args.phone || "",
+      address: args.address || "",
+      city: args.city || "",
+      country: args.country || "",
+      taxId: args.taxId || "",
+      type: args.type,
       status: args.status || "active",
       createdAt: Date.now(),
-      createdBy: "system" as any, // Removed auth
+      // createdBy is now optional - omitted for now
     });
 
+    await logClientEvent(ctx, { entityId: String(clientId), action: "create", message: `Client created: ${args.name || String(clientId)}` });
     return clientId;
   },
 });
@@ -136,37 +162,114 @@ export const update = mutation({
     }
 
     await ctx.db.patch(id, cleanUpdates);
+    await logClientEvent(ctx, { entityId: String(id), action: "update", message: `Client updated: ${cleanUpdates.name || String(id)}`, metadata: cleanUpdates });
     return { success: true };
   },
 });
 
-// Delete a client (soft delete by setting status to inactive)
+// Delete a client (hard delete - removes completely)
 export const remove = mutation({
   args: {
     id: v.id("clients"),
   },
   handler: async (ctx, args) => {
-    // Check if client has active orders
-    const activeOrders = await ctx.db
-      .query("orders")
-      .withIndex("by_client", (q) => q.eq("clientId", args.id))
-      .filter((q) => 
-        q.or(
-          q.eq(q.field("status"), "pending"),
-          q.eq(q.field("status"), "confirmed"),
-          q.eq(q.field("status"), "in_production"),
-          q.eq(q.field("status"), "shipped")
-        )
-      )
-      .first();
-
-    if (activeOrders) {
-      throw new Error("Cannot delete client with active orders");
+    // Check if client exists
+    const client = await ctx.db.get(args.id);
+    if (!client) {
+      throw new Error("Client not found");
     }
 
-    // Soft delete by setting status to inactive
-    await ctx.db.patch(args.id, { status: "inactive" });
+    // Check if client has any orders (active or completed)
+    const orders = await ctx.db
+      .query("orders")
+      .withIndex("by_client", (q) => q.eq("clientId", args.id))
+      .first();
+
+    if (orders) {
+      throw new Error("Cannot delete client with existing orders. Please remove all orders first.");
+    }
+
+    // Check if client has any invoices
+    const invoices = await ctx.db
+      .query("invoices")
+      .withIndex("by_client", (q) => q.eq("clientId", args.id))
+      .first();
+
+    if (invoices) {
+      throw new Error("Cannot delete client with existing invoices. Please remove all invoices first.");
+    }
+
+    // Hard delete the client
+    await ctx.db.delete(args.id);
+    await logClientEvent(ctx, { entityId: String(args.id), action: "delete", message: `Client deleted: ${client.name || String(args.id)}` });
     return { success: true };
+  },
+});
+
+// Get client summary with outstanding amounts and total quantities
+export const getClientSummary = query({
+  args: {
+    type: v.union(v.literal("local"), v.literal("international")),
+  },
+  handler: async (ctx, args) => {
+    // Get all clients of the specified type
+    const clients = await ctx.db
+      .query("clients")
+      .withIndex("by_type", q => q.eq("type", args.type))
+      .collect();
+
+    // Get all orders for these clients
+    const clientIds = clients.map(client => client._id);
+    const orders = await ctx.db
+      .query("orders")
+      .filter(q => q.or(...clientIds.map(id => q.eq(q.field("clientId"), id))))
+      .collect();
+
+    // Get all order items for these orders
+    const orderIds = orders.map(order => order._id);
+    const orderItems = await ctx.db
+      .query("orderItems")
+      .filter(q => q.or(...orderIds.map(id => q.eq(q.field("orderId"), id))))
+      .collect();
+
+    // Get all invoices for these clients
+    const invoices = await ctx.db
+      .query("invoices")
+      .filter(q => q.or(...clientIds.map(id => q.eq(q.field("clientId"), id))))
+      .collect();
+
+    // Calculate summary for each client
+    const clientSummary = clients.map(client => {
+      // Get orders for this client
+      const clientOrders = orders.filter(order => order.clientId === client._id);
+      
+      // Get order items for this client's orders
+      const clientOrderItems = orderItems.filter(item => 
+        clientOrders.some(order => order._id === item.orderId)
+      );
+      
+      // Calculate total quantity
+      const totalQuantity = clientOrderItems.reduce((sum, item) => sum + item.quantityKg, 0);
+      
+      // Get invoices for this client
+      const clientInvoices = invoices.filter(invoice => invoice.clientId === client._id);
+      
+      // Calculate outstanding amount
+      const outstandingAmount = clientInvoices.reduce((sum, invoice) => sum + invoice.outstandingBalance, 0);
+
+      return {
+        clientId: client._id,
+        clientName: client.name,
+        clientEmail: client.email,
+        totalQuantity,
+        outstandingAmount,
+        orderCount: clientOrders.length,
+        invoiceCount: clientInvoices.length,
+      };
+    });
+
+    // Sort by outstanding amount (highest first)
+    return clientSummary.sort((a, b) => b.outstandingAmount - a.outstandingAmount);
   },
 });
 

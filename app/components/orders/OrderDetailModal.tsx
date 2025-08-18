@@ -14,8 +14,18 @@ import {
   Truck,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Upload,
+  Edit,
+  Trash2
 } from "lucide-react";
+import DocumentUpload from "./DocumentUpload";
+import EditOrderModal from "./EditOrderModal";
+import DeleteConfirmModal from "./DeleteConfirmModal";
+import RecordPaymentModal from "@/app/components/finance/RecordPaymentModal";
+import ActivityLog from "../ActivityLog";
+import { useQuery as useConvexQuery } from "convex/react";
+import { api as convexApi } from "@/convex/_generated/api";
 
 interface OrderDetailModalProps {
   orderId: Id<"orders"> | null;
@@ -25,8 +35,15 @@ interface OrderDetailModalProps {
 
 export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDetailModalProps) {
   const order = useQuery(api.orders.get, orderId ? { id: orderId } : "skip");
+  const logs = useConvexQuery(convexApi.dashboard.listEntityLogs, orderId ? { entityTable: "orders", entityId: String(orderId) } : "skip");
   const updateStatus = useMutation(api.orders.updateStatus);
+  const updateInvoiceNumber = useMutation(api.orders.updateInvoiceNumber);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isEditingInvoiceNumber, setIsEditingInvoiceNumber] = useState(false);
+  const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
+  const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -51,6 +68,8 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
       setIsUpdating(false);
     }
   };
+
+
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -100,15 +119,38 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
           {/* Header */}
           <div className="border-b border-gray-200 px-6 py-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Order Details
-              </h2>
-              <button
-                onClick={onClose}
-                className="rounded-lg p-1 hover:bg-gray-100"
-              >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Order Details
+                </h2>
+                {order && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Order #{order.orderNumber}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setShowEditModal(true)}
+                  className="flex items-center px-3 py-1.5 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="flex items-center px-3 py-1.5 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
+                </button>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg p-1 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -140,7 +182,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                     <div>
                       <p className="text-sm text-gray-500">Expected Delivery</p>
                       <p className="font-medium text-gray-900">
-                        {formatDate(order.expectedDeliveryDate)}
+                        {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}
                       </p>
                     </div>
                     <div>
@@ -174,7 +216,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                     <div className="space-y-2">
                       <div>
                         <p className="text-sm text-gray-500">Company</p>
-                        <p className="font-medium text-gray-900">{order.client.name}</p>
+                        <p className="font-medium text-gray-900 break-words" title={order.client.name}>{order.client.name}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Contact Person</p>
@@ -202,37 +244,193 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                     <Package className="h-4 w-4 mr-2" />
                     Product Details
                   </h3>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {order.items.map((item, index) => (
-                      <div key={index} className="border-b border-gray-100 pb-3 last:border-0">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-gray-900">{item.product}</p>
-                            {item.notes && (
-                              <p className="text-sm text-gray-600 mt-1">{item.notes}</p>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <p className="font-medium text-gray-900">
-                              {formatCurrency(item.totalPrice, order.currency)}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {item.quantityKg} kg × {formatCurrency(item.unitPrice, order.currency)}/kg
-                            </p>
-                          </div>
+                      <div key={index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="mb-3">
+                          <p className="font-medium text-gray-900 text-lg">{item.product}</p>
+                          {item.notes && (
+                            <p className="text-sm text-gray-600 mt-1">{item.notes}</p>
+                          )}
+                        </div>
+                        
+                        {/* Product Breakdown Table */}
+                        <div className="bg-gray-50 rounded-md overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-gray-700">Value</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              <tr>
+                                <td className="px-3 py-2 text-xs text-gray-600">Quantity</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{item.quantityKg} kg</td>
+                              </tr>
+                              <tr>
+                                <td className="px-3 py-2 text-xs text-gray-600">Unit Price</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.unitPrice, order.currency)}/kg</td>
+                              </tr>
+                              <tr className="bg-gray-100">
+                                <td className="px-3 py-2 text-xs font-medium text-gray-700">Exclusive Value (Before GST)</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.exclusiveValue || (item.quantityKg * item.unitPrice), order.currency)}</td>
+                              </tr>
+                              {item.discountType && item.discountValue && (
+                                <>
+                                  <tr className="bg-green-50">
+                                    <td className="px-3 py-2 text-xs font-medium text-green-700">Total Before Discount</td>
+                                    <td className="px-3 py-2 text-xs text-right font-medium text-green-700">{formatCurrency((item.exclusiveValue || (item.quantityKg * item.unitPrice)) + (item.gstAmount || 0), order.currency)}</td>
+                                  </tr>
+                                  <tr className="bg-green-50">
+                                    <td className="px-3 py-2 text-xs font-medium text-green-700">Discount ({item.discountType === "amount" ? "Fixed Amount" : "Percentage"})</td>
+                                    <td className="px-3 py-2 text-xs text-right font-medium text-green-700">
+                                      {item.discountType === "amount" 
+                                        ? formatCurrency(item.discountValue, order.currency)
+                                        : `${item.discountValue}%`}
+                                    </td>
+                                  </tr>
+                                  <tr className="bg-green-50">
+                                    <td className="px-3 py-2 text-xs font-medium text-green-700">Discount Amount</td>
+                                    <td className="px-3 py-2 text-xs text-right font-medium text-green-700">-{formatCurrency(item.discountAmount || 0, order.currency)}</td>
+                                  </tr>
+                                </>
+                              )}
+                              <tr>
+                                <td className="px-3 py-2 text-xs text-gray-600">GST Rate</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{item.gstRate || 18}%</td>
+                              </tr>
+                              <tr>
+                                <td className="px-3 py-2 text-xs text-gray-600">GST Amount</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.gstAmount || 0, order.currency)}</td>
+                              </tr>
+                              <tr className="bg-primary/5 border-t-2 border-primary/20">
+                                <td className="px-3 py-2 text-xs font-bold text-primary">Inclusive Total (Including GST)</td>
+                                <td className="px-3 py-2 text-xs text-right font-bold text-primary">{formatCurrency(item.inclusiveTotal || item.totalPrice, order.currency)}</td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     ))}
-                    <div className="pt-2 border-t border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <p className="font-semibold text-gray-900">Total Amount</p>
-                        <p className="font-semibold text-lg text-gray-900">
-                          {formatCurrency(order.totalAmount, order.currency)}
-                        </p>
+                    
+                    {/* Order Total */}
+                    <div className="pt-4 border-t-2 border-gray-200">
+                      <div className="space-y-2">
+                        {/* Calculate product total from items */}
+                        {(() => {
+                          const productTotal = order.items.reduce((sum, item) => sum + (item.inclusiveTotal || item.totalPrice), 0);
+                          return (
+                            <>
+                              <div className="flex justify-between items-center text-sm text-gray-600">
+                                <span>Product Total:</span>
+                                <span>{formatCurrency(productTotal, order.currency)}</span>
+                              </div>
+                              {order.freightCost && order.freightCost > 0 && (
+                                <div className="flex justify-between items-center text-sm text-gray-600">
+                                  <span>Freight Cost:</span>
+                                  <span>{formatCurrency(order.freightCost, order.currency)}</span>
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                        <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                          <p className="text-lg font-bold text-gray-900">Order Total</p>
+                          <p className="text-xl font-bold text-primary">
+                            {formatCurrency(order.totalAmount, order.currency)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Timeline Information */}
+                <div className="card p-4">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Timeline
+                  </h3>
+                  <div className="space-y-3">
+                    {order.orderCreationDate && (
+                      <div>
+                        <p className="text-sm text-gray-500">Order Creation Date</p>
+                        <p className="font-medium text-gray-900">
+                          {formatDate(order.orderCreationDate)}
+                        </p>
+                      </div>
+                    )}
+                    {order.factoryDepartureDate && (
+                      <div>
+                        <p className="text-sm text-gray-500">Factory Departure Date</p>
+                        <p className="font-medium text-gray-900">
+                          {formatDate(order.factoryDepartureDate)}
+                        </p>
+                      </div>
+                    )}
+                    {order.estimatedDepartureDate && (
+                      <div>
+                        <p className="text-sm text-gray-500">Estimated Departure Date</p>
+                        <p className="font-medium text-gray-900">
+                          {formatDate(order.estimatedDepartureDate)}
+                        </p>
+                      </div>
+                    )}
+                    {order.estimatedArrivalDate && (
+                      <div>
+                        <p className="text-sm text-gray-500">Estimated Arrival Date</p>
+                        <p className="font-medium text-gray-900">
+                          {formatDate(order.estimatedArrivalDate)}
+                        </p>
+                      </div>
+                    )}
+                    {!order.orderCreationDate && !order.factoryDepartureDate && !order.estimatedDepartureDate && !order.estimatedArrivalDate && (
+                      <p className="text-sm text-gray-500">No timeline dates set</p>
+                    )}
+                    {order.timelineNotes && (
+                      <div>
+                        <p className="text-sm text-gray-500">Timeline Notes</p>
+                        <p className="font-medium text-gray-900">{order.timelineNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shipment Information */}
+                {(order.shipmentMethod || order.shippingCompany || order.shippingOrderNumber) && (
+                  <div className="card p-4">
+                    <h3 className="font-medium text-gray-900 mb-3 flex items-center">
+                      <Truck className="h-4 w-4 mr-2" />
+                      Shipment Information
+                    </h3>
+                    <div className="space-y-3">
+                      {order.shipmentMethod && (
+                        <div>
+                          <p className="text-sm text-gray-500">Shipment Method</p>
+                          <p className="font-medium text-gray-900">
+                            {order.shipmentMethod === "air" ? "By Air" : 
+                             order.shipmentMethod === "sea" ? "By Sea" : 
+                             order.shipmentMethod === "road" ? "By Road" : 
+                             order.shipmentMethod === "train" ? "By Train" : order.shipmentMethod}
+                          </p>
+                        </div>
+                      )}
+                      {order.shippingCompany && (
+                        <div>
+                          <p className="text-sm text-gray-500">Shipping Company</p>
+                          <p className="font-medium text-gray-900">{order.shippingCompany}</p>
+                        </div>
+                      )}
+                      {order.shippingOrderNumber && (
+                        <div>
+                          <p className="text-sm text-gray-500">Shipping Order Number</p>
+                          <p className="font-medium text-gray-900">{order.shippingOrderNumber}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Invoice & Payment Status */}
                 {order.invoice && (
@@ -243,35 +441,129 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                     </h3>
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
-                        <div>
+                        <div className="flex-1">
                           <p className="text-sm text-gray-500">Invoice Number</p>
-                          <p className="font-medium text-gray-900">
-                            {order.invoice.invoiceNumber}
-                          </p>
+                          {isEditingInvoiceNumber ? (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="text"
+                                value={newInvoiceNumber}
+                                onChange={(e) => setNewInvoiceNumber(e.target.value)}
+                                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-primary focus:border-primary"
+                                placeholder="Enter new invoice number"
+                              />
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await updateInvoiceNumber({
+                                      orderId: order._id,
+                                      invoiceNumber: newInvoiceNumber.trim(),
+                                    });
+                                    setIsEditingInvoiceNumber(false);
+                                    setNewInvoiceNumber("");
+                                  } catch (error) {
+                                    console.error("Failed to update invoice number:", error);
+                                    
+                                    // Provide more specific error messages based on the error type
+                                    let errorMessage = "Failed to update invoice number. Please try again.";
+                                    
+                                    if (error instanceof Error) {
+                                      const errorStr = error.message.toLowerCase();
+                                      
+                                      if (errorStr.includes("validation") || errorStr.includes("invalid")) {
+                                        errorMessage = "Invalid invoice number. Please check the format and try again.";
+                                      } else if (errorStr.includes("duplicate") || errorStr.includes("already exists")) {
+                                        errorMessage = "An invoice with this number already exists. Please use a different invoice number.";
+                                      } else if (errorStr.includes("permission") || errorStr.includes("unauthorized")) {
+                                        errorMessage = "You don't have permission to update invoice numbers. Please contact your administrator.";
+                                      } else if (errorStr.includes("not found") || errorStr.includes("doesn't exist")) {
+                                        errorMessage = "Order or invoice not found. The record may have been deleted.";
+                                      } else if (errorStr.includes("network") || errorStr.includes("connection")) {
+                                        errorMessage = "Network connection error. Please check your internet connection and try again.";
+                                      } else {
+                                        // For other errors, show the actual error message if it's not too technical
+                                        const cleanMessage = error.message.replace(/^Error: /, '').replace(/^ConvexError: /, '');
+                                        if (cleanMessage.length < 100 && !cleanMessage.includes('internal') && !cleanMessage.includes('server')) {
+                                          errorMessage = `Error: ${cleanMessage}`;
+                                        }
+                                      }
+                                    }
+                                    
+                                    alert(errorMessage);
+                                  }
+                                }}
+                                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                              >
+                                Save
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setIsEditingInvoiceNumber(false);
+                                  setNewInvoiceNumber("");
+                                }}
+                                className="px-2 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <p className="font-medium text-gray-900">
+                                {order.invoiceNumber || "Not set"}
+                              </p>
+                              <button
+                                onClick={() => {
+                                  setIsEditingInvoiceNumber(true);
+                                  setNewInvoiceNumber(order.invoiceNumber || "");
+                                }}
+                                className="text-blue-600 hover:text-blue-800"
+                                title="Edit invoice number"
+                              >
+                                <Edit className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <span className={`px-3 py-1 text-xs font-medium rounded-full ${getPaymentStatusColor(order.invoice.status)}`}>
                           {order.invoice.status.replace("_", " ")}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-sm text-gray-500">Total Paid</p>
-                          <p className="font-medium text-green-600">
-                            {formatCurrency(order.invoice.totalPaid, order.currency)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Outstanding</p>
-                          <p className="font-medium text-red-600">
-                            {formatCurrency(order.invoice.outstandingBalance, order.currency)}
-                          </p>
-                        </div>
-                      </div>
-                      {order.invoice.outstandingBalance > 0 && (
-                        <button className="w-full btn-primary text-sm">
-                          Record Payment
-                        </button>
-                      )}
+                      {(() => {
+                        const payments = (order as any).payments || [];
+                        const advancePaid = payments
+                          .filter((p: any) => p.type === "advance")
+                          .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+                        const invoicePaid = payments
+                          .filter((p: any) => p.type !== "advance")
+                          .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+                        return (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                              <p className="text-xs text-gray-500">Total Paid</p>
+                              <p className="mt-1 text-lg font-semibold text-green-600">{formatCurrency(order.invoice.totalPaid, order.currency)}</p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                              <p className="text-xs text-gray-500">Outstanding</p>
+                              <p className="mt-1 text-lg font-semibold text-orange-600">{formatCurrency(order.invoice.outstandingBalance, order.currency)}</p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                              <p className="text-xs text-gray-500">Advance Paid</p>
+                              <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(advancePaid, order.currency)}</p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 bg-white p-3">
+                              <p className="text-xs text-gray-500">Invoice Payments</p>
+                              <p className="mt-1 text-lg font-semibold text-green-700">{formatCurrency(invoicePaid, order.currency)}</p>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <button
+                        className="w-full btn-primary text-sm"
+                        onClick={() => setIsRecordPaymentOpen(true)}
+                      >
+                        Record Payment
+                      </button>
                     </div>
                   </div>
                 )}
@@ -313,11 +605,85 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                     <p className="text-sm text-gray-600">{order.notes}</p>
                   </div>
                 )}
+
+                {/* Documents */}
+                <div className="card p-4">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <Upload className="h-5 w-5 mr-2" />
+                    Order Documents
+                  </h3>
+                  <div className="space-y-4">
+                    <DocumentUpload
+                      orderId={orderId}
+                      documentType="packingList"
+                      currentFileId={order.packingListId}
+                      onUploadComplete={() => {
+                        // Refresh order data
+                      }}
+                    />
+                    
+                    <DocumentUpload
+                      orderId={orderId}
+                      documentType="proformaInvoice"
+                      currentFileId={order.proformaInvoiceId}
+                      onUploadComplete={() => {
+                        // Refresh order data
+                      }}
+                    />
+                    
+                    <DocumentUpload
+                      orderId={orderId}
+                      documentType="commercialInvoice"
+                      currentFileId={order.commercialInvoiceId}
+                      onUploadComplete={() => {
+                        // Refresh order data
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Activity Log */}
+                <ActivityLog entityId={String(orderId)} title="Order Activity" limit={5} />
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Edit Order Modal */}
+      <EditOrderModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        onSuccess={() => {
+          setShowEditModal(false);
+          // The order data will be automatically refreshed due to Convex reactivity
+        }}
+        orderId={orderId}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onSuccess={() => {
+          setShowDeleteModal(false);
+          onClose(); // Close the detail modal after successful deletion
+        }}
+        orderId={orderId}
+        orderNumber={order?.orderNumber}
+      />
+
+      {/* Record Payment Modal with preselected invoice and client */}
+      {order && (
+        <RecordPaymentModal
+          isOpen={isRecordPaymentOpen}
+          onClose={() => setIsRecordPaymentOpen(false)}
+          preselectedInvoiceId={order.invoice?._id as unknown as Id<"invoices">}
+          preselectedClientId={order.clientId as unknown as Id<"clients">}
+        />
+      )}
+
+
     </div>
   );
 }

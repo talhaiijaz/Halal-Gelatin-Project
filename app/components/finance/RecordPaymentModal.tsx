@@ -21,8 +21,11 @@ export default function RecordPaymentModal({
 }: RecordPaymentModalProps) {
   const recordPayment = useMutation(api.payments.recordPayment);
   const clients = useQuery(api.clients.list, { status: "active" });
+  const bankAccounts = useQuery(api.banks.list);
   const [selectedClientId, setSelectedClientId] = useState<string>(preselectedClientId || "");
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>(preselectedInvoiceId || "");
+  const [isAdvancePayment, setIsAdvancePayment] = useState<boolean>(false);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get unpaid invoices for selected client
@@ -37,6 +40,8 @@ export default function RecordPaymentModal({
     reference: "",
     paymentDate: new Date().toISOString().split('T')[0],
     notes: "",
+    applyWithholding: false,
+    withholdingRate: "",
   });
 
   useEffect(() => {
@@ -64,20 +69,33 @@ export default function RecordPaymentModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!selectedClientId) {
+      alert("Please select a customer");
+      return;
+    }
     if (!selectedInvoiceId) {
       alert("Please select an invoice");
+      return;
+    }
+
+    if (formData.method === "bank_transfer" && !selectedBankAccountId) {
+      alert("Please select a bank account for bank transfer");
       return;
     }
 
     setIsSubmitting(true);
     try {
       await recordPayment({
+        type: isAdvancePayment ? "advance" : "invoice",
         invoiceId: selectedInvoiceId as Id<"invoices">,
+        clientId: selectedClientId as Id<"clients">,
         amount: parseFloat(formData.amount),
         method: formData.method,
         reference: formData.reference,
         paymentDate: new Date(formData.paymentDate).getTime(),
         notes: formData.notes || undefined,
+        bankAccountId: formData.method === "bank_transfer" && selectedBankAccountId ? (selectedBankAccountId as Id<"bankAccounts">) : undefined,
+        withheldTaxRate: rate > 0 ? rate : undefined,
       });
       
       // Reset form
@@ -87,12 +105,48 @@ export default function RecordPaymentModal({
         reference: "",
         paymentDate: new Date().toISOString().split('T')[0],
         notes: "",
+        applyWithholding: false,
+        withholdingRate: "",
       });
       setSelectedClientId("");
       setSelectedInvoiceId("");
+      setIsAdvancePayment(false);
       onClose();
     } catch (error: any) {
-      alert(error.message || "Failed to record payment");
+      console.error("Failed to record payment:", error);
+      
+      // Provide more specific error messages based on the error type
+      let errorMessage = "Failed to record payment. Please try again.";
+      
+      if (error instanceof Error) {
+        const errorStr = error.message.toLowerCase();
+        
+        if (errorStr.includes("validation") || errorStr.includes("invalid")) {
+          errorMessage = "Invalid payment data. Please check all required fields and try again.";
+        } else if (errorStr.includes("amount") || errorStr.includes("payment")) {
+          errorMessage = "Payment amount is invalid. Please check the amount and try again.";
+        } else if (errorStr.includes("invoice") || errorStr.includes("order")) {
+          errorMessage = "Invoice information is invalid. Please select a valid invoice.";
+        } else if (errorStr.includes("client") || errorStr.includes("customer")) {
+          errorMessage = "Customer information is invalid. Please select a valid customer.";
+        } else if (errorStr.includes("bank") || errorStr.includes("account")) {
+          errorMessage = "Bank account information is invalid. Please select a valid bank account.";
+        } else if (errorStr.includes("network") || errorStr.includes("connection")) {
+          errorMessage = "Network connection error. Please check your internet connection and try again.";
+        } else if (errorStr.includes("permission") || errorStr.includes("unauthorized")) {
+          errorMessage = "You don't have permission to record payments. Please contact your administrator.";
+        } else if (errorStr.includes("duplicate") || errorStr.includes("already exists")) {
+          errorMessage = "A payment with similar details already exists. Please check and modify the payment details.";
+        } else {
+          // For other errors, show the actual error message if it's not too technical
+          const cleanMessage = error.message.replace(/^Error: /, '').replace(/^ConvexError: /, '');
+          if (cleanMessage.length < 100 && !cleanMessage.includes('internal') && !cleanMessage.includes('server')) {
+            errorMessage = `Error: ${cleanMessage}`;
+          }
+        }
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -111,6 +165,13 @@ export default function RecordPaymentModal({
       currency: "USD",
     }).format(amount);
   };
+  
+  const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
+  const isLocalClient = selectedClient?.type === "local";
+  const gross = parseFloat(formData.amount || "0") || 0;
+  const rate = formData.applyWithholding && isLocalClient ? Math.max(0, parseFloat(formData.withholdingRate || "0")) : 0;
+  const withheld = rate > 0 ? Math.round((gross * rate) / 100) : 0;
+  const netCash = Math.max(0, gross - withheld);
 
   if (!isOpen) return null;
 
@@ -136,6 +197,8 @@ export default function RecordPaymentModal({
 
           <form onSubmit={handleSubmit} className="p-6">
             <div className="space-y-4">
+              {/* Payment Type moved below invoice selection per request */}
+
               {/* Customer Selector */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -154,7 +217,7 @@ export default function RecordPaymentModal({
                   <option value="">Select a customer</option>
                   {clients?.map(client => (
                     <option key={client._id} value={client._id}>
-                      {client.name} ({client.type})
+                      {client.name} ({client.type === "international" ? "International" : "Local"})
                     </option>
                   ))}
                 </select>
@@ -176,7 +239,10 @@ export default function RecordPaymentModal({
                     <option value="">Select an invoice</option>
                     {unpaidInvoices?.map(invoice => (
                       <option key={invoice._id} value={invoice._id}>
-                        {invoice.invoiceNumber} - {formatCurrency(invoice.outstandingBalance)} outstanding
+                        {(invoice.invoiceNumber && invoice.invoiceNumber.trim() !== "")
+                          ? `${invoice.invoiceNumber} • ${invoice.order?.orderNumber || "Order"}`
+                          : `${invoice.order?.orderNumber || "Order"}`
+                        } - {formatCurrency(invoice.outstandingBalance)} outstanding
                       </option>
                     ))}
                   </select>
@@ -231,24 +297,104 @@ export default function RecordPaymentModal({
                 />
               </div>
 
-              {/* Payment Method */}
+              {/* Payment Method intentionally removed — only Bank Transfer is supported */}
+
+              {/* Withholding (local clients) */}
+              {isLocalClient && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Income Tax Withheld?</label>
+                    <input
+                      type="checkbox"
+                      checked={formData.applyWithholding}
+                      onChange={(e) => setFormData(prev => ({ ...prev, applyWithholding: e.target.checked }))}
+                    />
+                  </div>
+                  {formData.applyWithholding && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-700">Rate (%)</label>
+                      <input
+                        type="number"
+                        value={formData.withholdingRate}
+                        onChange={(e) => setFormData(prev => ({ ...prev, withholdingRate: e.target.value }))}
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g. 4 or 5"
+                        className="w-28 px-2 py-1 border rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      />
+                      <div className="text-xs text-gray-500">Custom rate allowed</div>
+                    </div>
+                  )}
+                  {/* Preview */}
+                  {formData.applyWithholding && (
+                    <div className="bg-gray-50 rounded-md p-3 text-sm grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-gray-600">Gross Amount</div>
+                        <div className="font-semibold">{formatCurrency(gross)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-600">Withheld ({rate || 0}%)</div>
+                        <div className="font-semibold">{formatCurrency(withheld)}</div>
+                      </div>
+                      <div className="col-span-2">
+                        <div className="text-gray-600">Net Cash to Deposit</div>
+                        <div className="font-semibold">{formatCurrency(netCash)}</div>
+                      </div>
+                      {selectedInvoiceId && unpaidInvoices && (() => {
+                        const inv = unpaidInvoices.find(i => i._id === selectedInvoiceId);
+                        if (!inv) return null;
+                        const newOutstanding = Math.max(0, inv.outstandingBalance - gross);
+                        return (
+                          <div className="col-span-2">
+                            <div className="text-gray-600">Outstanding after this payment</div>
+                            <div className="font-semibold text-primary">{formatCurrency(newOutstanding)}</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bank Account Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment Method *
+                  Bank Account *
                 </label>
                 <select
-                  name="method"
-                  value={formData.method}
-                  onChange={handleChange}
+                  value={selectedBankAccountId}
+                  onChange={(e) => setSelectedBankAccountId(e.target.value)}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 >
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="check">Check</option>
-                  <option value="cash">Cash</option>
-                  <option value="credit_card">Credit Card</option>
-                  <option value="other">Other</option>
+                  <option value="">Select a bank account</option>
+                  {bankAccounts?.filter(account => account.status === "active").map(account => (
+                    <option key={account._id} value={account._id}>
+                      {account.accountName} - {account.bankName} ({account.currency})
+                    </option>
+                  ))}
                 </select>
+              </div>
+
+              {/* Advance toggle placed after bank account */}
+              <div className="flex items-center space-x-3">
+                <span className="text-sm text-gray-700">Is this an advance payment?</span>
+                <div className="inline-flex rounded-md border border-gray-300 overflow-hidden">
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-sm ${!isAdvancePayment ? "bg-primary text-white" : "bg-white text-gray-700"}`}
+                    onClick={() => setIsAdvancePayment(false)}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-3 py-1 text-sm ${isAdvancePayment ? "bg-primary text-white" : "bg-white text-gray-700"}`}
+                    onClick={() => setIsAdvancePayment(true)}
+                  >
+                    Yes
+                  </button>
+                </div>
               </div>
 
               {/* Reference */}
@@ -308,7 +454,7 @@ export default function RecordPaymentModal({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !selectedInvoiceId}
+                disabled={isSubmitting || !selectedClientId || !selectedInvoiceId}
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "Recording..." : "Record Payment"}

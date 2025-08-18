@@ -15,18 +15,18 @@ export default defineSchema({
 
   // Clients table
   clients: defineTable({
-    name: v.string(),
-    contactPerson: v.string(),
-    email: v.string(),
-    phone: v.string(),
-    address: v.string(),
-    city: v.string(),
-    country: v.string(),
-    taxId: v.string(),
+    name: v.optional(v.string()),
+    contactPerson: v.optional(v.string()),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
+    address: v.optional(v.string()),
+    city: v.optional(v.string()),
+    country: v.optional(v.string()),
+    taxId: v.optional(v.string()),
     type: v.union(v.literal("local"), v.literal("international")),
     status: v.union(v.literal("active"), v.literal("inactive")),
     createdAt: v.number(),
-    createdBy: v.id("users"),
+    createdBy: v.optional(v.id("users")),
   })
     .index("by_type", ["type"])
     .index("by_status", ["status"])
@@ -37,6 +37,7 @@ export default defineSchema({
   // Orders table
   orders: defineTable({
     orderNumber: v.string(),
+    invoiceNumber: v.optional(v.string()), // Optional invoice number (can be added later)
     clientId: v.id("clients"),
     status: v.union(
       v.literal("pending"),
@@ -46,38 +47,66 @@ export default defineSchema({
       v.literal("delivered"),
       v.literal("cancelled")
     ),
-    expectedDeliveryDate: v.number(),
-    salesRepId: v.id("users"),
+    expectedDeliveryDate: v.optional(v.number()),
+    salesRepId: v.optional(v.id("users")),
     totalAmount: v.number(), // Calculated from order items
+    freightCost: v.optional(v.number()), // Freight/shipping cost
     currency: v.string(),
     notes: v.optional(v.string()),
+    fiscalYear: v.optional(v.number()), // Fiscal year when the order was created
+    // Timeline fields
+    orderCreationDate: v.optional(v.number()),
+    factoryDepartureDate: v.optional(v.number()),
+    estimatedDepartureDate: v.optional(v.number()),
+    estimatedArrivalDate: v.optional(v.number()),
+    timelineNotes: v.optional(v.string()),
+    // Shipment information
+    shipmentMethod: v.optional(v.union(v.literal("air"), v.literal("sea"), v.literal("road"), v.literal("train"))),
+    shippingCompany: v.optional(v.string()),
+    shippingOrderNumber: v.optional(v.string()),
+    // Document attachments
+    packingListId: v.optional(v.id("_storage")),
+    proformaInvoiceId: v.optional(v.id("_storage")),
+    commercialInvoiceId: v.optional(v.id("_storage")),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_client", ["clientId"])
     .index("by_status", ["status"])
     .index("by_order_number", ["orderNumber"])
-    .index("by_sales_rep", ["salesRepId"]),
+    .index("by_invoice_number", ["invoiceNumber"]),
 
   // Order Items table
   orderItems: defineTable({
     orderId: v.id("orders"),
     product: v.string(),
+    // Product specifications
+    bloom: v.optional(v.number()),
+    mesh: v.optional(v.number()),
+    lotNumbers: v.optional(v.array(v.string())),
     quantityKg: v.number(),
     unitPrice: v.number(),
-    totalPrice: v.number(), // quantityKg * unitPrice
+    exclusiveValue: v.optional(v.number()), // quantityKg * unitPrice (before GST)
+    gstRate: v.optional(v.number()), // GST percentage
+    gstAmount: v.optional(v.number()), // GST amount
+    inclusiveTotal: v.optional(v.number()), // Total including GST
+    totalPrice: v.number(), // Legacy field for backward compatibility (same as inclusiveTotal)
     notes: v.optional(v.string()),
+    // Discount fields
+    discountType: v.optional(v.union(v.literal("amount"), v.literal("percentage"))),
+    discountValue: v.optional(v.number()), // Amount or percentage value
+    discountAmount: v.optional(v.number()), // Calculated discount amount
   })
     .index("by_order", ["orderId"]),
 
   // Invoices table
   invoices: defineTable({
-    invoiceNumber: v.string(),
+    invoiceNumber: v.optional(v.string()), // Unique invoice number (e.g., INV-2025-0001)
     orderId: v.id("orders"),
     clientId: v.id("clients"),
     issueDate: v.number(),
     dueDate: v.number(),
-    status: v.union(v.literal("draft"), v.literal("sent"), v.literal("due"), v.literal("partially_paid"), v.literal("paid"), v.literal("overdue")),
+    status: v.union(v.literal("unpaid"), v.literal("partially_paid"), v.literal("paid")),
     amount: v.number(), // Same as order total
     currency: v.string(),
     totalPaid: v.number(),
@@ -93,29 +122,56 @@ export default defineSchema({
 
   // Payments table
   payments: defineTable({
-    invoiceId: v.id("invoices"),
+    // Either linked to an invoice or recorded as an advance against a client
+    type: v.union(v.literal("invoice"), v.literal("advance")),
+    invoiceId: v.optional(v.id("invoices")),
+    clientId: v.id("clients"),
     amount: v.number(),
     currency: v.string(),
     paymentDate: v.number(),
-    method: v.union(v.literal("bank_transfer"), v.literal("check"), v.literal("cash"), v.literal("credit_card"), v.literal("other")),
+    method: v.union(
+      v.literal("bank_transfer"),
+      v.literal("check"),
+      v.literal("cash"),
+      v.literal("credit_card"),
+      v.literal("other")
+    ),
     reference: v.string(),
     notes: v.optional(v.string()),
-    recordedBy: v.id("users"),
+    bankAccountId: v.optional(v.id("bankAccounts")), // Link to bank account for bank transfers
+    // Withholding support (for local clients)
+    cashReceived: v.optional(v.number()), // Net cash deposited to bank (amount - withheld)
+    withheldTaxRate: v.optional(v.number()), // Percentage rate e.g., 5 for 5%
+    withheldTaxAmount: v.optional(v.number()), // Calculated from cashReceived * rate / 100
+    recordedBy: v.optional(v.id("users")),
     createdAt: v.number(),
   })
     .index("by_invoice", ["invoiceId"])
-    .index("by_date", ["paymentDate"]),
+    .index("by_date", ["paymentDate"])
+    .index("by_bank_account", ["bankAccountId"])
+    .index("by_client", ["clientId"]),
 
   // Deliveries table
   deliveries: defineTable({
     orderId: v.id("orders"),
     carrier: v.string(),
     trackingNumber: v.optional(v.string()),
+    // New optional fields to align with UI usage
+    address: v.optional(v.string()),
+    scheduledDate: v.optional(v.number()),
     shippedDate: v.optional(v.number()),
     deliveredDate: v.optional(v.number()),
     incoterms: v.string(), // FOB, CIF, EXW, etc.
     destination: v.string(),
-    status: v.union(v.literal("preparing"), v.literal("shipped"), v.literal("in_transit"), v.literal("delivered")),
+    // Extend statuses to match UI while keeping legacy values for compatibility
+    status: v.union(
+      v.literal("pending"),        // UI expects "pending"
+      v.literal("preparing"),      // legacy value
+      v.literal("shipped"),        // legacy value
+      v.literal("in_transit"),
+      v.literal("delivered"),
+      v.literal("failed")          // UI expects "failed"
+    ),
     notes: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -131,36 +187,21 @@ export default defineSchema({
     currency: v.string(),
     accountType: v.union(v.literal("checking"), v.literal("savings"), v.literal("business")),
     status: v.union(v.literal("active"), v.literal("inactive")),
-    openingBalance: v.number(),
-    currentBalance: v.number(), // Calculated from transactions
     createdAt: v.number(),
   })
     .index("by_currency", ["currency"])
     .index("by_status", ["status"]),
 
-  // Transactions table
-  transactions: defineTable({
-    bankAccountId: v.id("bankAccounts"),
-    type: v.union(
-      v.literal("deposit"),
-      v.literal("withdrawal"),
-      v.literal("payment"),
-      v.literal("receipt"),
-      v.literal("fee"),
-      v.literal("transfer_in"),
-      v.literal("transfer_out")
-    ),
-    amount: v.number(),
-    currency: v.string(),
-    transactionDate: v.number(),
-    reference: v.string(),
-    description: v.string(),
-    invoiceId: v.optional(v.id("invoices")), // Optional link to invoice
-    recordedBy: v.id("users"),
+  // Audit Logs table
+  logs: defineTable({
+    entityTable: v.string(), // e.g., "orders", "clients", "invoices", "payments", "banks"
+    entityId: v.string(), // stringified id for cross-table reference
+    action: v.union(v.literal("create"), v.literal("update"), v.literal("delete")),
+    message: v.string(),
+    metadata: v.optional(v.any()),
+    userId: v.optional(v.id("users")),
     createdAt: v.number(),
   })
-    .index("by_account", ["bankAccountId"])
-    .index("by_type", ["type"])
-    .index("by_date", ["transactionDate"])
-    .index("by_invoice", ["invoiceId"]),
+    .index("by_entity", ["entityTable", "entityId"]) 
+    .index("by_createdAt", ["createdAt"]),
 });

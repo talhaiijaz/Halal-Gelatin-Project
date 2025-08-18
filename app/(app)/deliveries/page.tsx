@@ -321,9 +321,9 @@ export default function DeliveriesPage() {
                         {delivery.order?.orderNumber}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{delivery.client?.name}</div>
-                      <div className="text-xs text-gray-500 capitalize">{delivery.client?.type}</div>
+                    <td className="px-6 py-4 max-w-0">
+                      <div className="text-sm text-gray-900 truncate" title={delivery.client?.name}>{delivery.client?.name}</div>
+                      <div className="text-xs text-gray-500 capitalize truncate" title={delivery.client?.type}>{delivery.client?.type}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(delivery.status)}`}>

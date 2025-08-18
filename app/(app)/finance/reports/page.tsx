@@ -18,10 +18,11 @@ import {
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { getCurrentFiscalYear, getFiscalYearRange, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState<"revenue" | "clients" | "orders" | "payments">("revenue");
-  const [dateRange, setDateRange] = useState<"thisMonth" | "lastMonth" | "thisQuarter" | "thisYear" | "all">("thisMonth");
+  const [dateRange, setDateRange] = useState<"thisMonth" | "lastMonth" | "thisQuarter" | "thisFiscalYear" | "all">("thisMonth");
   
   // Calculate date range based on filter
   const getDateRange = () => {
@@ -30,7 +31,10 @@ export default function ReportsPage() {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
     const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    
+    // Fiscal year range
+    const currentFiscalYear = getCurrentFiscalYear();
+    const fiscalYearRange = getFiscalYearRange(currentFiscalYear);
 
     switch (dateRange) {
       case "thisMonth":
@@ -39,8 +43,8 @@ export default function ReportsPage() {
         return { startDate: startOfLastMonth.getTime(), endDate: endOfLastMonth.getTime() };
       case "thisQuarter":
         return { startDate: startOfQuarter.getTime(), endDate: now.getTime() };
-      case "thisYear":
-        return { startDate: startOfYear.getTime(), endDate: now.getTime() };
+      case "thisFiscalYear":
+        return { startDate: fiscalYearRange.startDate, endDate: now.getTime() };
       default:
         return {};
     }
@@ -232,7 +236,7 @@ export default function ReportsPage() {
           <option value="thisMonth">This Month</option>
           <option value="lastMonth">Last Month</option>
           <option value="thisQuarter">This Quarter</option>
-          <option value="thisYear">This Year</option>
+                          <option value="thisFiscalYear">This Fiscal Year</option>
           <option value="all">All Time</option>
         </select>
       </div>

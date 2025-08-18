@@ -25,11 +25,13 @@ export default function CustomerCard({ customer }: CustomerCardProps) {
           <div className="p-2 bg-gray-100 rounded-lg">
             <Building2 className="h-5 w-5 text-gray-600" />
           </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-900 line-clamp-1">
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-gray-900 truncate" title={customer.name}>
               {customer.name}
             </h3>
-            <p className="text-sm text-gray-600 mt-1">{customer.contactPerson}</p>
+            <p className="text-sm text-gray-600 mt-1 truncate" title={customer.contactPerson}>
+              {customer.contactPerson}
+            </p>
           </div>
         </div>
         <span

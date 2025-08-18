@@ -17,6 +17,7 @@ import {
   TrendingUp,
   Settings,
   LogOut,
+  Activity,
 } from "lucide-react";
 
 interface NavItem {
@@ -33,9 +34,8 @@ const navigation: NavItem[] = [
     href: "#",
     icon: Users,
     children: [
-      { name: "Local Clients", href: "/clients/local" },
-      { name: "International Clients", href: "/clients/international" },
-      { name: "All Clients", href: "/clients" },
+      { name: "Local", href: "/clients/local" },
+      { name: "International", href: "/clients/international" },
     ],
   },
   {
@@ -45,20 +45,10 @@ const navigation: NavItem[] = [
   },
   {
     name: "Finance",
-    href: "#",
+    href: "/finance",
     icon: DollarSign,
-    children: [
-      { name: "Dashboard", href: "/finance" },
-      { name: "Invoices", href: "/finance/invoices" },
-      { name: "Payments", href: "/finance/payments" },
-      { name: "Reports", href: "/finance/reports" },
-    ],
   },
-  {
-    name: "Deliveries",
-    href: "/deliveries",
-    icon: MapPin,
-  },
+
 ];
 
 export default function Sidebar() {
@@ -91,7 +81,14 @@ export default function Sidebar() {
     <>
       {/* Logo Section */}
       <div className="flex h-16 items-center px-6 border-b border-gray-200">
-        <h1 className="text-xl font-bold text-gray-900">Halal Gelatin CRM</h1>
+        <div className="flex items-center">
+          <img
+            src="/images/Logo-Final-Vector-22.png"
+            alt="Halal Gelatin"
+            className="h-10 w-auto"
+          />
+          <span className="ml-3 text-base font-semibold text-gray-900">Halal Gelatin</span>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -187,6 +184,14 @@ export default function Sidebar() {
               <Settings className="mr-3 h-4 w-4 text-gray-400" />
               Settings
             </Link>
+            <Link
+              href="/logs"
+              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Activity className="mr-3 h-4 w-4 text-gray-400" />
+              Logs
+            </Link>
           </div>
         </div>
       </div>
@@ -198,7 +203,14 @@ export default function Sidebar() {
       {/* Mobile menu button */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200">
         <div className="flex items-center justify-between h-16 px-4">
-          <h1 className="text-lg font-bold text-gray-900">Halal Gelatin CRM</h1>
+          <div className="flex items-center">
+            <img
+              src="/images/Logo-Final-Vector-22.png"
+              alt="Halal Gelatin"
+              className="h-8 w-auto"
+            />
+            <span className="ml-2 text-sm font-semibold text-gray-900">Halal Gelatin</span>
+          </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"

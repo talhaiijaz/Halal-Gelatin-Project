@@ -7,6 +7,9 @@ import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation"
 import CustomerCard from "@/app/components/clients/CustomerCard";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import AddCustomerModal from "@/app/components/clients/AddCustomerModal";
+import EditCustomerModal from "@/app/components/clients/EditCustomerModal";
+import DeleteConfirmModal from "@/app/components/clients/DeleteConfirmModal";
+import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import { 
   Search, 
   Plus, 
@@ -15,18 +18,38 @@ import {
   TrendingUp,
   Filter,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  Building2,
+  Mail,
+  Phone,
+  MapPin,
+  Edit,
+  Trash2
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
+import Link from "next/link";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 
 export default function InternationalClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
+  const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
+  const [selectedClientForOrder, setSelectedClientForOrder] = useState<Id<"clients"> | null>(null);
+  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [selectedClientForEdit, setSelectedClientForEdit] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [customerFilter, setCustomerFilter] = useState<string>("");
-  const [productFilter, setProductFilter] = useState<string>("");
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | undefined>(undefined);
 
+  const router = useRouter();
+
+
+
+  // Internal tabs (Dashboard, Orders, Customers)
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <TrendingUp className="h-4 w-4" /> },
     { id: "orders", label: "Orders", icon: <Package className="h-4 w-4" /> },
@@ -36,36 +59,36 @@ export default function InternationalClientsPage() {
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
 
   // Fetch data
-  const clients = useQuery(api.clients.list, { 
+  const clients = useQuery(api.clients.list, {
     type: "international",
-    search: searchQuery || undefined,
+    search: searchQuery,
   });
 
-  const orders = useQuery(api.orders.list, { 
+  const orders = useQuery(api.orders.list, {
+    clientType: "international",
+    fiscalYear: selectedFiscalYear,
+  });
+
+  const stats = useQuery(api.clients.getStats, {
+    type: "international",
+  });
+
+  const orderStats = useQuery(api.orders.getStats, {
     clientType: "international",
   });
-
-  const stats = useQuery(api.clients.getStats, { type: "international" });
-  const orderStats = useQuery(api.orders.getStats, { clientType: "international" });
+  const clientSummary = useQuery(api.clients.getClientSummary, { type: "international" });
 
   // Filter orders
-  const filteredOrders = orders?.filter(order => {
-    if (statusFilter && order.status !== statusFilter) return false;
-    if (customerFilter && order.client?.name !== customerFilter) return false;
-    if (productFilter) {
-      const hasProduct = order.items.some(item => 
-        item.product.toLowerCase().includes(productFilter.toLowerCase())
-      );
-      if (!hasProduct) return false;
-    }
-    return true;
+  const filteredOrders = orders?.filter((order) => {
+    const matchesStatus = !statusFilter || order.status === statusFilter;
+    const matchesCustomer = !customerFilter || order.client?.name?.toLowerCase().includes(customerFilter.toLowerCase());
+    return matchesStatus && matchesCustomer;
   });
 
-  // Get unique values for filters
-  const uniqueCustomers = [...new Set(orders?.map(o => o.client?.name).filter(Boolean))];
-  const uniqueProducts = [...new Set(
-    orders?.flatMap(o => o.items.map(i => i.product)) || []
-  )];
+  // Get unique customers for filter
+  const uniqueCustomers = orders 
+    ? Array.from(new Set(orders.map(order => order.client?.name).filter(Boolean) as string[])).sort()
+    : [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -75,47 +98,51 @@ export default function InternationalClientsPage() {
   };
 
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return new Date(timestamp).toLocaleDateString();
   };
 
   const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: "bg-yellow-100 text-yellow-800",
-      confirmed: "bg-blue-100 text-blue-800",
-      in_production: "bg-purple-100 text-purple-800",
-      shipped: "bg-indigo-100 text-indigo-800",
-      delivered: "bg-green-100 text-green-800",
-      cancelled: "bg-red-100 text-red-800",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "confirmed":
+        return "bg-blue-100 text-blue-800";
+      case "in_production":
+        return "bg-purple-100 text-purple-800";
+      case "shipped":
+        return "bg-indigo-100 text-indigo-800";
+      case "delivered":
+        return "bg-green-100 text-green-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
   };
 
   const getPaymentStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      draft: "bg-gray-100 text-gray-800",
-      sent: "bg-blue-100 text-blue-800",
-      due: "bg-yellow-100 text-yellow-800",
-      partially_paid: "bg-orange-100 text-orange-800",
-      paid: "bg-green-100 text-green-800",
-      overdue: "bg-red-100 text-red-800",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
+    switch (status) {
+      case "paid":
+        return "bg-green-100 text-green-800";
+      case "partially_paid":
+        return "bg-yellow-100 text-yellow-800";
+      case "overdue":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
   };
 
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">International Clients</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Manage your international client relationships
-          </p>
-        </div>
+              <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">International Clients</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Manage your international client relationships
+            </p>
+          </div>
         <button
           onClick={() => setIsAddCustomerOpen(true)}
           className="btn-primary flex items-center"
@@ -123,10 +150,10 @@ export default function InternationalClientsPage() {
           <Plus className="h-4 w-4 mr-2" />
           Add Customer
         </button>
-      </div>
+              </div>
 
-      {/* Tab Navigation */}
-      <TabNavigation
+        {/* Tab Navigation */}
+        <TabNavigation
         tabs={tabs}
         defaultTab={activeTab}
         onTabChange={setActiveTab}
@@ -136,24 +163,21 @@ export default function InternationalClientsPage() {
       {/* Dashboard Tab */}
       {activeTab === "dashboard" && (
         <div className="space-y-6">
-          {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="card p-4">
               <p className="text-sm text-gray-500">Total Customers</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {stats?.totalClients || 0}
               </p>
-              <p className="text-xs text-gray-600 mt-1">
-                {stats?.activeClients || 0} active
-              </p>
             </div>
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Orders</p>
+              <p className="text-sm text-gray-500">Active Orders</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
-                {stats?.totalOrders || 0}
+                {stats?.activeOrders || 0}
               </p>
-              <p className="text-xs text-gray-600 mt-1">
-                {stats?.activeOrders || 0} active
+              <p className="text-xs text-gray-500 mt-1">
+                Total Orders: {stats?.totalOrders || 0}
               </p>
             </div>
             <div className="card p-4">
@@ -166,6 +190,12 @@ export default function InternationalClientsPage() {
               <p className="text-sm text-gray-500">Outstanding</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">
                 {formatCurrency(stats?.outstandingAmount || 0)}
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Total Quantity (kg)</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {(orderStats?.totalQuantity || 0).toLocaleString()}
               </p>
             </div>
           </div>
@@ -189,25 +219,103 @@ export default function InternationalClientsPage() {
             </div>
           )}
 
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Average Order Value</p>
-              <p className="text-xl font-bold text-gray-900 mt-1">
-                {formatCurrency(orderStats?.averageOrderValue || 0)}
+
+
+          {/* Client Summary Table */}
+          <div className="card overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Client Summary
+              </h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Outstanding amounts and total quantities by client
               </p>
             </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Quantity (kg)</p>
-              <p className="text-xl font-bold text-gray-900 mt-1">
-                {orderStats?.totalQuantity?.toLocaleString() || 0}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Active Orders</p>
-              <p className="text-xl font-bold text-gray-900 mt-1">
-                {orderStats?.activeOrders || 0}
-              </p>
+            <div className="overflow-x-auto">
+              <table className="w-full table-fixed divide-y divide-gray-200">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[50%]">
+                      Client
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
+                      Outstanding Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
+                      Total Quantity (kg)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {!clientSummary ? (
+                    // Loading skeletons
+                    [...Array(5)].map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse mr-3" />
+                            <div>
+                              <div className="w-32 h-4 bg-gray-200 rounded animate-pulse" />
+                              <div className="w-24 h-3 bg-gray-200 rounded animate-pulse mt-1" />
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4"><div className="w-20 h-4 bg-gray-200 rounded animate-pulse" /></td>
+                        <td className="px-6 py-4"><div className="w-16 h-4 bg-gray-200 rounded animate-pulse" /></td>
+                      </tr>
+                    ))
+                  ) : clientSummary.length === 0 ? (
+                    // Empty state
+                    <tr>
+                      <td colSpan={3} className="px-6 py-12 text-center">
+                        <Building2 className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No clients found</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Start by adding your first international client.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    // Client rows
+                    clientSummary.map((client) => (
+                      <tr key={client.clientId} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
+                              <span className="text-white text-sm font-medium">
+                                {client.clientName?.charAt(0).toUpperCase() || "?"}
+                              </span>
+                            </div>
+                            <div className="ml-3 min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-900 truncate" title={client.clientName}>
+                                {client.clientName}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate" title={client.clientEmail}>
+                                {client.clientEmail}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(client.outstandingAmount)}
+                          </div>
+                          {client.outstandingAmount > 0 && (
+                            <div className="text-xs text-red-600 font-medium">
+                              Outstanding
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {(client.totalQuantity || 0).toLocaleString()}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -229,12 +337,12 @@ export default function InternationalClientsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 >
                   <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="in_production">In Production</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
                   <option value="cancelled">Cancelled</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="in_production">In Production</option>
+                  <option value="pending">Pending</option>
+                  <option value="shipped">Shipped</option>
                 </select>
               </div>
 
@@ -258,89 +366,125 @@ export default function InternationalClientsPage() {
 
               <div className="flex-1 min-w-[200px]">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Product
+                  Fiscal Year
                 </label>
-                <input
-                  type="text"
-                  value={productFilter}
-                  onChange={(e) => setProductFilter(e.target.value)}
-                  placeholder="Search product..."
+                <select
+                  value={selectedFiscalYear || ""}
+                  onChange={(e) => setSelectedFiscalYear(e.target.value ? Number(e.target.value) : undefined)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                />
+                >
+                  <option value="">All Fiscal Years</option>
+                  {getFiscalYearOptions().map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
               </div>
+
             </div>
           </div>
 
           {/* Orders Table */}
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                      Order Number
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Customer
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
+                      Client
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Order Detail
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                      Status
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Processing Status
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                      Total Amount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Product
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
+                      Delivery Date
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Payment Status
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
+                      Created
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[7%]">
+                      Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrders?.map((order) => (
-                    <tr
-                      key={order._id}
-                      onClick={() => setSelectedOrderId(order._id)}
-                      className="hover:bg-gray-50 cursor-pointer"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDate(order.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.client?.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {order.orderNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status.replace("_", " ")}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        <div className="max-w-xs truncate">
-                          {order.items.map(item => item.product).join(", ")}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {order.invoice ? (
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getPaymentStatusColor(order.invoice.status)}`}>
-                            {order.invoice.status.replace("_", " ")}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-500">No invoice</span>
-                        )}
+                  {filteredOrders?.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center">
+                        <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                        <p className="text-gray-500">No orders found</p>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredOrders?.map((order) => (
+                      <tr
+                        key={order._id}
+                        className="hover:bg-gray-50 cursor-pointer"
+                        onClick={() => setSelectedOrderId(order._id)}
+                      >
+                        <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                          <div className="truncate" title={order.orderNumber}>
+                            {order.orderNumber}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 max-w-0">
+                          <div className="w-full">
+                            <div className="text-sm font-medium text-gray-900 truncate" title={order.client?.name}>
+                              {order.client?.name}
+                            </div>
+                            <div className="text-sm text-gray-500 truncate" title={`${order.client?.city}, ${order.client?.country}`}>
+                              {order.client?.city}, {order.client?.country}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                            {order.status.replace("_", " ")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(order.totalAmount)}
+                          </div>
+                          <div className="text-sm text-gray-500">{order.currency}</div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-900">
+                          <div className="truncate" title={order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}>
+                            {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-900">
+                          <div className="truncate" title={formatDate(order.createdAt)}>
+                            {formatDate(order.createdAt)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-sm font-medium">
+                          <div className="flex items-center justify-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedOrderId(order._id);
+                              }}
+                              className="text-primary hover:text-primary-dark p-1 rounded hover:bg-gray-100"
+                              title="View Details"
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
-              {filteredOrders?.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  No orders found
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -362,9 +506,98 @@ export default function InternationalClientsPage() {
           </div>
 
           {/* Customer Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {clients?.map((client) => (
-              <CustomerCard key={client._id} customer={client} />
+              <div key={client._id} className="card-hover p-6 flex flex-col h-full">
+                {/* Header with icon, name and status */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start space-x-3 flex-1 min-w-0">
+                    <div className="flex-shrink-0 p-3 bg-primary/10 rounded-lg">
+                      <Building2 className="h-6 w-6 text-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg font-semibold text-gray-900 truncate">
+                        {client.name}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1 truncate">{client.contactPerson}</p>
+                    </div>
+                  </div>
+                  <span
+                    className={`flex-shrink-0 ml-2 inline-flex px-3 py-1 text-xs font-medium rounded-full ${
+                      client.status === "active"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {client.status}
+                  </span>
+                </div>
+
+                {/* Contact Information */}
+                <div className="space-y-3 flex-1 mb-6">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <MapPin className="h-4 w-4 mr-3 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">
+                      {client.city}, {client.country}
+                    </span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Mail className="h-4 w-4 mr-3 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">{client.email}</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Phone className="h-4 w-4 mr-3 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">{client.phone}</span>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2 mt-auto">
+                  {/* Primary Actions */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        setSelectedClientForOrder(client._id);
+                        setIsCreateOrderOpen(true);
+                      }}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Order
+                    </button>
+                    <Link
+                      href={`/clients/${client._id}`}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary-dark transition-colors"
+                    >
+                      View Details
+                    </Link>
+                  </div>
+                  
+                  {/* Secondary Actions */}
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => {
+                        setSelectedClientForEdit(client);
+                        setIsEditCustomerOpen(true);
+                      }}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedClientForEdit(client);
+                        setIsDeleteConfirmOpen(true);
+                      }}
+                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
 
@@ -389,10 +622,45 @@ export default function InternationalClientsPage() {
         onClose={() => setSelectedOrderId(null)}
       />
 
+      <CreateOrderModal
+        isOpen={isCreateOrderOpen}
+        onClose={() => {
+          setIsCreateOrderOpen(false);
+          setSelectedClientForOrder(null);
+        }}
+        preselectedClientId={selectedClientForOrder || undefined}
+        onSuccess={() => {
+          setIsCreateOrderOpen(false);
+          setSelectedClientForOrder(null);
+          toast.success("Order created successfully!");
+        }}
+      />
+
       <AddCustomerModal
         isOpen={isAddCustomerOpen}
         onClose={() => setIsAddCustomerOpen(false)}
         type="international"
+      />
+
+      <EditCustomerModal
+        isOpen={isEditCustomerOpen}
+        onClose={() => {
+          setIsEditCustomerOpen(false);
+          setSelectedClientForEdit(null);
+        }}
+        client={selectedClientForEdit}
+      />
+
+      <DeleteConfirmModal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => {
+          setIsDeleteConfirmOpen(false);
+          setSelectedClientForEdit(null);
+        }}
+        client={selectedClientForEdit}
+        onSuccess={() => {
+          toast.success("Customer deleted successfully!");
+        }}
       />
     </div>
   );
