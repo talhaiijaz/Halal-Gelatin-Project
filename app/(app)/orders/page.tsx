@@ -38,6 +38,14 @@ export default function OrdersPage() {
     fiscalYear: selectedFiscalYear,
   });
 
+  const formatCurrency = (amount: number, currency: 'USD' | 'PKR') =>
+    new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount || 0);
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "pending":
@@ -280,10 +288,7 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="text-sm font-medium text-gray-900">
-                      ${order.totalAmount.toFixed(2)}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {order.currency}
+                      {formatCurrency(order.totalAmount, (order as any).currency === 'PKR' ? 'PKR' : 'USD')}
                     </div>
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-900">

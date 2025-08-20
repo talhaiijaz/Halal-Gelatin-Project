@@ -70,15 +70,19 @@ export const getStats = query({
     activeOrders: v.object({
       value: v.number(),
     }),
-    currentYearRevenue: v.object({
-      value: v.number(),
-    }),
-    outstandingAmount: v.object({
-      value: v.number(),
-    }),
+    currentYearRevenue: v.object({ value: v.number() }),
+    outstandingAmount: v.object({ value: v.number() }),
+    revenueUSD: v.number(),
+    revenuePKR: v.number(),
+    outstandingUSD: v.number(),
+    outstandingPKR: v.number(),
     totalRevenue: v.number(),
     totalPaid: v.number(),
     activeClients: v.number(),
+    localClients: v.number(),
+    internationalClients: v.number(),
+    localOrders: v.number(),
+    internationalOrders: v.number(),
     totalOrders: v.optional(v.object({
       value: v.number(),
     })),
@@ -93,17 +97,33 @@ export const getStats = query({
     // Calculate client stats
     const totalClients = clients.length;
     const activeClients = clients.filter(c => c.status === "active").length;
+    const localClients = clients.filter(c => c.type === "local").length;
+    const internationalClients = clients.filter(c => c.type === "international").length;
 
     // Calculate order stats
     const totalOrders = orders.length;
     const activeOrders = orders.filter(o => 
       ["pending", "confirmed", "in_production", "shipped"].includes(o.status)
     ).length;
+    
+    // Calculate orders by client type
+    const localOrders = orders.filter(o => {
+      const client = clients.find(c => c._id === o.clientId);
+      return client?.type === "local";
+    }).length;
+    const internationalOrders = orders.filter(o => {
+      const client = clients.find(c => c._id === o.clientId);
+      return client?.type === "international";
+    }).length;
 
-    // Calculate financial stats
+    // Calculate financial stats (by currency)
     const totalRevenue = invoices.reduce((sum, inv) => sum + inv.amount, 0);
     const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     const outstandingAmount = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    const revenueUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.amount, 0);
+    const revenuePKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.amount, 0);
+    const outstandingUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
+    const outstandingPKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
 
     // Get current fiscal year stats (July 1 to June 30)
     const currentDate = new Date();
@@ -160,15 +180,19 @@ export const getStats = query({
       activeOrders: {
         value: activeOrders,
       },
-      currentYearRevenue: {
-        value: currentYearRevenue,
-      },
-      outstandingAmount: {
-        value: outstandingAmount,
-      },
+      currentYearRevenue: { value: currentYearRevenue },
+      outstandingAmount: { value: outstandingAmount },
+      revenueUSD,
+      revenuePKR,
+      outstandingUSD,
+      outstandingPKR,
       totalRevenue,
       totalPaid,
       activeClients,
+      localClients,
+      internationalClients,
+      localOrders,
+      internationalOrders,
       totalOrders: {
         value: totalOrders,
       },

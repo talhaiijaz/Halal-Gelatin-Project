@@ -86,10 +86,12 @@ export default function LocalClientsPage() {
     : [];
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
+    return new Intl.NumberFormat('en-PK', {
+      style: 'currency',
+      currency: 'PKR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount || 0);
   };
 
   const formatDate = (timestamp: number) => {
@@ -442,7 +444,6 @@ export default function LocalClientsPage() {
                           <div className="text-sm font-medium text-gray-900">
                             {formatCurrency(order.totalAmount)}
                           </div>
-                          <div className="text-sm text-gray-500">{order.currency}</div>
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900">
                           <div className="truncate" title={order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}>

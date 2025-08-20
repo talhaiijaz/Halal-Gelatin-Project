@@ -104,9 +104,11 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   };
 
   const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
       style: "currency",
       currency: currency || "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 

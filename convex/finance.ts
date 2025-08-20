@@ -55,6 +55,13 @@ export const getDashboardStats = query({
 
     const totalPaid = yearInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     const totalOutstanding = yearInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    // Per-currency aggregates for Option A
+    const totalRevenueUSD = yearInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.amount, 0);
+    const totalRevenuePKR = yearInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.amount, 0);
+    const totalPaidUSD = yearInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.totalPaid, 0);
+    const totalPaidPKR = yearInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.totalPaid, 0);
+    const totalOutstandingUSD = yearInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
+    const totalOutstandingPKR = yearInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
 
     // No due/overdue concept in this system
     const overdueInvoices: any[] = [];
@@ -88,6 +95,12 @@ export const getDashboardStats = query({
       totalRevenue,
       totalPaid,
       totalOutstanding,
+      totalRevenueUSD,
+      totalRevenuePKR,
+      totalPaidUSD,
+      totalPaidPKR,
+      totalOutstandingUSD,
+      totalOutstandingPKR,
       overdueInvoices: overdueInvoices.length,
       // Payment statistics
       totalPaymentsReceived,
@@ -222,6 +235,10 @@ export const getInvoiceStats = query({
     totalPaid: v.number(),
     overdueCount: v.number(),
     totalCount: v.number(),
+    totalOutstandingUSD: v.number(),
+    totalOutstandingPKR: v.number(),
+    totalPaidUSD: v.number(),
+    totalPaidPKR: v.number(),
   }),
   handler: async (ctx, args) => {
     let invoices = await ctx.db.query("invoices").collect();
@@ -238,6 +255,10 @@ export const getInvoiceStats = query({
 
     const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
     const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+    const totalOutstandingUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
+    const totalOutstandingPKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
+    const totalPaidUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.totalPaid, 0);
+    const totalPaidPKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.totalPaid, 0);
     const overdueCount = 0;
     const totalCount = invoices.length;
 
@@ -246,6 +267,10 @@ export const getInvoiceStats = query({
       totalPaid,
       overdueCount,
       totalCount,
+      totalOutstandingUSD,
+      totalOutstandingPKR,
+      totalPaidUSD,
+      totalPaidPKR,
     };
   },
 });

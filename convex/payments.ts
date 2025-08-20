@@ -4,9 +4,11 @@ import { Id } from "./_generated/dataModel";
 
 // Helper function to format currency
 function formatCurrency(amount: number, currency: string = "USD"): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
     style: "currency",
     currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 
@@ -76,6 +78,14 @@ export const recordPayment = mutation({
       const rate = isLocalClient && args.withheldTaxRate ? Math.max(0, args.withheldTaxRate) : 0;
       const withheldAmount = rate > 0 ? Math.round((args.amount * rate) / 100) : 0;
       const netCash = Math.max(0, args.amount - withheldAmount);
+
+      // Validate bank account currency if provided (must match invoice currency)
+      if (args.bankAccountId) {
+        const bank = await ctx.db.get(args.bankAccountId);
+        if (bank && bank.currency !== currency) {
+          throw new Error(`Bank account currency (${bank.currency}) must match invoice currency (${currency})`);
+        }
+      }
 
       // Create payment record (respect requested type; default to 'invoice')
       const paymentId = await ctx.db.insert("payments", {
@@ -149,14 +159,22 @@ export const recordPayment = mutation({
     const client = await ctx.db.get(args.clientId);
     if (!client) throw new Error("Client not found");
 
-    // Use a default currency for advances; could be improved by client default
-    currency = "USD";
+    // Set currency for advances by client type (local -> PKR, international -> USD)
+    currency = client.type === "local" ? "PKR" : "USD";
     clientId = args.clientId;
     paymentType = "advance";
 
     const rateForAdvance = client.type === "local" && args.withheldTaxRate ? Math.max(0, args.withheldTaxRate) : 0;
     const withheldForAdvance = rateForAdvance > 0 ? Math.round((args.amount * rateForAdvance) / 100) : 0;
     const netCashAdvance = Math.max(0, args.amount - withheldForAdvance);
+
+    // Validate bank account currency for advances too (must match derived currency)
+    if (args.bankAccountId) {
+      const bank = await ctx.db.get(args.bankAccountId);
+      if (bank && bank.currency !== currency) {
+        throw new Error(`Bank account currency (${bank.currency}) must match client currency (${currency})`);
+      }
+    }
 
     const paymentId = await ctx.db.insert("payments", {
       type: paymentType,
@@ -357,8 +375,10 @@ export const getStats = query({
       }
     });
 
-    // Calculate total
+    // Calculate totals (per currency)
     const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalAmountUSD = payments.filter(p => p.currency === "USD").reduce((s, p) => s + p.amount, 0);
+    const totalAmountPKR = payments.filter(p => p.currency === "PKR").reduce((s, p) => s + p.amount, 0);
     const totalCount = payments.length;
 
     // Calculate daily average
@@ -367,6 +387,8 @@ export const getStats = query({
 
     return {
       totalAmount,
+      totalAmountUSD,
+      totalAmountPKR,
       totalCount,
       dailyAverage,
       methodStats,
@@ -562,7 +584,7 @@ export const updatePayment = mutation({
       entityTable: "payments",
       entityId: String(args.paymentId),
       action: "update",
-      message: `Payment updated: ${invoiceNumber} - $${args.amount} (${clientName})`,
+      message: `Payment updated: ${invoiceNumber} - ${formatCurrency(args.amount, existing.currency || 'USD')} (${clientName})`,
       metadata: { 
         previous: { amount: existing.amount, bankAccountId: existing.bankAccountId }, 
         next: { amount: args.amount, bankAccountId: args.bankAccountId },

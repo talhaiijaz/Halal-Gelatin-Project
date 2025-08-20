@@ -255,6 +255,12 @@ export const getStats = query({
       totalAmount: 0,
       totalPaid: 0,
       totalOutstanding: 0,
+      totalAmountUSD: 0,
+      totalAmountPKR: 0,
+      totalPaidUSD: 0,
+      totalPaidPKR: 0,
+      totalOutstandingUSD: 0,
+      totalOutstandingPKR: 0,
       byStatus: {
         unpaid: 0,
         partially_paid: 0,
@@ -269,6 +275,17 @@ export const getStats = query({
       stats.totalAmount += invoice.amount;
       stats.totalPaid += invoice.totalPaid;
       stats.totalOutstanding += invoice.outstandingBalance;
+      
+      // Separate by currency
+      if (invoice.currency === "USD") {
+        stats.totalAmountUSD += invoice.amount;
+        stats.totalPaidUSD += invoice.totalPaid;
+        stats.totalOutstandingUSD += invoice.outstandingBalance;
+      } else if (invoice.currency === "PKR") {
+        stats.totalAmountPKR += invoice.amount;
+        stats.totalPaidPKR += invoice.totalPaid;
+        stats.totalOutstandingPKR += invoice.outstandingBalance;
+      }
       
       // Categorize invoices by payment status
       if (invoice.outstandingBalance === 0) {

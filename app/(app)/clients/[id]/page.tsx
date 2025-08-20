@@ -41,10 +41,12 @@ export default function ClientDetailPage() {
   const client = useQuery(api.clients.get, { id: clientId });
   const updateClient = useMutation(api.clients.update);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+  const formatCurrency = (amount: number, currency: 'USD' | 'PKR' = 'USD') => {
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
       style: 'currency',
-      currency: 'USD',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -286,9 +288,11 @@ export default function ClientDetailPage() {
               </div>
               
               <div className="text-center p-3 bg-green-50 rounded-lg">
-                <DollarSign className="h-6 w-6 text-green-600 mx-auto mb-1" />
+                <span className="text-green-600 text-lg font-bold mx-auto mb-1 block">
+                  {client.type === 'local' ? '₨' : '$'}
+                </span>
                 <div className="text-lg font-semibold text-gray-900">
-                  {formatCurrency(client.outstandingAmount || 0)}
+                  {formatCurrency(client.outstandingAmount || 0, client.type === 'local' ? 'PKR' : 'USD')}
                 </div>
                 <div className="text-xs text-gray-600">Outstanding</div>
               </div>
@@ -338,7 +342,7 @@ export default function ClientDetailPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-900">
-                        {formatCurrency(order.totalAmount)}
+                        {formatCurrency(order.totalAmount, client.type === 'local' ? 'PKR' : 'USD')}
                       </p>
                       <p className="text-xs text-gray-500 capitalize">
                         {order.status.replace("_", " ")}

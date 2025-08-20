@@ -106,10 +106,10 @@ export default function FinancePage() {
   // Mutations
   const deletePayment = useMutation(api.payments.deletePayment);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+  const formatCurrency = (amount: number, currency: 'USD' | 'PKR' = 'USD') => {
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+      style: 'currency',
+      currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
@@ -291,31 +291,28 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Financial Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Financial Summary (split by currency) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="card p-4">
               <p className="text-sm text-gray-500">Total Revenue</p>
-              <p className="text-xl font-bold text-gray-900 mt-1">
-                {formatCurrency(dashboardStats?.totalRevenue || 0)}
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+              </div>
             </div>
             <div className="card p-4">
               <p className="text-sm text-gray-500">Total Paid</p>
-              <p className="text-xl font-bold text-green-600 mt-1">
-                {formatCurrency(dashboardStats?.totalPaid || 0)}
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+              </div>
             </div>
             <div className="card p-4">
               <p className="text-sm text-gray-500">Outstanding</p>
-              <p className="text-xl font-bold text-orange-600 mt-1">
-                {formatCurrency(dashboardStats?.totalOutstanding || 0)}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Overdue Invoices</p>
-              <p className="text-xl font-bold text-red-600 mt-1">
-                {dashboardStats?.overdueInvoices || 0}
-              </p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+              </div>
             </div>
           </div>
 
@@ -363,7 +360,7 @@ export default function FinancePage() {
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                    <Tooltip formatter={(value) => formatCurrency(Number(value), 'USD')} />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
@@ -396,7 +393,7 @@ export default function FinancePage() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-gray-900">
-                        {formatCurrency(customer.revenue)}
+                        {formatCurrency(customer.revenue, customer.type === 'local' ? 'PKR' : 'USD')}
                       </p>
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         customer.type === "local" 
@@ -419,7 +416,7 @@ export default function FinancePage() {
         <div className="space-y-6">
           {/* Payment Statistics */}
           {paymentStats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="card p-4">
                 <p className="text-sm text-gray-500">Total Payments</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -427,9 +424,15 @@ export default function FinancePage() {
                 </p>
               </div>
               <div className="card p-4">
-                <p className="text-sm text-gray-500">Total Amount</p>
+                <p className="text-sm text-gray-500">Total Amount (USD)</p>
                 <p className="text-2xl font-bold text-green-600 mt-1">
-                  {formatCurrency(paymentStats.totalAmount)}
+                  {formatCurrency(paymentStats.totalAmountUSD || 0, 'USD')}
+                </p>
+              </div>
+              <div className="card p-4">
+                <p className="text-sm text-gray-500">Total Amount (PKR)</p>
+                <p className="text-2xl font-bold text-green-600 mt-1">
+                  {formatCurrency(paymentStats.totalAmountPKR || 0, 'PKR')}
                 </p>
               </div>
             </div>
@@ -485,7 +488,7 @@ export default function FinancePage() {
                           {payment.type === "advance" ? "Advance" : "Invoice"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(payment.amount)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(payment.amount, (payment as any).currency === 'PKR' ? 'PKR' : 'USD')}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.reference}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {payment.bankAccount ? (
@@ -517,18 +520,20 @@ export default function FinancePage() {
         <div className="space-y-6">
           {/* Invoice Statistics */}
           {invoiceStats && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
               <div className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="text-xs text-gray-500">Total Outstanding</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {formatCurrency(invoiceStats.totalOutstanding)}
-                </p>
+                <div className="mt-1 space-y-1">
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                </div>
               </div>
               <div className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="text-xs text-gray-500">Total Paid</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {formatCurrency(invoiceStats.totalPaid)}
-                </p>
+                <div className="mt-1 space-y-1">
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                </div>
               </div>
               <div className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="text-xs text-gray-500">Overdue</p>
@@ -669,14 +674,14 @@ export default function FinancePage() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(invoice.amount)}
+                            {formatCurrency(invoice.amount, (invoice as any).currency === 'PKR' ? 'PKR' : 'USD')}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Paid: {formatCurrency(invoice.totalPaid)}
+                            Paid: {formatCurrency(invoice.totalPaid, (invoice as any).currency === 'PKR' ? 'PKR' : 'USD')}
                           </div>
                           {invoice.outstandingBalance > 0 && (
                             <div className="text-xs text-red-600 font-medium">
-                              Outstanding: {formatCurrency(invoice.outstandingBalance)}
+                              Outstanding: {formatCurrency(invoice.outstandingBalance, (invoice as any).currency === 'PKR' ? 'PKR' : 'USD')}
                             </div>
                           )}
                         </td>

@@ -59,7 +59,12 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
   if (!isOpen || !payment) return null;
 
   const formatCurrency = (amount?: number, currency?: string) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount || 0);
+    new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', { 
+      style: "currency", 
+      currency: currency || "USD", 
+      minimumFractionDigits: 0, 
+      maximumFractionDigits: 0 
+    }).format(amount || 0);
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -82,12 +87,12 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                   {client && (
                     <div>
                       <span className="text-gray-600">Client Outstanding:</span>
-                      <span className="ml-1 font-semibold">{formatCurrency((client as any).outstandingAmount)}</span>
+                      <span className="ml-1 font-semibold">{formatCurrency((client as any).outstandingAmount, (client as any).type === 'local' ? 'PKR' : 'USD')}</span>
                     </div>
                   )}
                   <div>
                     <span className="text-gray-600">This Payment:</span>
-                    <span className="ml-1 font-semibold">{formatCurrency(Number(form.amount))}</span>
+                    <span className="ml-1 font-semibold">{formatCurrency(Number(form.amount), (client as any)?.type === 'local' ? 'PKR' : 'USD')}</span>
                   </div>
                   <div className="text-xs text-gray-500">You are editing an advance payment.</div>
                 </div>

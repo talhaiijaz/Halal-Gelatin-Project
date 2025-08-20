@@ -81,6 +81,18 @@ export default function CreateOrderModal({
   const bankAccounts = useQuery(api.banks.list);
   const createOrder = useMutation(api.orders.create);
 
+  // Currency helpers
+  const selectedClient = clients?.find(c => c._id === selectedClientId);
+  const currentCurrency: 'USD' | 'PKR' = selectedClient?.type === 'local' ? 'PKR' : 'USD';
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat(currentCurrency === 'USD' ? 'en-US' : 'en-PK', {
+      style: 'currency',
+      currency: currentCurrency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount || 0);
+  };
+
   // Handle preselected client changes
   useEffect(() => {
     if (preselectedClientId) {
@@ -259,7 +271,6 @@ export default function CreateOrderModal({
         clientId: selectedClientId,
         invoiceNumber: invoiceNumber.trim() || undefined,
         fiscalYear: selectedFiscalYear,
-        currency: "USD",
         notes,
         freightCost: freightCost || 0,
         // Timeline fields
@@ -359,7 +370,7 @@ export default function CreateOrderModal({
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
     : [];
 
-  const selectedClient = clients?.find(c => c._id === selectedClientId);
+  // selectedClient computed above
 
   if (!isOpen) return null;
 
@@ -601,7 +612,7 @@ export default function CreateOrderModal({
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Rate ($ per kg)
+                        {`Rate (${currentCurrency} per kg)`}
                       </label>
                       <input
                         type="number"
@@ -622,7 +633,7 @@ export default function CreateOrderModal({
                         Ex. Value (Before GST)
                       </label>
                       <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                        ${orderItem.exclusiveValue.toFixed(2)}
+                        {formatCurrency(orderItem.exclusiveValue)}
                       </div>
                     </div>
                     <div>
@@ -662,7 +673,7 @@ export default function CreateOrderModal({
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          {orderItem.discountType === "amount" ? "Discount Amount ($)" : 
+                          {orderItem.discountType === "amount" ? `Discount Amount (${currentCurrency})` : 
                            orderItem.discountType === "percentage" ? "Discount Percentage (%)" : 
                            "Discount Value"}
                         </label>
@@ -686,13 +697,13 @@ export default function CreateOrderModal({
                           Total Before Discount
                         </label>
                         <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
-                          ${(orderItem.exclusiveValue + orderItem.gstAmount).toFixed(2)}
+                          {formatCurrency(orderItem.exclusiveValue + orderItem.gstAmount)}
                         </div>
                         <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
                           Calculated Discount Amount
                         </label>
                         <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
-                          ${orderItem.discountAmount?.toFixed(2) || "0.00"}
+                          {formatCurrency(orderItem.discountAmount || 0)}
                         </div>
                       </div>
                     )}
@@ -705,7 +716,7 @@ export default function CreateOrderModal({
                         GST Amount
                       </label>
                       <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                        ${orderItem.gstAmount.toFixed(2)}
+                        {formatCurrency(orderItem.gstAmount)}
                       </div>
                     </div>
                     <div>
@@ -713,7 +724,7 @@ export default function CreateOrderModal({
                         Inclusive Total (Including GST)
                       </label>
                       <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
-                        ${orderItem.inclusiveTotal.toFixed(2)}
+                        {formatCurrency(orderItem.inclusiveTotal)}
                       </div>
                     </div>
                   </div>
@@ -724,7 +735,7 @@ export default function CreateOrderModal({
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Freight Cost ($)
+                          {`Freight Cost (${currentCurrency})`}
                         </label>
                         <input
                           type="number"
@@ -741,7 +752,7 @@ export default function CreateOrderModal({
                           Product Total
                         </label>
                         <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                          ${orderItem.inclusiveTotal.toFixed(2)}
+                          {formatCurrency(orderItem.inclusiveTotal)}
                         </div>
                       </div>
                     </div>
@@ -752,15 +763,15 @@ export default function CreateOrderModal({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Product Total:</span>
-                      <span>${orderItem.inclusiveTotal.toFixed(2)}</span>
+                      <span>{formatCurrency(orderItem.inclusiveTotal)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Freight Cost:</span>
-                      <span>${freightCost.toFixed(2)}</span>
+                      <span>{formatCurrency(freightCost)}</span>
                     </div>
                     <div className="flex items-center justify-between text-lg font-medium border-t pt-2">
                       <span>Order Total:</span>
-                      <span className="text-primary">${orderTotal.toFixed(2)}</span>
+                      <span className="text-primary">{formatCurrency(orderTotal)}</span>
                     </div>
                   </div>
                 </div>
@@ -942,15 +953,15 @@ export default function CreateOrderModal({
                           <tr>
                             <td className="px-2 py-2 text-xs">{orderItem.product}</td>
                             <td className="px-2 py-2 text-xs text-right">{orderItem.quantityKg} kg</td>
-                            <td className="px-2 py-2 text-xs text-right">${orderItem.unitPrice.toFixed(2)}</td>
-                            <td className="px-2 py-2 text-xs text-right">${orderItem.exclusiveValue.toFixed(2)}</td>
+                            <td className="px-2 py-2 text-xs text-right">{formatCurrency(orderItem.unitPrice)}</td>
+                            <td className="px-2 py-2 text-xs text-right">{formatCurrency(orderItem.exclusiveValue)}</td>
                             <td className="px-2 py-2 text-xs text-right">{orderItem.gstRate}%</td>
-                            <td className="px-2 py-2 text-xs text-right">${orderItem.gstAmount.toFixed(2)}</td>
-                            <td className="px-2 py-2 text-xs text-right font-medium">${orderItem.inclusiveTotal.toFixed(2)}</td>
+                            <td className="px-2 py-2 text-xs text-right">{formatCurrency(orderItem.gstAmount)}</td>
+                            <td className="px-2 py-2 text-xs text-right font-medium">{formatCurrency(orderItem.inclusiveTotal)}</td>
                           </tr>
                           <tr className="bg-gray-100 font-medium">
                             <td colSpan={6} className="px-2 py-2 text-xs text-right">Grand Total:</td>
-                            <td className="px-2 py-2 text-xs text-right text-primary font-bold">${orderTotal.toFixed(2)}</td>
+                            <td className="px-2 py-2 text-xs text-right text-primary font-bold">{formatCurrency(orderTotal)}</td>
                           </tr>
                         </tbody>
                       </table>

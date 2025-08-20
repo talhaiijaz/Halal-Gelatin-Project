@@ -31,7 +31,7 @@ export default function BankAccountModal({
   const [accountName, setAccountName] = useState("");
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
-  const [currency, setCurrency] = useState("USD");
+  const [currency, setCurrency] = useState("PKR");
   const [accountType, setAccountType] = useState<"checking" | "savings" | "business">("checking");
   const [status, setStatus] = useState<"active" | "inactive">("active");
 
@@ -57,7 +57,7 @@ export default function BankAccountModal({
         setAccountName("");
         setBankName("");
         setAccountNumber("");
-        setCurrency("USD");
+        setCurrency("PKR");
         setAccountType("checking");
         setStatus("active");
 
@@ -209,14 +209,8 @@ export default function BankAccountModal({
                 onChange={(e) => setCurrency(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
               >
+                <option value="PKR">PKR</option>
                 <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="CAD">CAD</option>
-                <option value="AUD">AUD</option>
-                <option value="JPY">JPY</option>
-                <option value="CHF">CHF</option>
-                <option value="CNY">CNY</option>
               </select>
             </div>
 

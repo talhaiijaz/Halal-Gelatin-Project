@@ -199,7 +199,7 @@ export const create = mutation({
     clientId: v.id("clients"),
     invoiceNumber: v.optional(v.string()), // Optional invoice number
     fiscalYear: v.optional(v.number()), // Optional fiscal year for order number
-    currency: v.string(),
+    // currency is derived from client type
     notes: v.optional(v.string()),
     freightCost: v.optional(v.number()),
     // Timeline fields
@@ -251,6 +251,12 @@ export const create = mutation({
     );
     const totalAmount = itemsTotal + (args.freightCost || 0);
 
+    // Enforce currency by client type
+    const client = await ctx.db.get(args.clientId);
+    if (!client) throw new Error("Client not found");
+    const enforcedCurrency = client.type === "local" ? "PKR" : "USD";
+    const currencyToUse = enforcedCurrency;
+
     // Create order
     const orderNumber = await generateOrderNumber(ctx, args.fiscalYear);
     const orderId = await ctx.db.insert("orders", {
@@ -271,7 +277,7 @@ export const create = mutation({
       // salesRepId is now optional - omitted for now
       totalAmount,
       freightCost: args.freightCost,
-      currency: args.currency,
+      currency: currencyToUse,
       notes: args.notes,
       fiscalYear: args.fiscalYear, // Store the selected fiscal year
       createdAt: Date.now(),
@@ -340,7 +346,7 @@ export const create = mutation({
       dueDate,
       status: "partially_paid",
       amount: totalAmount,
-      currency: args.currency,
+      currency: currencyToUse,
       totalPaid: 0,
       outstandingBalance: totalAmount,
       notes: `Invoice for Order ${orderNumber}`,
@@ -349,7 +355,7 @@ export const create = mutation({
     });
 
     // Get client information for meaningful logging
-    const client = await ctx.db.get(args.clientId);
+    // client is already fetched above
     const clientName = client?.name || "Unknown Client";
     
     await logOrderEvent(ctx, { 
@@ -964,7 +970,7 @@ export const update = mutation({
   args: {
     orderId: v.id("orders"),
     clientId: v.optional(v.id("clients")),
-    currency: v.optional(v.string()),
+    // currency cannot be changed; derived from client type
     notes: v.optional(v.string()),
     freightCost: v.optional(v.number()),
     // Timeline fields

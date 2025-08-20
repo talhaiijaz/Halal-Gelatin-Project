@@ -160,10 +160,14 @@ export default function RecordPaymentModal({
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
+    const invoice = unpaidInvoices?.find(inv => inv._id === selectedInvoiceId);
+    const currency = invoice?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount || 0);
   };
   
   const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
@@ -368,7 +372,11 @@ export default function RecordPaymentModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 >
                   <option value="">Select a bank account</option>
-                  {bankAccounts?.filter(account => account.status === "active").map(account => (
+                  {bankAccounts?.filter(account => {
+                    const inv = unpaidInvoices?.find(i => i._id === selectedInvoiceId);
+                    const requiredCurrency = inv?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
+                    return account.status === 'active' && account.currency === requiredCurrency;
+                  }).map(account => (
                     <option key={account._id} value={account._id}>
                       {account.accountName} - {account.bankName} ({account.currency})
                     </option>

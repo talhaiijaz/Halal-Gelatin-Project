@@ -36,10 +36,12 @@ export default function DashboardPage() {
   console.log("Dashboard data:", { dashboardStats, recentOrdersData, recentActivity });
 
   // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+  const formatCurrency = (amount: number, currency: 'USD' | 'PKR' = 'USD') => {
+    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
       style: 'currency',
-      currency: 'USD',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -61,15 +63,29 @@ export default function DashboardPage() {
       subtitle: `Total Orders: ${dashboardStats.totalOrders?.value?.toString() || "0"}`,
     },
     {
-      name: "Revenue (Current Fiscal Year)",
-      value: formatCurrency(dashboardStats.currentYearRevenue.value),
+      name: "Revenue (USD)",
+      value: formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD'),
       icon: DollarSign,
       color: "text-primary",
       bgColor: "bg-orange-100",
     },
     {
-      name: "Outstanding",
-      value: formatCurrency(dashboardStats.outstandingAmount.value),
+      name: "Revenue (PKR)",
+      value: formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR'),
+      icon: DollarSign,
+      color: "text-primary",
+      bgColor: "bg-orange-100",
+    },
+    {
+      name: "Outstanding (USD)",
+      value: formatCurrency((dashboardStats as any).outstandingUSD ?? 0, 'USD'),
+      icon: TrendingUp,
+      color: "text-purple-600",
+      bgColor: "bg-purple-100",
+    },
+    {
+      name: "Outstanding (PKR)",
+      value: formatCurrency((dashboardStats as any).outstandingPKR ?? 0, 'PKR'),
       icon: TrendingUp,
       color: "text-purple-600",
       bgColor: "bg-purple-100",
@@ -80,7 +96,7 @@ export default function DashboardPage() {
   const recentOrders = recentOrdersData ? recentOrdersData.map(order => ({
     id: order.orderNumber,
     client: order.client?.name || "Unknown Client",
-    amount: formatCurrency(order.totalAmount),
+    amount: formatCurrency(order.totalAmount, (order as any).currency === 'PKR' ? 'PKR' : 'USD'),
     status: order.status,
     date: new Date(order.createdAt).toLocaleDateString(),
   })) : [];
@@ -116,39 +132,61 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {!dashboardStats ? (
-          // Loading skeletons
-          [...Array(4)].map((_, i) => (
-            <div key={i} className="card p-6">
-              <div className="flex items-center justify-between mb-4">
-                <Skeleton width={40} height={40} />
-                <Skeleton width={40} height={20} />
+      {/* International & Local Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* International */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">International</h3>
+          {!dashboardStats ? (
+            <Skeleton height={120} />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Clients</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalClients}</p>
               </div>
-              <Skeleton width={80} height={32} />
-              <Skeleton width={120} height={16} className="mt-1" />
+              <div>
+                <p className="text-sm text-gray-500">Active Orders</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalOrders}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Revenue (USD)</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD')}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Outstanding (USD)</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).outstandingUSD ?? 0, 'USD')}</p>
+              </div>
             </div>
-          ))
-        ) : (
-          stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.name} className="card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                    <Icon className={`h-6 w-6 ${stat.color}`} />
-                  </div>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900">{stat.value}</h3>
-                <p className="text-sm text-gray-600 mt-1">{stat.name}</p>
-                {stat.subtitle && (
-                  <p className="text-xs text-gray-500 mt-1">{stat.subtitle}</p>
-                )}
+          )}
+        </div>
+
+        {/* Local */}
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Local</h3>
+          {!dashboardStats ? (
+            <Skeleton height={120} />
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Clients</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localClients}</p>
               </div>
-            );
-          })
-        )}
+              <div>
+                <p className="text-sm text-gray-500">Active Orders</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localOrders}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Revenue (PKR)</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR')}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Outstanding (PKR)</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).outstandingPKR ?? 0, 'PKR')}</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Content Grid */}
