@@ -131,7 +131,7 @@ export default function ActivityLog({ entityId, limit = 10, title = "Activity Lo
                   <span>{formatDate(log.createdAt)}</span>
                 </div>
               </div>
-              <p className="mt-1 text-sm text-gray-900">{log.message}</p>
+              <p className="mt-1 text-sm text-gray-900 break-all whitespace-pre-wrap">{log.message}</p>
               {log.metadata && (
                 <div className="mt-2 text-xs text-gray-600">
                   <details className="cursor-pointer">

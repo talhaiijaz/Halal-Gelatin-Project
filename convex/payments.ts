@@ -103,8 +103,27 @@ export const recordPayment = mutation({
         metadata: { invoiceId: args.invoiceId, clientId, netCash, withheldAmount, rate },
       });
 
-
-
+      // If linked to a bank account, also log activity under that bank account
+      if (args.bankAccountId) {
+        const bank = await ctx.db.get(args.bankAccountId);
+        const client = await ctx.db.get(clientId!);
+        await logEvent(ctx, {
+          entityTable: "banks",
+          entityId: String(args.bankAccountId),
+          action: "update",
+          message: `Payment received${bank ? ` to ${bank.accountName}` : ""}: ${formatCurrency(args.amount, currency)}${client ? ` from ${client.name}` : ""}`,
+          metadata: {
+            paymentId,
+            invoiceId: args.invoiceId,
+            clientId,
+            method: args.method,
+            reference: args.reference,
+            netCash,
+            withheldAmount,
+            rate,
+          },
+        });
+      }
       // Update invoice aggregates
       const newTotalPaid = invoice.totalPaid + args.amount; // invoice credited by gross amount
       const newOutstandingBalance = Math.max(0, invoice.amount - newTotalPaid);
@@ -162,8 +181,25 @@ export const recordPayment = mutation({
       message: `Advance payment recorded for client ${client.name || String(client._id)}: ${args.amount}`,
       metadata: { clientId, netCashAdvance, withheldForAdvance, rateForAdvance },
     });
-
-
+    // If linked to a bank account, also log activity under that bank account
+    if (args.bankAccountId) {
+      const bank = await ctx.db.get(args.bankAccountId);
+      await logEvent(ctx, {
+        entityTable: "banks",
+        entityId: String(args.bankAccountId),
+        action: "update",
+        message: `Advance payment received${bank ? ` to ${bank.accountName}` : ""}: ${formatCurrency(args.amount, currency)} (Client: ${client.name || String(client._id)})`,
+        metadata: {
+          paymentId,
+          clientId,
+          method: args.method,
+          reference: args.reference,
+          netCash: netCashAdvance,
+          withheldAmount: withheldForAdvance,
+          rate: rateForAdvance,
+        },
+      });
+    }
 
     return paymentId;
   },
