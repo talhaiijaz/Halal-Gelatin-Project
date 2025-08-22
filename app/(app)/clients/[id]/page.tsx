@@ -41,8 +41,11 @@ export default function ClientDetailPage() {
   const client = useQuery(api.clients.get, { id: clientId });
   const updateClient = useMutation(api.clients.update);
 
-  const formatCurrency = (amount: number, currency: 'USD' | 'PKR' = 'USD') => {
-    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
+    // Use appropriate locale based on currency
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
@@ -288,20 +291,29 @@ export default function ClientDetailPage() {
               </div>
               
               <div className="text-center p-3 bg-green-50 rounded-lg">
-                <span className="text-green-600 text-lg font-bold mx-auto mb-1 block">
-                  {client.type === 'local' ? '₨' : '$'}
-                </span>
-                <div className="text-lg font-semibold text-gray-900">
-                  {formatCurrency(client.outstandingAmount || 0, client.type === 'local' ? 'PKR' : 'USD')}
-                </div>
                 <div className="text-xs text-gray-600">Outstanding</div>
+                {client.type === 'international' && client.outstandingByCurrency ? (
+                  <div className="mt-1 space-y-1">
+                    {Object.entries(client.outstandingByCurrency)
+                      .filter(([_, amount]) => (amount as number) > 0)
+                      .map(([currency, amount]) => (
+                        <div key={currency} className="text-sm font-semibold text-gray-900">
+                          {formatCurrency(amount as number, currency)}
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-lg font-semibold text-gray-900 mt-1">
+                    {formatCurrency(client.outstandingAmount || 0, 'PKR')}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Activity Log */}
           <div className="card p-6 mt-6">
-            <ActivityLog entityId={String(clientId)} title="Client Activity" limit={5} />
+            <ActivityLog entityId={String(clientId)} entityTable="clients" title="Client Activity" limit={5} />
           </div>
         </div>
 
@@ -342,7 +354,7 @@ export default function ClientDetailPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-medium text-gray-900">
-                        {formatCurrency(order.totalAmount, client.type === 'local' ? 'PKR' : 'USD')}
+                        {formatCurrency(order.totalAmount, order.currency)}
                       </p>
                       <p className="text-xs text-gray-500 capitalize">
                         {order.status.replace("_", " ")}

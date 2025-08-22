@@ -155,6 +155,29 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                       <label className="text-xs font-medium text-gray-500">Currency</label>
                       <p className="mt-1 text-sm text-gray-900">{payment.currency}</p>
                     </div>
+
+                    {/* Conversion Details for International Payments */}
+                    {payment.conversionRateToUSD && payment.convertedAmountUSD && payment.currency !== 'USD' && (
+                      <div className="col-span-2">
+                        <div className="bg-blue-50 rounded-md p-3 mt-2">
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Currency Conversion</h4>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">Original Amount:</span>
+                              <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">Conversion Rate:</span>
+                              <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">Converted to USD:</span>
+                              <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {payment.notes && (
@@ -254,7 +277,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                 )}
 
                 {/* Activity Log */}
-                <ActivityLog entityId={String(paymentId)} title="Payment Activity" limit={5} />
+                <ActivityLog entityId={String(paymentId)} entityTable="payments" title="Payment Activity" limit={5} />
               </>
             )}
           </div>

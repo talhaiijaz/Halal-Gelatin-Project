@@ -76,6 +76,7 @@ export const getStats = query({
     revenuePKR: v.number(),
     outstandingUSD: v.number(),
     outstandingPKR: v.number(),
+    outstandingByCurrency: v.record(v.string(), v.number()),
     totalRevenue: v.number(),
     totalPaid: v.number(),
     activeClients: v.number(),
@@ -116,14 +117,38 @@ export const getStats = query({
       return client?.type === "international";
     }).length;
 
-    // Calculate financial stats (by currency)
+    // Calculate financial stats using payments with converted amounts
     const totalRevenue = invoices.reduce((sum, inv) => sum + inv.amount, 0);
     const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     const outstandingAmount = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
-    const revenueUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.amount, 0);
-    const revenuePKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.amount, 0);
-    const outstandingUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
-    const outstandingPKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
+    
+    // Calculate revenue by currency using payments (with conversion for international)
+    const revenueUSD = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "international" && p.convertedAmountUSD;
+      })
+      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    
+    const revenuePKR = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "local";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    // Calculate outstanding by currency (using invoices - original currency until payment)
+    const outstandingByCurrency: Record<string, number> = {};
+    invoices.forEach(invoice => {
+      const currency = invoice.currency;
+      if (invoice.outstandingBalance > 0) {
+        outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
+      }
+    });
+
+    // For backward compatibility, also calculate USD and PKR totals
+    const outstandingUSD = outstandingByCurrency["USD"] || 0;
+    const outstandingPKR = outstandingByCurrency["PKR"] || 0;
 
     // Get current fiscal year stats (July 1 to June 30)
     const currentDate = new Date();
@@ -186,6 +211,7 @@ export const getStats = query({
       revenuePKR,
       outstandingUSD,
       outstandingPKR,
+      outstandingByCurrency,
       totalRevenue,
       totalPaid,
       activeClients,

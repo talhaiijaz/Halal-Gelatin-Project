@@ -18,6 +18,7 @@ import {
   Settings,
   LogOut,
   Activity,
+  Truck,
 } from "lucide-react";
 
 interface NavItem {
@@ -48,7 +49,11 @@ const navigation: NavItem[] = [
     href: "/finance",
     icon: DollarSign,
   },
-
+  {
+    name: "Shipments",
+    href: "/shipments",
+    icon: Truck,
+  },
 ];
 
 export default function Sidebar() {

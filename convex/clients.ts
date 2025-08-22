@@ -77,11 +77,20 @@ export const get = query({
       .collect();
 
     const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    // Group outstanding by original invoice currency
+    const outstandingByCurrency: Record<string, number> = {};
+    invoices.forEach(inv => {
+      const currency = inv.currency;
+      if (inv.outstandingBalance > 0) {
+        outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + inv.outstandingBalance;
+      }
+    });
 
     return {
       ...client,
       recentOrders: orders,
       outstandingAmount: totalOutstanding,
+      outstandingByCurrency,
       totalOrders: orders.length,
     };
   },
@@ -254,8 +263,19 @@ export const getClientSummary = query({
       // Get invoices for this client
       const clientInvoices = invoices.filter(invoice => invoice.clientId === client._id);
       
-      // Calculate outstanding amount
-      const outstandingAmount = clientInvoices.reduce((sum, invoice) => sum + invoice.outstandingBalance, 0);
+      // Calculate outstanding amount by currency
+      const outstandingByCurrency: Record<string, number> = {};
+      clientInvoices.forEach(invoice => {
+        const currency = invoice.currency;
+        outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
+      });
+
+      // Get the primary currency (most outstanding amount) or default to USD for international
+      const primaryCurrency = Object.keys(outstandingByCurrency).length > 0 
+        ? Object.entries(outstandingByCurrency).reduce((a, b) => a[1] > b[1] ? a : b)[0]
+        : (args.type === 'international' ? 'USD' : 'PKR');
+      
+      const outstandingAmount = outstandingByCurrency[primaryCurrency] || 0;
 
       return {
         clientId: client._id,
@@ -263,6 +283,8 @@ export const getClientSummary = query({
         clientEmail: client.email,
         totalQuantity,
         outstandingAmount,
+        outstandingCurrency: primaryCurrency,
+        outstandingByCurrency,
         orderCount: clientOrders.length,
         invoiceCount: clientInvoices.length,
       };
@@ -294,7 +316,25 @@ export const getStats = query({
         })
       : orders;
 
-    // Calculate revenue (from invoices)
+    // Calculate revenue from actual payments (not invoices)
+    const payments = await ctx.db.query("payments").collect();
+    const clientPayments = args.type
+      ? payments.filter(p => {
+          const client = clients.find(c => c._id === p.clientId);
+          return client && client.type === args.type;
+        })
+      : payments;
+
+    // Calculate revenue from payments
+    const totalRevenue = clientPayments.reduce((sum, payment) => {
+      if (args.type === 'international' && payment.convertedAmountUSD) {
+        return sum + payment.convertedAmountUSD;
+      } else {
+        return sum + payment.amount;
+      }
+    }, 0);
+
+    // Calculate outstanding from invoices
     const invoices = await ctx.db.query("invoices").collect();
     const clientInvoices = args.type
       ? invoices.filter(i => {
@@ -303,7 +343,15 @@ export const getStats = query({
         })
       : invoices;
 
-    const totalRevenue = clientInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+    // Calculate outstanding by currency
+    const outstandingByCurrency: Record<string, number> = {};
+    clientInvoices.forEach(invoice => {
+      const currency = invoice.currency;
+      if (invoice.outstandingBalance > 0) {
+        outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
+      }
+    });
+
     const outstandingAmount = clientInvoices
       .filter(inv => inv.status !== "paid")
       .reduce((sum, inv) => sum + inv.outstandingBalance, 0);
@@ -317,6 +365,7 @@ export const getStats = query({
       ).length,
       totalRevenue,
       outstandingAmount,
+      outstandingByCurrency,
     };
   },
 });

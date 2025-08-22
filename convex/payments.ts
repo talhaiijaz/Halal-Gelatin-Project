@@ -47,6 +47,8 @@ export const recordPayment = mutation({
     paymentDate: v.optional(v.number()),
     notes: v.optional(v.string()),
     bankAccountId: v.optional(v.id("bankAccounts")), // Add bank account integration
+    // Multi-currency conversion support
+    conversionRateToUSD: v.optional(v.number()), // Required for non-USD international payments
     // Withholding fields (optional; apply to local clients only)
     withheldTaxRate: v.optional(v.number()), // e.g., 4, 5 or custom
   },
@@ -79,12 +81,31 @@ export const recordPayment = mutation({
       const withheldAmount = rate > 0 ? Math.round((args.amount * rate) / 100) : 0;
       const netCash = Math.max(0, args.amount - withheldAmount);
 
-      // Validate bank account currency if provided (must match invoice currency)
+      // Validate bank account currency if provided
       if (args.bankAccountId) {
         const bank = await ctx.db.get(args.bankAccountId);
-        if (bank && bank.currency !== currency) {
-          throw new Error(`Bank account currency (${bank.currency}) must match invoice currency (${currency})`);
+        if (bank) {
+          // For international payments, bank account should be USD (since payments get converted to USD)
+          // For local payments, bank account should match invoice currency (PKR)
+          const expectedBankCurrency = clientOfInvoice?.type === "local" ? currency : "USD";
+          if (bank.currency !== expectedBankCurrency) {
+            throw new Error(`Bank account currency (${bank.currency}) must be ${expectedBankCurrency} for ${clientOfInvoice?.type === "local" ? "local" : "international"} payments`);
+          }
         }
+      }
+
+      // Handle conversion rate for international non-USD payments
+      let conversionRateToUSD: number | undefined;
+      let convertedAmountUSD: number | undefined;
+      
+      if (clientOfInvoice?.type === "international" && currency !== "USD") {
+        if (!args.conversionRateToUSD) {
+          throw new Error(`Conversion rate to USD is required for international payments in ${currency}`);
+        }
+        conversionRateToUSD = args.conversionRateToUSD;
+        convertedAmountUSD = args.amount * conversionRateToUSD;
+      } else if (currency === "USD") {
+        convertedAmountUSD = args.amount;
       }
 
       // Create payment record (respect requested type; default to 'invoice')
@@ -99,6 +120,8 @@ export const recordPayment = mutation({
         reference: args.reference,
         notes: args.notes,
         bankAccountId: args.bankAccountId,
+        conversionRateToUSD,
+        convertedAmountUSD,
         cashReceived: netCash,
         withheldTaxRate: rate > 0 ? rate : undefined,
         withheldTaxAmount: rate > 0 ? withheldAmount : undefined,
@@ -149,6 +172,25 @@ export const recordPayment = mutation({
         updatedAt: Date.now(),
       });
 
+      // Also log under the related order so Order Activity reflects this payment
+      await logEvent(ctx, {
+        entityTable: "orders",
+        entityId: String(invoice.orderId),
+        action: "update",
+        message: `Payment recorded for ${invoice.invoiceNumber || String(invoice._id)}: ${formatCurrency(args.amount, currency)}${convertedAmountUSD ? ` (USD ${formatCurrency(convertedAmountUSD, "USD")})` : ""}`,
+        metadata: {
+          paymentId,
+          invoiceId: args.invoiceId,
+          orderId: invoice.orderId,
+          amount: args.amount,
+          currency,
+          convertedAmountUSD,
+          conversionRateToUSD,
+          outstandingAfter: newOutstandingBalance,
+          statusAfter: newStatus,
+        },
+      });
+
       return paymentId;
     }
 
@@ -159,7 +201,8 @@ export const recordPayment = mutation({
     const client = await ctx.db.get(args.clientId);
     if (!client) throw new Error("Client not found");
 
-    // Set currency for advances by client type (local -> PKR, international -> USD)
+    // For advance payments, currency should be provided or default based on client type
+    // Note: Advance payments will use the currency provided or default to client type currency
     currency = client.type === "local" ? "PKR" : "USD";
     clientId = args.clientId;
     paymentType = "advance";
@@ -167,6 +210,20 @@ export const recordPayment = mutation({
     const rateForAdvance = client.type === "local" && args.withheldTaxRate ? Math.max(0, args.withheldTaxRate) : 0;
     const withheldForAdvance = rateForAdvance > 0 ? Math.round((args.amount * rateForAdvance) / 100) : 0;
     const netCashAdvance = Math.max(0, args.amount - withheldForAdvance);
+
+    // Handle conversion rate for international advance payments
+    let conversionRateToUSD: number | undefined;
+    let convertedAmountUSD: number | undefined;
+    
+    if (client.type === "international" && currency !== "USD") {
+      if (!args.conversionRateToUSD) {
+        throw new Error(`Conversion rate to USD is required for international advance payments in ${currency}`);
+      }
+      conversionRateToUSD = args.conversionRateToUSD;
+      convertedAmountUSD = args.amount * conversionRateToUSD;
+    } else if (currency === "USD") {
+      convertedAmountUSD = args.amount;
+    }
 
     // Validate bank account currency for advances too (must match derived currency)
     if (args.bankAccountId) {
@@ -186,6 +243,8 @@ export const recordPayment = mutation({
       reference: args.reference,
       notes: args.notes,
       bankAccountId: args.bankAccountId,
+      conversionRateToUSD,
+      convertedAmountUSD,
       cashReceived: netCashAdvance,
       withheldTaxRate: rateForAdvance > 0 ? rateForAdvance : undefined,
       withheldTaxAmount: rateForAdvance > 0 ? withheldForAdvance : undefined,
@@ -375,10 +434,25 @@ export const getStats = query({
       }
     });
 
-    // Calculate totals (per currency)
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-    const totalAmountUSD = payments.filter(p => p.currency === "USD").reduce((s, p) => s + p.amount, 0);
-    const totalAmountPKR = payments.filter(p => p.currency === "PKR").reduce((s, p) => s + p.amount, 0);
+    // Get clients for currency classification
+    const clients = await ctx.db.query("clients").collect();
+    
+    // Calculate totals using converted amounts for international payments
+    const totalAmountUSD = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "international" && p.convertedAmountUSD;
+      })
+      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    
+    const totalAmountPKR = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "local";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    const totalAmount = totalAmountUSD + totalAmountPKR; // Use converted amounts
     const totalCount = payments.length;
 
     // Calculate daily average

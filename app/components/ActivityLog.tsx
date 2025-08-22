@@ -6,15 +6,16 @@ import { Clock, User, Edit, Plus, Trash2, FileText, Eye, Upload } from "lucide-r
 
 interface ActivityLogProps {
   entityId: string;
+  entityTable?: string; // Optional; when provided we use indexed query
   limit?: number;
   title?: string;
 }
 
-export default function ActivityLog({ entityId, limit = 10, title = "Activity Log" }: ActivityLogProps) {
-  const logs = useQuery(api.dashboard.getEntityActivityLogs, { 
-    entityId, 
-    limit 
-  });
+export default function ActivityLog({ entityId, entityTable, limit = 10, title = "Activity Log" }: ActivityLogProps) {
+  // Prefer indexed query when entityTable provided
+  const logs = entityTable
+    ? useQuery(api.dashboard.listEntityLogs, { entityTable, entityId })
+    : useQuery(api.dashboard.getEntityActivityLogs, { entityId, limit });
 
   const getActionIcon = (action: string, metadata?: any) => {
     // Check if this is a document activity

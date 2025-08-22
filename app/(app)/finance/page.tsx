@@ -106,8 +106,11 @@ export default function FinancePage() {
   // Mutations
   const deletePayment = useMutation(api.payments.deletePayment);
 
-  const formatCurrency = (amount: number, currency: 'USD' | 'PKR' = 'USD') => {
-    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
+    // Use appropriate locale based on currency
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
@@ -310,8 +313,21 @@ export default function FinancePage() {
             <div className="card p-4">
               <p className="text-sm text-gray-500">Outstanding</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                {(dashboardStats as any)?.outstandingByCurrency ? 
+                  Object.entries((dashboardStats as any).outstandingByCurrency)
+                    .filter(([currency, amount]) => (amount as number) > 0)
+                    .map(([currency, amount]) => (
+                      <p key={currency} className="text-xl font-bold text-orange-600">
+                        {formatCurrency(amount as number, currency)} <span className="text-xs text-gray-500">{currency}</span>
+                      </p>
+                    ))
+                  : (
+                    <>
+                      <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                      <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                    </>
+                  )
+                }
               </div>
             </div>
           </div>
@@ -488,7 +504,7 @@ export default function FinancePage() {
                           {payment.type === "advance" ? "Advance" : "Invoice"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(payment.amount, (payment as any).currency === 'PKR' ? 'PKR' : 'USD')}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(payment.amount, payment.currency)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.reference}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {payment.bankAccount ? (
@@ -524,15 +540,41 @@ export default function FinancePage() {
               <div className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="text-xs text-gray-500">Total Outstanding</p>
                 <div className="mt-1 space-y-1">
-                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                  {(invoiceStats as any).outstandingByCurrency ? 
+                    Object.entries((invoiceStats as any).outstandingByCurrency)
+                      .filter(([currency, amount]) => (amount as number) > 0)
+                      .map(([currency, amount]) => (
+                        <p key={currency} className="text-lg font-semibold text-gray-900">
+                          {formatCurrency(amount as number, currency)} <span className="text-xs text-gray-500">{currency}</span>
+                        </p>
+                      ))
+                    : (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                      </>
+                    )
+                  }
                 </div>
               </div>
               <div className="rounded-lg border border-gray-200 bg-white p-3">
                 <p className="text-xs text-gray-500">Total Paid</p>
                 <div className="mt-1 space-y-1">
-                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                  <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                  {(invoiceStats as any)?.paidByCurrency ? 
+                    Object.entries((invoiceStats as any).paidByCurrency)
+                      .filter(([currency, amount]) => (amount as number) > 0)
+                      .map(([currency, amount]) => (
+                        <p key={currency} className="text-lg font-semibold text-gray-900">
+                          {formatCurrency(amount as number, currency)} <span className="text-xs text-gray-500">{currency}</span>
+                        </p>
+                      ))
+                    : (
+                      <>
+                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
+                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                      </>
+                    )
+                  }
                 </div>
               </div>
               <div className="rounded-lg border border-gray-200 bg-white p-3">
@@ -674,14 +716,14 @@ export default function FinancePage() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(invoice.amount, (invoice as any).currency === 'PKR' ? 'PKR' : 'USD')}
+                            {formatCurrency(invoice.amount, invoice.currency)}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Paid: {formatCurrency(invoice.totalPaid, (invoice as any).currency === 'PKR' ? 'PKR' : 'USD')}
+                            Paid: {formatCurrency(invoice.totalPaid, invoice.currency)}
                           </div>
                           {invoice.outstandingBalance > 0 && (
                             <div className="text-xs text-red-600 font-medium">
-                              Outstanding: {formatCurrency(invoice.outstandingBalance, (invoice as any).currency === 'PKR' ? 'PKR' : 'USD')}
+                              Outstanding: {formatCurrency(invoice.outstandingBalance, invoice.currency)}
                             </div>
                           )}
                         </td>

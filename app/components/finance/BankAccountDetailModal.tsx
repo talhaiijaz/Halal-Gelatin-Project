@@ -129,6 +129,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                 {/* Activity Log */}
                 <ActivityLog 
                   entityId={String(bankAccountId)} 
+                  entityTable="banks"
                   title="Bank Account Activity"
                 />
               </>

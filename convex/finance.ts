@@ -6,6 +6,27 @@ export const getDashboardStats = query({
   args: {
     year: v.optional(v.number()),
   },
+  returns: v.object({
+    year: v.number(),
+    numberOfOrders: v.number(),
+    activeOrders: v.number(),
+    totalQuantityKg: v.number(),
+    averageOrderAmount: v.number(),
+    totalRevenue: v.number(),
+    totalPaid: v.number(),
+    totalOutstanding: v.number(),
+    totalRevenueUSD: v.number(),
+    totalRevenuePKR: v.number(),
+    totalPaidUSD: v.number(),
+    totalPaidPKR: v.number(),
+    totalOutstandingUSD: v.number(),
+    totalOutstandingPKR: v.number(),
+    outstandingByCurrency: v.record(v.string(), v.number()),
+    overdueInvoices: v.number(),
+    totalPaymentsReceived: v.number(),
+    averagePaymentAmount: v.number(),
+    paymentCount: v.number(),
+  }),
   handler: async (ctx, args) => {
     const year = args.year || new Date().getFullYear();
     // Convert to fiscal year: July 1 to June 30
@@ -55,17 +76,7 @@ export const getDashboardStats = query({
 
     const totalPaid = yearInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     const totalOutstanding = yearInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
-    // Per-currency aggregates for Option A
-    const totalRevenueUSD = yearInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.amount, 0);
-    const totalRevenuePKR = yearInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.amount, 0);
-    const totalPaidUSD = yearInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.totalPaid, 0);
-    const totalPaidPKR = yearInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.totalPaid, 0);
-    const totalOutstandingUSD = yearInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
-    const totalOutstandingPKR = yearInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
-
-    // No due/overdue concept in this system
-    const overdueInvoices: any[] = [];
-
+    
     // Get payment statistics for the year
     const payments = await ctx.db.query("payments").collect();
     const yearPayments = payments.filter(
@@ -77,6 +88,55 @@ export const getDashboardStats = query({
         return order && order.fiscalYear === year;
       }
     );
+    
+    // Get clients for currency classification
+    const clients = await ctx.db.query("clients").collect();
+    
+    // Calculate revenue by currency using payments (with conversion for international)
+    const totalRevenueUSD = yearPayments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "international" && p.convertedAmountUSD;
+      })
+      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    
+    const totalRevenuePKR = yearPayments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "local";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    // Calculate paid amounts by currency using payments
+    const totalPaidUSD = yearPayments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "international" && p.convertedAmountUSD;
+      })
+      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    
+    const totalPaidPKR = yearPayments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "local";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+    
+    // Calculate outstanding by currency (using invoices - original currency until payment)
+    const outstandingByCurrency: Record<string, number> = {};
+    yearInvoices.forEach(invoice => {
+      const currency = invoice.currency;
+      if (invoice.outstandingBalance > 0) {
+        outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
+      }
+    });
+
+    // For backward compatibility, also calculate USD and PKR totals
+    const totalOutstandingUSD = outstandingByCurrency["USD"] || 0;
+    const totalOutstandingPKR = outstandingByCurrency["PKR"] || 0;
+
+    // No due/overdue concept in this system
+    const overdueInvoices: any[] = [];
 
     const totalPaymentsReceived = yearPayments.reduce((sum, payment) => sum + payment.amount, 0);
     const averagePaymentAmount = yearPayments.length > 0 
@@ -101,6 +161,7 @@ export const getDashboardStats = query({
       totalPaidPKR,
       totalOutstandingUSD,
       totalOutstandingPKR,
+      outstandingByCurrency,
       overdueInvoices: overdueInvoices.length,
       // Payment statistics
       totalPaymentsReceived,
@@ -239,6 +300,8 @@ export const getInvoiceStats = query({
     totalOutstandingPKR: v.number(),
     totalPaidUSD: v.number(),
     totalPaidPKR: v.number(),
+    outstandingByCurrency: v.record(v.string(), v.number()),
+    paidByCurrency: v.record(v.string(), v.number()),
   }),
   handler: async (ctx, args) => {
     let invoices = await ctx.db.query("invoices").collect();
@@ -253,14 +316,49 @@ export const getInvoiceStats = query({
       });
     }
 
+    // Calculate outstanding by currency
+    const outstandingByCurrency: Record<string, number> = {};
+    invoices.forEach(invoice => {
+      const currency = invoice.currency;
+      if (invoice.outstandingBalance > 0) {
+        outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
+      }
+    });
+
+    // Get payments and clients for accurate paid amounts
+    const payments = await ctx.db.query("payments").collect();
+    const clients = await ctx.db.query("clients").collect();
+    
+    // Calculate paid amounts by currency using actual payments (with conversion for international)
+    const totalPaidUSD = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "international" && p.convertedAmountUSD;
+      })
+      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    
+    const totalPaidPKR = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return client?.type === "local";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+
     const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
-    const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+    const totalPaid = totalPaidUSD + totalPaidPKR; // Use converted amounts
     const totalOutstandingUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
     const totalOutstandingPKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
-    const totalPaidUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.totalPaid, 0);
-    const totalPaidPKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.totalPaid, 0);
     const overdueCount = 0;
     const totalCount = invoices.length;
+
+    // Calculate paid by currency for display (only show USD and PKR for paid amounts)
+    const paidByCurrency: Record<string, number> = {};
+    if (totalPaidUSD > 0) {
+      paidByCurrency["USD"] = totalPaidUSD;
+    }
+    if (totalPaidPKR > 0) {
+      paidByCurrency["PKR"] = totalPaidPKR;
+    }
 
     return {
       totalOutstanding,
@@ -271,6 +369,8 @@ export const getInvoiceStats = query({
       totalOutstandingPKR,
       totalPaidUSD,
       totalPaidPKR,
+      outstandingByCurrency,
+      paidByCurrency,
     };
   },
 });

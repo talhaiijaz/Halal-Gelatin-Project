@@ -177,7 +177,14 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                                   {p.type === "advance" ? "Advance" : "Invoice"}
                                 </span>
                               </td>
-                              <td className="px-3 py-2 text-right text-green-700 font-medium">{formatCurrency(p.amount, invoice.currency)}</td>
+                              <td className="px-3 py-2 text-right text-green-700 font-medium">
+                                {formatCurrency(p.amount, invoice.currency)}
+                                {p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD' && (
+                                  <div className="text-xs text-blue-600 mt-1">
+                                    = {formatCurrency(p.convertedAmountUSD, 'USD')}
+                                  </div>
+                                )}
+                              </td>
                               <td className="px-3 py-2">{p.reference}</td>
                               <td className="px-3 py-2">{p.bankAccountId ? (p.bankAccount?.accountName || p.bankAccount?.bankName || "Bank Transfer") : "-"}</td>
                             </tr>
@@ -187,6 +194,43 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                     </div>
                   )}
                 </div>
+
+                {/* Conversion Details for International Payments */}
+                {(() => {
+                  const internationalPayments = payments.filter((p: any) => 
+                    p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD'
+                  );
+                  
+                  if (internationalPayments.length === 0) return null;
+                  
+                  return (
+                    <div className="card p-4">
+                      <h3 className="font-medium text-gray-900 mb-2 flex items-center">
+                        <DollarSign className="h-4 w-4 mr-2"/> Currency Conversion Details
+                      </h3>
+                      <div className="space-y-3">
+                        {internationalPayments.map((payment: any, index: number) => (
+                          <div key={index} className="bg-blue-50 rounded-md p-3">
+                            <div className="grid grid-cols-1 gap-2 text-sm">
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Original Payment:</span>
+                                <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Conversion Rate:</span>
+                                <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Converted to USD:</span>
+                                <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
 
               </>

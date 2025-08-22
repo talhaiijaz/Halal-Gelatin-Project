@@ -90,10 +90,15 @@ export default function InternationalClientsPage() {
     ? Array.from(new Set(orders.map(order => order.client?.name).filter(Boolean) as string[])).sort()
     : [];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
+    // Use appropriate locale based on currency
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 'en-US';
+    return new Intl.NumberFormat(locale, {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
@@ -188,9 +193,18 @@ export default function InternationalClientsPage() {
             </div>
             <div className="card p-4">
               <p className="text-sm text-gray-500">Outstanding</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {formatCurrency(stats?.outstandingAmount || 0)}
-              </p>
+              <div className="text-2xl font-bold text-gray-900 mt-1">
+                {(stats as any)?.outstandingByCurrency ? 
+                  Object.entries((stats as any).outstandingByCurrency)
+                    .filter(([currency, amount]) => (amount as number) > 0)
+                    .map(([currency, amount]) => (
+                      <div key={currency} className="text-lg">
+                        {formatCurrency(amount as number, currency)}
+                      </div>
+                    ))
+                  : formatCurrency(stats?.outstandingAmount || 0, 'USD')
+                }
+              </div>
             </div>
             <div className="card p-4">
               <p className="text-sm text-gray-500">Total Quantity (kg)</p>
@@ -298,7 +312,16 @@ export default function InternationalClientsPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(client.outstandingAmount)}
+                            {client.outstandingByCurrency ? 
+                              Object.entries(client.outstandingByCurrency)
+                                .filter(([currency, amount]) => (amount as number) > 0)
+                                .map(([currency, amount]) => (
+                                  <div key={currency} className="mb-1">
+                                    {formatCurrency(amount as number, currency)}
+                                  </div>
+                                ))
+                              : formatCurrency(client.outstandingAmount, client.outstandingCurrency)
+                            }
                           </div>
                           {client.outstandingAmount > 0 && (
                             <div className="text-xs text-red-600 font-medium">
@@ -449,9 +472,8 @@ export default function InternationalClientsPage() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(order.totalAmount)}
+                            {formatCurrency(order.totalAmount, order.currency)}
                           </div>
-                          <div className="text-sm text-gray-500">{order.currency}</div>
                         </td>
                         <td className="px-4 py-4 text-sm text-gray-900">
                           <div className="truncate" title={order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}>

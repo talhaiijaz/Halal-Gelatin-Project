@@ -38,13 +38,17 @@ export default function OrdersPage() {
     fiscalYear: selectedFiscalYear,
   });
 
-  const formatCurrency = (amount: number, currency: 'USD' | 'PKR') =>
-    new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+  const formatCurrency = (amount: number, currency: string) => {
+    // Use appropriate locale based on currency
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount || 0);
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -288,7 +292,7 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="text-sm font-medium text-gray-900">
-                      {formatCurrency(order.totalAmount, (order as any).currency === 'PKR' ? 'PKR' : 'USD')}
+                      {formatCurrency(order.totalAmount, order.currency)}
                     </div>
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-900">

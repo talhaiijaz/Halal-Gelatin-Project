@@ -74,6 +74,7 @@ export default function EditOrderModal({
   const [freightCost, setFreightCost] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [lotNumbersInput, setLotNumbersInput] = useState("");
 
   const order = useQuery(api.orders.get, orderId ? { id: orderId } : "skip");
   const clients = useQuery(api.clients.list, {});
@@ -112,6 +113,9 @@ export default function EditOrderModal({
       setShippingOrderNumber(order.shippingOrderNumber || "");
       setNotes(order.notes || "");
       setFreightCost(order.freightCost || 0);
+      // Seed lot numbers input for editing
+      const ln = ((order.items[0] as any).lotNumbers || []).join(", ");
+      setLotNumbersInput(ln);
     }
   }, [order]);
 
@@ -245,7 +249,6 @@ export default function EditOrderModal({
       await updateOrder({
         orderId,
         clientId: selectedClientId,
-        currency: "USD",
         notes,
         freightCost: freightCost || 0,
         // Timeline fields
@@ -514,6 +517,23 @@ export default function EditOrderModal({
                   </div>
 
 
+                </div>
+
+                {/* Lot Numbers */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Lot Numbers (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={lotNumbersInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLotNumbersInput(val);
+                      const tokens = val.split(",").map(v => v.trim()).filter(Boolean);
+                      setOrderItem({ ...orderItem, lotNumbers: tokens });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    placeholder="e.g., 12345, 67890"
+                  />
                 </div>
 
                 {/* Discount Section */}

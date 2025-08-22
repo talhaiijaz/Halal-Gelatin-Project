@@ -36,8 +36,11 @@ export default function DashboardPage() {
   console.log("Dashboard data:", { dashboardStats, recentOrdersData, recentActivity });
 
   // Format currency
-  const formatCurrency = (amount: number, currency: 'USD' | 'PKR' = 'USD') => {
-    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+  const formatCurrency = (amount: number, currency: string = 'USD') => {
+    // Use appropriate locale based on currency
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
@@ -96,7 +99,7 @@ export default function DashboardPage() {
   const recentOrders = recentOrdersData ? recentOrdersData.map(order => ({
     id: order.orderNumber,
     client: order.client?.name || "Unknown Client",
-    amount: formatCurrency(order.totalAmount, (order as any).currency === 'PKR' ? 'PKR' : 'USD'),
+    amount: formatCurrency(order.totalAmount, order.currency),
     status: order.status,
     date: new Date(order.createdAt).toLocaleDateString(),
   })) : [];
@@ -154,8 +157,19 @@ export default function DashboardPage() {
                 <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD')}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Outstanding (USD)</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).outstandingUSD ?? 0, 'USD')}</p>
+                <p className="text-sm text-gray-500">Outstanding</p>
+                <div className="text-2xl font-bold text-gray-900 mt-1">
+                  {(dashboardStats as any).outstandingByCurrency ? 
+                    Object.entries((dashboardStats as any).outstandingByCurrency)
+                      .filter(([currency, amount]) => (amount as number) > 0 && currency !== 'PKR')
+                      .map(([currency, amount]) => (
+                        <div key={currency} className="text-lg">
+                          {formatCurrency(amount as number, currency)}
+                        </div>
+                      ))
+                    : formatCurrency((dashboardStats as any).outstandingUSD ?? 0, 'USD')
+                  }
+                </div>
               </div>
             </div>
           )}
@@ -181,8 +195,19 @@ export default function DashboardPage() {
                 <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR')}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Outstanding (PKR)</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).outstandingPKR ?? 0, 'PKR')}</p>
+                <p className="text-sm text-gray-500">Outstanding</p>
+                <div className="text-2xl font-bold text-gray-900 mt-1">
+                  {(dashboardStats as any).outstandingByCurrency ? 
+                    Object.entries((dashboardStats as any).outstandingByCurrency)
+                      .filter(([currency, amount]) => (amount as number) > 0 && currency === 'PKR')
+                      .map(([currency, amount]) => (
+                        <div key={currency} className="text-lg">
+                          {formatCurrency(amount as number, currency)}
+                        </div>
+                      ))
+                    : formatCurrency((dashboardStats as any).outstandingPKR ?? 0, 'PKR')
+                  }
+                </div>
               </div>
             </div>
           )}

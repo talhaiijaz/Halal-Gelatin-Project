@@ -57,10 +57,16 @@ export default function CreateOrderModal({
     mesh: undefined,
     lotNumbers: [],
   });
+  // Keep a separate raw input string so users can type commas naturally
+  const [lotNumbersInput, setLotNumbersInput] = useState("");
   const [gstRateInput, setGstRateInput] = useState("0"); // Track GST rate input as string
   const [selectedFiscalYear, setSelectedFiscalYear] = useState(getCurrentFiscalYear()); // Default to current fiscal year
   // Timeline fields
-  const [orderCreationDate, setOrderCreationDate] = useState("");
+  const [orderCreationDate, setOrderCreationDate] = useState(() => {
+    // Set default to today's date in YYYY-MM-DD format
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
   const [factoryDepartureDate, setFactoryDepartureDate] = useState("");
   const [estimatedDepartureDate, setEstimatedDepartureDate] = useState("");
   const [estimatedArrivalDate, setEstimatedArrivalDate] = useState("");
@@ -76,6 +82,7 @@ export default function CreateOrderModal({
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [orderCreationAttempted, setOrderCreationAttempted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [selectedCurrency, setSelectedCurrency] = useState("USD");
 
   const clients = useQuery(api.clients.list, {});
   const bankAccounts = useQuery(api.banks.list);
@@ -83,9 +90,12 @@ export default function CreateOrderModal({
 
   // Currency helpers
   const selectedClient = clients?.find(c => c._id === selectedClientId);
-  const currentCurrency: 'USD' | 'PKR' = selectedClient?.type === 'local' ? 'PKR' : 'USD';
+  const currentCurrency: string = selectedClient?.type === 'local' ? 'PKR' : selectedCurrency;
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat(currentCurrency === 'USD' ? 'en-US' : 'en-PK', {
+    // Use appropriate locale based on currency
+    const locale = currentCurrency === 'USD' ? 'en-US' : 
+                   currentCurrency === 'PKR' ? 'en-PK' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: currentCurrency,
       minimumFractionDigits: 2,
@@ -239,7 +249,11 @@ export default function CreateOrderModal({
     });
     setGstRateInput("0"); // Reset the GST rate input string
     setSelectedFiscalYear(getCurrentFiscalYear()); // Reset to current fiscal year
-    setOrderCreationDate("");
+    setOrderCreationDate(() => {
+      // Reset to today's date in YYYY-MM-DD format
+      const today = new Date();
+      return today.toISOString().split('T')[0];
+    });
     setFactoryDepartureDate("");
     setEstimatedDepartureDate("");
     setEstimatedArrivalDate("");
@@ -254,6 +268,7 @@ export default function CreateOrderModal({
     setOrderCreationAttempted(false);
     setClientSearchQuery("");
     setInvoiceNumber("");
+    setLotNumbersInput("");
   };
 
   const handleClose = () => {
@@ -271,6 +286,7 @@ export default function CreateOrderModal({
         clientId: selectedClientId,
         invoiceNumber: invoiceNumber.trim() || undefined,
         fiscalYear: selectedFiscalYear,
+        currency: selectedClient?.type === 'international' ? selectedCurrency : undefined,
         notes,
         freightCost: freightCost || 0,
         // Timeline fields
@@ -542,6 +558,34 @@ export default function CreateOrderModal({
                     </p>
                   </div>
 
+                  {/* Currency Selection for International Clients */}
+                  {selectedClient?.type === 'international' && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Currency
+                      </label>
+                      <select
+                        value={selectedCurrency}
+                        onChange={(e) => setSelectedCurrency(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      >
+                        <option value="USD">USD - US Dollar</option>
+                        <option value="EUR">EUR - Euro</option>
+                        <option value="GBP">GBP - British Pound</option>
+                        <option value="AED">AED - UAE Dirham</option>
+                        <option value="CNY">CNY - Chinese Yuan</option>
+                        <option value="JPY">JPY - Japanese Yen</option>
+                        <option value="CAD">CAD - Canadian Dollar</option>
+                        <option value="AUD">AUD - Australian Dollar</option>
+                        <option value="CHF">CHF - Swiss Franc</option>
+                        <option value="SGD">SGD - Singapore Dollar</option>
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Select the currency for this order. Conversion rate to USD will be required during payment.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Product Name */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -587,8 +631,13 @@ export default function CreateOrderModal({
                     <label className="block text-sm font-medium text-gray-700 mb-1">Lot Numbers (comma-separated)</label>
                     <input
                       type="text"
-                      value={(orderItem.lotNumbers || []).join(", ")}
-                      onChange={(e) => setOrderItem({ ...orderItem, lotNumbers: e.target.value.split(",").map(v => v.trim()).filter(Boolean) })}
+                      value={lotNumbersInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLotNumbersInput(val);
+                        const tokens = val.split(",").map(v => v.trim()).filter(v => v.length > 0);
+                        setOrderItem({ ...orderItem, lotNumbers: tokens });
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                       placeholder="e.g., 12345, 67890"
                     />

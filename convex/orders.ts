@@ -199,7 +199,7 @@ export const create = mutation({
     clientId: v.id("clients"),
     invoiceNumber: v.optional(v.string()), // Optional invoice number
     fiscalYear: v.optional(v.number()), // Optional fiscal year for order number
-    // currency is derived from client type
+    currency: v.optional(v.string()), // Currency for international clients (defaults to USD)
     notes: v.optional(v.string()),
     freightCost: v.optional(v.number()),
     // Timeline fields
@@ -251,11 +251,18 @@ export const create = mutation({
     );
     const totalAmount = itemsTotal + (args.freightCost || 0);
 
-    // Enforce currency by client type
+    // Get client and determine currency
     const client = await ctx.db.get(args.clientId);
     if (!client) throw new Error("Client not found");
-    const enforcedCurrency = client.type === "local" ? "PKR" : "USD";
-    const currencyToUse = enforcedCurrency;
+    
+    // Currency logic: Local clients use PKR, International clients can use any currency
+    let currencyToUse: string;
+    if (client.type === "local") {
+      currencyToUse = "PKR";
+    } else {
+      // For international clients, use provided currency or default to USD
+      currencyToUse = args.currency || "USD";
+    }
 
     // Create order
     const orderNumber = await generateOrderNumber(ctx, args.fiscalYear);
@@ -265,7 +272,7 @@ export const create = mutation({
       clientId: args.clientId,
       status: "pending",
       // Timeline fields
-      orderCreationDate: args.orderCreationDate,
+      orderCreationDate: args.orderCreationDate || Date.now(), // Default to current timestamp if not provided
       factoryDepartureDate: args.factoryDepartureDate,
       estimatedDepartureDate: args.estimatedDepartureDate,
       estimatedArrivalDate: args.estimatedArrivalDate,
@@ -1293,5 +1300,14 @@ export const clearAllInvoiceNumbers = mutation({
     }
     
     return { updatedOrders, updatedInvoices };
+  },
+});
+
+// List all order items
+export const listItems = query({
+  args: {},
+  handler: async (ctx, args) => {
+    const orderItems = await ctx.db.query("orderItems").collect();
+    return orderItems;
   },
 });

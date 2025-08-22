@@ -42,6 +42,7 @@ export default function RecordPaymentModal({
     notes: "",
     applyWithholding: false,
     withholdingRate: "",
+    conversionRateToUSD: "",
   });
 
   useEffect(() => {
@@ -61,6 +62,7 @@ export default function RecordPaymentModal({
         setFormData(prev => ({
           ...prev,
           amount: invoice.outstandingBalance.toString(),
+          conversionRateToUSD: "",
         }));
       }
     }
@@ -96,6 +98,7 @@ export default function RecordPaymentModal({
         notes: formData.notes || undefined,
         bankAccountId: formData.method === "bank_transfer" && selectedBankAccountId ? (selectedBankAccountId as Id<"bankAccounts">) : undefined,
         withheldTaxRate: rate > 0 ? rate : undefined,
+        conversionRateToUSD: formData.conversionRateToUSD ? parseFloat(formData.conversionRateToUSD) : undefined,
       });
       
       // Reset form
@@ -107,6 +110,7 @@ export default function RecordPaymentModal({
         notes: "",
         applyWithholding: false,
         withholdingRate: "",
+        conversionRateToUSD: "",
       });
       setSelectedClientId("");
       setSelectedInvoiceId("");
@@ -159,12 +163,14 @@ export default function RecordPaymentModal({
     }));
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency?: string) => {
     const invoice = unpaidInvoices?.find(inv => inv._id === selectedInvoiceId);
-    const currency = invoice?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
-    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+    const currencyToUse = currency || invoice?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
+    const locale = currencyToUse === 'USD' ? 'en-US' : 
+                   currencyToUse === 'PKR' ? 'en-PK' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
-      currency,
+      currency: currencyToUse,
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount || 0);
@@ -246,7 +252,7 @@ export default function RecordPaymentModal({
                         {(invoice.invoiceNumber && invoice.invoiceNumber.trim() !== "")
                           ? `${invoice.invoiceNumber} • ${invoice.order?.orderNumber || "Order"}`
                           : `${invoice.order?.orderNumber || "Order"}`
-                        } - {formatCurrency(invoice.outstandingBalance)} outstanding
+                        } - {formatCurrency(invoice.outstandingBalance, invoice.currency)} outstanding
                       </option>
                     ))}
                   </select>
@@ -270,13 +276,13 @@ export default function RecordPaymentModal({
                     return (
                       <div className="mt-1 space-y-1">
                         <p className="text-sm">
-                          <span className="font-medium">Total Amount:</span> {formatCurrency(invoice.amount)}
+                          <span className="font-medium">Total Amount:</span> {formatCurrency(invoice.amount, invoice.currency)}
                         </p>
                         <p className="text-sm">
-                          <span className="font-medium">Paid:</span> {formatCurrency(invoice.totalPaid)}
+                          <span className="font-medium">Paid:</span> {formatCurrency(invoice.totalPaid, invoice.currency)}
                         </p>
                         <p className="text-sm font-medium text-primary">
-                          Outstanding: {formatCurrency(invoice.outstandingBalance)}
+                          Outstanding: {formatCurrency(invoice.outstandingBalance, invoice.currency)}
                         </p>
                       </div>
                     );
@@ -360,6 +366,51 @@ export default function RecordPaymentModal({
                 </div>
               )}
 
+              {/* Conversion Rate for International Non-USD Payments */}
+              {selectedClient?.type === 'international' && selectedInvoiceId && unpaidInvoices && (() => {
+                const invoice = unpaidInvoices.find(inv => inv._id === selectedInvoiceId);
+                if (!invoice || invoice.currency === 'USD') return null;
+                
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Conversion Rate to USD *
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={formData.conversionRateToUSD}
+                        onChange={(e) => setFormData(prev => ({ ...prev, conversionRateToUSD: e.target.value }))}
+                        min="0"
+                        step="0.0001"
+                        placeholder="e.g. 1.08 for EUR"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        required
+                      />
+                      <div className="text-xs text-gray-500">
+                        1 {invoice.currency} = ? USD
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Required for international payments in {invoice.currency}. This converts the payment to USD for dashboard reporting.
+                    </p>
+                    
+                    {/* USD Conversion Display */}
+                    {formData.conversionRateToUSD && formData.amount && (
+                      <div className="mt-2 bg-blue-50 rounded-md p-3 text-sm">
+                        <div className="text-gray-600">USD Conversion Preview:</div>
+                        <div className="font-semibold text-blue-800">
+                          {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), 'USD')}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {formData.amount} {invoice.currency} × {formData.conversionRateToUSD} = {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), 'USD')}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Bank Account Selection */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -373,8 +424,9 @@ export default function RecordPaymentModal({
                 >
                   <option value="">Select a bank account</option>
                   {bankAccounts?.filter(account => {
-                    const inv = unpaidInvoices?.find(i => i._id === selectedInvoiceId);
-                    const requiredCurrency = inv?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
+                    // For international payments, always use USD bank accounts (since payments get converted to USD)
+                    // For local payments, use PKR bank accounts
+                    const requiredCurrency = selectedClient?.type === 'local' ? 'PKR' : 'USD';
                     return account.status === 'active' && account.currency === requiredCurrency;
                   }).map(account => (
                     <option key={account._id} value={account._id}>

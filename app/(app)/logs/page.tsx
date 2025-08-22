@@ -27,13 +27,35 @@ export default function LogsPage() {
   // Fetch logs with pagination
   const logs = useQuery(api.dashboard.listLogs, { limit: 100 });
 
+  // Compute date threshold based on filter
+  const dateThreshold = (() => {
+    if (dateFilter === "today") {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d.getTime();
+    }
+    if (dateFilter === "week") {
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      return d.getTime();
+    }
+    if (dateFilter === "month") {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      return d.getTime();
+    }
+    return 0; // all time
+  })();
+
   // Filter logs based on search and filters
   const filteredLogs = logs?.filter(log => {
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
+      const meta = log.metadata ? JSON.stringify(log.metadata).toLowerCase() : "";
       if (!log.message.toLowerCase().includes(searchLower) &&
           !log.entityTable.toLowerCase().includes(searchLower) &&
-          !log.action.toLowerCase().includes(searchLower)) {
+          !log.action.toLowerCase().includes(searchLower) &&
+          !meta.includes(searchLower)) {
         return false;
       }
     }
@@ -43,6 +65,10 @@ export default function LogsPage() {
     }
     
     if (actionFilter !== "all" && log.action !== actionFilter) {
+      return false;
+    }
+    
+    if (dateFilter !== "all" && log.createdAt < dateThreshold) {
       return false;
     }
     

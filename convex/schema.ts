@@ -99,6 +99,23 @@ export default defineSchema({
   })
     .index("by_order", ["orderId"]),
 
+  // Shipment Schedules table
+  shipmentSchedules: defineTable({
+    month: v.string(), // e.g., "Jun-25", "Jul-25"
+    bloom: v.string(), // e.g., "160-180", "200-220", "220-240", "240-260", "250-270"
+    clientQuantities: v.record(v.string(), v.number()), // Client name -> quantity mapping
+    partyName: v.optional(v.string()),
+    partyType: v.optional(v.string()),
+    totalQty: v.number(), // Total quantity for this bloom range
+    totalByBloom: v.record(v.string(), v.number()), // Bloom range -> total quantity mapping
+    fiscalYear: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_month_and_bloom", ["month", "bloom"])
+    .index("by_fiscal_year", ["fiscalYear"])
+    .index("by_month", ["month"]),
+
   // Invoices table
   invoices: defineTable({
     invoiceNumber: v.optional(v.string()), // Unique invoice number (e.g., INV-2025-0001)
@@ -139,6 +156,9 @@ export default defineSchema({
     reference: v.string(),
     notes: v.optional(v.string()),
     bankAccountId: v.optional(v.id("bankAccounts")), // Link to bank account for bank transfers
+    // Multi-currency conversion support
+    conversionRateToUSD: v.optional(v.number()), // Required for non-USD international payments
+    convertedAmountUSD: v.optional(v.number()), // Calculated amount in USD for dashboard
     // Withholding support (for local clients)
     cashReceived: v.optional(v.number()), // Net cash deposited to bank (amount - withheld)
     withheldTaxRate: v.optional(v.number()), // Percentage rate e.g., 5 for 5%

@@ -266,6 +266,24 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
+                              {item.bloom !== undefined && (
+                                <tr>
+                                  <td className="px-3 py-2 text-xs text-gray-600">Bloom</td>
+                                  <td className="px-3 py-2 text-xs text-right font-medium">{item.bloom}</td>
+                                </tr>
+                              )}
+                              {item.mesh !== undefined && (
+                                <tr>
+                                  <td className="px-3 py-2 text-xs text-gray-600">Mesh</td>
+                                  <td className="px-3 py-2 text-xs text-right font-medium">{item.mesh}</td>
+                                </tr>
+                              )}
+                              {item.lotNumbers && item.lotNumbers.length > 0 && (
+                                <tr>
+                                  <td className="px-3 py-2 text-xs text-gray-600">Lot Numbers</td>
+                                  <td className="px-3 py-2 text-xs text-right font-medium">{item.lotNumbers.join(", ")}</td>
+                                </tr>
+                              )}
                               <tr>
                                 <td className="px-3 py-2 text-xs text-gray-600">Quantity</td>
                                 <td className="px-3 py-2 text-xs text-right font-medium">{item.quantityKg} kg</td>
@@ -560,6 +578,40 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                         );
                       })()}
 
+                      {/* Conversion Details for International Payments */}
+                      {(() => {
+                        const payments = (order as any).payments || [];
+                        const internationalPayments = payments.filter((p: any) => 
+                          p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD'
+                        );
+                        
+                        if (internationalPayments.length === 0) return null;
+                        
+                        return (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-gray-700 mb-2">Currency Conversion Details</h4>
+                            <div className="space-y-2">
+                              {internationalPayments.map((payment: any, index: number) => (
+                                <div key={index} className="bg-blue-50 rounded-md p-3 text-sm">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Original Payment:</span>
+                                    <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Conversion Rate:</span>
+                                    <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-gray-600">Converted to USD:</span>
+                                    <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
                       <button
                         className="w-full btn-primary text-sm"
                         onClick={() => setIsRecordPaymentOpen(true)}
@@ -645,7 +697,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                 </div>
 
                 {/* Activity Log */}
-                <ActivityLog entityId={String(orderId)} title="Order Activity" limit={5} />
+                <ActivityLog entityId={String(orderId)} entityTable="orders" title="Order Activity" limit={5} />
               </div>
             )}
           </div>

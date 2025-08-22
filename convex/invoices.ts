@@ -358,6 +358,50 @@ export const updateOverdueInvoices = mutation({
   },
 });
 
+// Fix invoice statuses based on actual payment data
+export const fixInvoiceStatuses = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const invoices = await ctx.db.query("invoices").collect();
+    let updatedCount = 0;
+    
+    for (const invoice of invoices) {
+      // Get all payments for this invoice
+      const payments = await ctx.db
+        .query("payments")
+        .withIndex("by_invoice", q => q.eq("invoiceId", invoice._id))
+        .collect();
+      
+      // Calculate actual total paid
+      const actualTotalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const actualOutstandingBalance = Math.max(0, invoice.amount - actualTotalPaid);
+      
+      // Determine correct status
+      let correctStatus: "unpaid" | "partially_paid" | "paid";
+      if (actualOutstandingBalance === 0) {
+        correctStatus = "paid";
+      } else if (actualTotalPaid > 0) {
+        correctStatus = "partially_paid";
+      } else {
+        correctStatus = "unpaid";
+      }
+      
+      // Update if status or totalPaid is incorrect
+      if (invoice.status !== correctStatus || invoice.totalPaid !== actualTotalPaid || invoice.outstandingBalance !== actualOutstandingBalance) {
+        await ctx.db.patch(invoice._id, {
+          status: correctStatus,
+          totalPaid: actualTotalPaid,
+          outstandingBalance: actualOutstandingBalance,
+          updatedAt: Date.now(),
+        });
+        updatedCount++;
+      }
+    }
+    
+    return { updatedCount };
+  },
+});
+
 // Delete invoice (only if no payments recorded)
 export const deleteInvoice = mutation({
   args: {
