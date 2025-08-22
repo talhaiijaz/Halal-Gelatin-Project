@@ -81,7 +81,7 @@ export default defineSchema({
     orderId: v.id("orders"),
     product: v.string(),
     // Product specifications
-    bloom: v.optional(v.number()),
+    bloom: v.optional(v.string()),
     mesh: v.optional(v.number()),
     lotNumbers: v.optional(v.array(v.string())),
     quantityKg: v.number(),

@@ -143,4 +143,28 @@ export const deleteProblematicBankAccount = mutation({
   },
 });
 
+// Migration to convert any existing numeric bloom values to strings
+export const migrateBloomValues = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Get all order items
+    const orderItems = await ctx.db.query("orderItems").collect();
+    
+    let migratedCount = 0;
+    
+    for (const item of orderItems) {
+      // If bloom is a number, convert it to string
+      if (typeof item.bloom === 'number') {
+        await ctx.db.patch(item._id, {
+          bloom: item.bloom.toString()
+        });
+        migratedCount++;
+      }
+    }
+    
+    console.log(`Migrated ${migratedCount} bloom values from number to string`);
+    return { migratedCount };
+  },
+});
+
 

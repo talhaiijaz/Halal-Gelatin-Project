@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import DocumentUpload from "./DocumentUpload";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 
 interface OrderItem {
   product: string;
@@ -21,7 +22,7 @@ interface OrderItem {
   discountValue?: number;
   discountAmount?: number;
   // New product specs
-  bloom?: number;
+  bloom?: string;
   mesh?: number;
   lotNumbers?: string[];
 }
@@ -120,7 +121,7 @@ export default function CreateOrderModal({
     if (field === "product") {
       updatedItem.product = value as string;
     } else if (field === "bloom") {
-      updatedItem.bloom = typeof value === "string" ? (value === "" ? undefined : parseFloat(value)) : (value as number);
+      updatedItem.bloom = typeof value === "string" ? (value === "" ? undefined : value) : value.toString();
       setOrderItem(updatedItem);
       return;
     } else if (field === "mesh") {
@@ -603,15 +604,18 @@ export default function CreateOrderModal({
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
-                      <input
-                        type="number"
+                      <select
                         value={orderItem.bloom ?? ""}
                         onChange={(e) => handleUpdateItem("bloom", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        placeholder="e.g., 250"
-                        min="0"
-                        step="1"
-                      />
+                      >
+                        <option value="">Select Bloom Value</option>
+                        {ALL_BLOOM_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>

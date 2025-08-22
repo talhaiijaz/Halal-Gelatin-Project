@@ -214,7 +214,7 @@ export const create = mutation({
     shippingOrderNumber: v.optional(v.string()),
     items: v.array(v.object({
       product: v.string(),
-      bloom: v.optional(v.number()),
+      bloom: v.optional(v.string()),
       mesh: v.optional(v.number()),
       lotNumbers: v.optional(v.array(v.string())),
       quantityKg: v.number(),
@@ -992,7 +992,7 @@ export const update = mutation({
     shippingOrderNumber: v.optional(v.string()),
     items: v.optional(v.array(v.object({
       product: v.string(),
-      bloom: v.optional(v.number()),
+      bloom: v.optional(v.string()),
       mesh: v.optional(v.number()),
       lotNumbers: v.optional(v.array(v.string())),
       quantityKg: v.number(),
