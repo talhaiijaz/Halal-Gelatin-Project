@@ -351,7 +351,7 @@ export const create = mutation({
       clientId: args.clientId,
       issueDate,
       dueDate,
-      status: "partially_paid",
+      status: "unpaid",
       amount: totalAmount,
       currency: currencyToUse,
       totalPaid: 0,

@@ -154,9 +154,9 @@ export const migrateBloomValues = mutation({
     
     for (const item of orderItems) {
       // If bloom is a number, convert it to string
-      if (typeof item.bloom === 'number') {
+      if (item.bloom !== undefined && typeof item.bloom === 'number') {
         await ctx.db.patch(item._id, {
-          bloom: item.bloom.toString()
+          bloom: (item.bloom as number).toString()
         });
         migratedCount++;
       }
