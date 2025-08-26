@@ -182,14 +182,6 @@ export default function Sidebar() {
           </div>
           <div className="space-y-1">
             <Link
-              href="/settings"
-              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Settings className="mr-3 h-4 w-4 text-gray-400" />
-              Settings
-            </Link>
-            <Link
               href="/logs"
               className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
               onClick={() => setMobileMenuOpen(false)}
