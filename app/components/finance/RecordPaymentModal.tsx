@@ -71,12 +71,25 @@ export default function RecordPaymentModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate required fields
     if (!selectedClientId) {
       alert("Please select a customer");
       return;
     }
     if (!selectedInvoiceId) {
       alert("Please select an invoice");
+      return;
+    }
+    if (!formData.amount || parseFloat(formData.amount) <= 0) {
+      alert("Please enter a valid payment amount");
+      return;
+    }
+    if (!formData.reference || formData.reference.trim() === "") {
+      alert("Please enter a reference number");
+      return;
+    }
+    if (!formData.paymentDate) {
+      alert("Please select a payment date");
       return;
     }
 
@@ -87,6 +100,11 @@ export default function RecordPaymentModal({
 
     setIsSubmitting(true);
     try {
+      // Calculate withholding rate
+      const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
+      const isLocalClient = selectedClient?.type === "local";
+      const rate = formData.applyWithholding && isLocalClient ? Math.max(0, parseFloat(formData.withholdingRate || "0")) : 0;
+
       await recordPayment({
         type: isAdvancePayment ? "advance" : "invoice",
         invoiceId: selectedInvoiceId as Id<"invoices">,

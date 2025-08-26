@@ -53,9 +53,17 @@ export const recordPayment = mutation({
     withheldTaxRate: v.optional(v.number()), // e.g., 4, 5 or custom
   },
   handler: async (ctx, args) => {
-    // Validate amount
-    if (args.amount <= 0) {
+    // Validate required fields
+    if (!args.amount || args.amount <= 0) {
       throw new Error("Payment amount must be greater than 0");
+    }
+    
+    if (!args.reference || args.reference.trim() === "") {
+      throw new Error("Reference number is required");
+    }
+    
+    if (!args.method) {
+      throw new Error("Payment method is required");
     }
 
     let currency = "USD";

@@ -5,9 +5,8 @@ import { Id } from "./_generated/dataModel";
 // Get current user's role
 export const getCurrentUserRole = query({
   args: {},
-  returns: v.union(v.literal("admin"), v.literal("user"), v.null()),
+  returns: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.null()),
   handler: async (ctx) => {
-    // This will be called from the frontend with the user's Clerk ID
     // For now, we'll return null and handle this in the frontend
     return null;
   },
@@ -28,6 +27,7 @@ export const createOrUpdateUser = mutation({
   args: {
     email: v.string(),
     name: v.string(),
+    role: v.optional(v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"))),
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
@@ -41,15 +41,16 @@ export const createOrUpdateUser = mutation({
       // Update existing user
       await ctx.db.patch(existingUser._id, {
         name: args.name,
+        role: args.role || existingUser.role,
         lastLogin: Date.now(),
       });
       return existingUser._id;
     } else {
-      // Create new user with full permissions
+      // Create new user with admin permissions by default
       return await ctx.db.insert("users", {
         email: args.email,
         name: args.name,
-        role: "admin", // All users have admin permissions
+        role: args.role || "admin",
         createdAt: Date.now(),
         lastLogin: Date.now(),
       });
@@ -65,7 +66,7 @@ export const getAllUsers = query({
     _creationTime: v.number(),
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("admin"), v.literal("user")),
+    role: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations")),
     createdAt: v.number(),
     lastLogin: v.optional(v.number()),
   })),
@@ -82,37 +83,4 @@ export const getAllUsers = query({
 
 // Approval system removed - all users have full permissions
 
-// Sync Clerk user with our database
-export const syncClerkUser = mutation({
-  args: {
-    email: v.string(),
-    name: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    // Check if user already exists
-    const existingUser = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .unique();
 
-    if (existingUser) {
-      // Update existing user's name and last login
-      await ctx.db.patch(existingUser._id, {
-        name: args.name,
-        lastLogin: Date.now(),
-      });
-    } else {
-      // Create new user with full permissions
-      await ctx.db.insert("users", {
-        email: args.email,
-        name: args.name,
-        role: "admin", // All users have admin permissions
-        createdAt: Date.now(),
-        lastLogin: Date.now(),
-      });
-    }
-
-    return null;
-  },
-});

@@ -2,28 +2,24 @@
 
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useUser } from '@clerk/nextjs';
 import { useState } from "react";
 import { Plus, Edit, Trash2, Shield, User } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function UsersPage() {
-  const { user } = useUser();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     email: "",
     name: "",
-    role: "user" as "admin" | "user"
+    role: "admin" as "admin" | "sales" | "finance" | "operations"
   });
 
   // Get all users
   const users = useQuery(api.users.getAllUsers);
   
-  // Check if current user is admin
-  const isAdmin = useQuery(api.users.isUserAdmin, { 
-    userId: user?.emailAddresses[0]?.emailAddress || "" 
-  });
+  // For now, assume all users have admin access since we're not using external auth
+  const isAdmin = true;
 
   // Mutations
   const createOrUpdateUser = useMutation(api.users.createOrUpdateUser);
@@ -47,7 +43,7 @@ export default function UsersPage() {
       toast.success(editingUser ? "User updated successfully" : "User created successfully");
       setShowAddModal(false);
       setEditingUser(null);
-      setFormData({ email: "", name: "", role: "user" });
+      setFormData({ email: "", name: "", role: "admin" });
     } catch (error) {
       toast.error("Failed to save user");
       console.error(error);
@@ -66,7 +62,7 @@ export default function UsersPage() {
   };
 
   // If not admin, show access denied
-  if (isAdmin === false) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -79,7 +75,7 @@ export default function UsersPage() {
   }
 
   // Loading state
-  if (isAdmin === undefined || users === undefined) {
+  if (users === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
@@ -99,7 +95,7 @@ export default function UsersPage() {
         <button
           onClick={() => {
             setEditingUser(null);
-            setFormData({ email: "", name: "", role: "user" });
+            setFormData({ email: "", name: "", role: "admin" });
             setShowAddModal(true);
           }}
           className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700"
@@ -132,7 +128,11 @@ export default function UsersPage() {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     user.role === "admin" 
                       ? "bg-purple-100 text-purple-800" 
-                      : "bg-gray-100 text-gray-800"
+                      : user.role === "sales"
+                      ? "bg-blue-100 text-blue-800"
+                      : user.role === "finance"
+                      ? "bg-green-100 text-green-800"
+                      : "bg-orange-100 text-orange-800"
                   }`}>
                     {user.role === "admin" ? (
                       <Shield className="h-3 w-3 mr-1" />
@@ -198,11 +198,13 @@ export default function UsersPage() {
                   </label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as "admin" | "user" })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as "admin" | "sales" | "finance" | "operations" })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                   >
-                    <option value="user">User</option>
                     <option value="admin">Admin</option>
+                    <option value="sales">Sales</option>
+                    <option value="finance">Finance</option>
+                    <option value="operations">Operations</option>
                   </select>
                 </div>
 
@@ -212,7 +214,7 @@ export default function UsersPage() {
                     onClick={() => {
                       setShowAddModal(false);
                       setEditingUser(null);
-                      setFormData({ email: "", name: "", role: "user" });
+                      setFormData({ email: "", name: "", role: "admin" });
                     }}
                     className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                   >

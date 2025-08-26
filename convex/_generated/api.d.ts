@@ -25,6 +25,7 @@ import type * as invoices from "../invoices.js";
 import type * as migrations from "../migrations.js";
 import type * as orders from "../orders.js";
 import type * as payments from "../payments.js";
+import type * as users from "../users.js";
 
 /**
  * A utility for referencing Convex functions in your app's API.
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   orders: typeof orders;
   payments: typeof payments;
+  users: typeof users;
 }>;
 export declare const api: FilterApi<
   typeof fullApi,
