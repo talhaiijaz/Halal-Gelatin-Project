@@ -5,7 +5,7 @@ import { Id } from "./_generated/dataModel";
 // Get current user's role
 export const getCurrentUserRole = query({
   args: {},
-  returns: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.null()),
+  returns: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user"), v.null()),
   handler: async (ctx) => {
     // For now, we'll return null and handle this in the frontend
     return null;
@@ -27,7 +27,7 @@ export const createOrUpdateUser = mutation({
   args: {
     email: v.string(),
     name: v.string(),
-    role: v.optional(v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"))),
+    role: v.optional(v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user"))),
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
@@ -66,7 +66,7 @@ export const getAllUsers = query({
     _creationTime: v.number(),
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations")),
+    role: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user")),
     createdAt: v.number(),
     lastLogin: v.optional(v.number()),
   })),

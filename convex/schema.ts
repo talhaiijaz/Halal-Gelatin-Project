@@ -7,7 +7,7 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations")),
+    role: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user")),
     createdAt: v.number(),
     lastLogin: v.optional(v.number()),
   })
@@ -25,6 +25,10 @@ export default defineSchema({
     taxId: v.optional(v.string()),
     type: v.union(v.literal("local"), v.literal("international")),
     status: v.union(v.literal("active"), v.literal("inactive")),
+    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
+    approvalNotes: v.optional(v.string()),
+    approvedAt: v.optional(v.number()),
+    approvedBy: v.optional(v.id("users")),
     createdAt: v.number(),
     createdBy: v.optional(v.id("users")),
   })
@@ -68,6 +72,7 @@ export default defineSchema({
     packingListId: v.optional(v.id("_storage")),
     proformaInvoiceId: v.optional(v.id("_storage")),
     commercialInvoiceId: v.optional(v.id("_storage")),
+    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -129,6 +134,7 @@ export default defineSchema({
     totalPaid: v.number(),
     outstandingBalance: v.number(), // amount - totalPaid
     notes: v.optional(v.string()),
+    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -164,6 +170,7 @@ export default defineSchema({
     withheldTaxRate: v.optional(v.number()), // Percentage rate e.g., 5 for 5%
     withheldTaxAmount: v.optional(v.number()), // Calculated from cashReceived * rate / 100
     recordedBy: v.optional(v.id("users")),
+    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
   })
     .index("by_invoice", ["invoiceId"])
@@ -207,6 +214,7 @@ export default defineSchema({
     currency: v.string(),
     accountType: v.union(v.literal("checking"), v.literal("savings"), v.literal("business")),
     status: v.union(v.literal("active"), v.literal("inactive")),
+    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
   })
     .index("by_currency", ["currency"])
