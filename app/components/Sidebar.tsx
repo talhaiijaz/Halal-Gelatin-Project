@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useAuth } from "./AuthProvider";
 import {
   Home,
   Users,
@@ -60,6 +61,7 @@ export default function Sidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const pathname = usePathname();
+  const { logout } = useAuth();
 
   const toggleExpanded = (itemName: string) => {
     setExpandedItems((prev) =>
@@ -189,6 +191,16 @@ export default function Sidebar() {
               <Activity className="mr-3 h-4 w-4 text-gray-400" />
               Logs
             </Link>
+            <button
+              onClick={() => {
+                logout();
+                setMobileMenuOpen(false);
+              }}
+              className="flex items-center w-full px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+            >
+              <LogOut className="mr-3 h-4 w-4 text-gray-400" />
+              Logout
+            </button>
           </div>
         </div>
       </div>

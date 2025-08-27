@@ -1,6 +1,7 @@
 "use client";
 
 import Sidebar from "@/app/components/Sidebar";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 
 export default function AppLayout({
   children,
@@ -8,18 +9,20 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      
-      {/* Main content area */}
-      <div className="lg:pl-64">
-        {/* Mobile top padding to account for mobile header */}
-        <div className="pt-16 lg:pt-0">
-          <main className="p-4 sm:p-6 lg:p-8">
-            {children}
-          </main>
+    <ProtectedRoute>
+      <div className="min-h-screen bg-gray-50">
+        <Sidebar />
+        
+        {/* Main content area */}
+        <div className="lg:pl-64">
+          {/* Mobile top padding to account for mobile header */}
+          <div className="pt-16 lg:pt-0">
+            <main className="p-4 sm:p-6 lg:p-8">
+              {children}
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </ProtectedRoute>
   );
 }
