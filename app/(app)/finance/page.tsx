@@ -11,7 +11,6 @@ import PaymentDetailModal from "@/app/components/finance/PaymentDetailModal";
 import BankAccountModal from "@/app/components/finance/BankAccountModal";
 import DeleteBankConfirmModal from "@/app/components/finance/DeleteBankConfirmModal";
 import BankAccountDetailModal from "@/app/components/finance/BankAccountDetailModal";
-import ErrorBoundary from "@/app/components/ErrorBoundary";
 import { 
   TrendingUp,
   DollarSign,
@@ -217,7 +216,6 @@ export default function FinancePage() {
   ].filter(d => d.value > 0) : [];
 
   return (
-    <ErrorBoundary>
     <div>
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
@@ -1005,6 +1003,5 @@ export default function FinancePage() {
         bankAccountId={selectedBankAccountId as any}
       />
     </div>
-    </ErrorBoundary>
   );
 }
