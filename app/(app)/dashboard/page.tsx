@@ -126,8 +126,8 @@ export default function DashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
           Welcome back!
         </h1>
         <p className="mt-1 text-sm text-gray-600">
@@ -136,25 +136,25 @@ export default function DashboardPage() {
       </div>
 
       {/* International & Local Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
         {/* International */}
         <div className="card p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">International</h3>
           {!dashboardStats ? (
             <Skeleton height={120} />
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-sm text-gray-500">Clients</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalClients}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalClients}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Active Orders</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalOrders}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalOrders}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Revenue (USD)</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD')}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD')}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Outstanding</p>
@@ -181,18 +181,18 @@ export default function DashboardPage() {
           {!dashboardStats ? (
             <Skeleton height={120} />
           ) : (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-sm text-gray-500">Clients</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localClients}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localClients}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Active Orders</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localOrders}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localOrders}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Revenue (PKR)</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR')}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR')}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Outstanding</p>
@@ -215,7 +215,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Recent Orders */}
         <div className="card p-6">
           <div className="flex items-center justify-between mb-4">
@@ -290,7 +290,7 @@ export default function DashboardPage() {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button
               onClick={() => {
                 setIsAddClientOpen(true);
