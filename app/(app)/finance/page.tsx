@@ -687,8 +687,11 @@ export default function FinancePage() {
                     filteredInvoices?.map((invoice) => (
                       <tr
                         key={invoice._id}
-                        className="hover:bg-gray-50 cursor-pointer"
+                        className="hover:bg-gray-50 cursor-pointer transition-colors"
                         onClick={() => {
+                          setSelectedInvoiceId(invoice._id);
+                          setIsInvoiceModalOpen(true);
+                        }}
                           setSelectedInvoiceId(invoice._id);
                           setIsInvoiceModalOpen(true);
                         }}
@@ -737,17 +740,9 @@ export default function FinancePage() {
                         </td>
                         <td className="py-2 text-sm text-center">
                           <div className="flex items-center justify-center">
-                            <button
-                              className="flex items-center justify-center w-8 h-8 rounded text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                              title="View Details"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedInvoiceId(invoice._id);
-                                setIsInvoiceModalOpen(true);
-                              }}
-                            >
+                            <div className="flex items-center justify-center w-8 h-8 rounded text-gray-600">
                               <Eye className="h-4 w-4" />
-                            </button>
+                            </div>
                           </div>
                         </td>
                       </tr>

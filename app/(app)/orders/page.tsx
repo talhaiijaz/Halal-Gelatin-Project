@@ -285,7 +285,11 @@ function OrdersPageContent() {
                 ))
               ) : (filteredOrders && filteredOrders.length > 0) ? (
                 filteredOrders.map((order) => (
-                  <tr key={order._id} className="hover:bg-gray-50 cursor-pointer">
+                  <tr 
+                    key={order._id} 
+                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => setSelectedOrderId(order._id)}
+                  >
                     <td className="px-4 py-4">
                       <div className="text-sm font-medium text-gray-900">
                         {order.orderNumber}
@@ -319,16 +323,9 @@ function OrdersPageContent() {
                     </td>
                     <td className="px-4 py-4 text-sm font-medium">
                       <div className="flex items-center justify-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedOrderId(order._id);
-                          }}
-                          className="text-primary hover:text-primary-dark p-1 rounded hover:bg-gray-100"
-                          title="View Details"
-                        >
+                        <div className="text-primary p-1 rounded">
                           <Eye className="h-5 w-5" />
-                        </button>
+                        </div>
                       </div>
                     </td>
                   </tr>
