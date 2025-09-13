@@ -175,19 +175,6 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
-            
-            {/* Success notice for database connection */}
-            {currentLimitFromDB !== undefined && (
-              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-                <div className="flex items-start text-sm">
-                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
-                  <div className="text-green-700">
-                    <p><strong>Database Connected:</strong> Settings are synchronized across all devices and sessions.</p>
-                    <p className="mt-1 text-xs">Changes will be immediately visible in the shipment scheduler and dashboard.</p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Action Buttons */}
