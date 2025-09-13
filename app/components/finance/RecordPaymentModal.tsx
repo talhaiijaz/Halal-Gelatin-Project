@@ -386,15 +386,18 @@ export default function RecordPaymentModal({
                 </div>
               )}
 
-              {/* Conversion Rate for International Non-USD Payments */}
-              {selectedClient?.type === 'international' && selectedInvoiceId && unpaidInvoices && (() => {
+              {/* Conversion Rate - Only when invoice currency differs from bank account currency */}
+              {selectedClient?.type === 'international' && selectedInvoiceId && selectedBankAccountId && unpaidInvoices && bankAccounts && (() => {
                 const invoice = unpaidInvoices.find(inv => inv._id === selectedInvoiceId);
-                if (!invoice || invoice.currency === 'USD') return null;
+                const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+                
+                // Only show conversion rate if currencies don't match
+                if (!invoice || !selectedBank || invoice.currency === selectedBank.currency) return null;
                 
                 return (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Conversion Rate to USD *
+                      Conversion Rate *
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -403,16 +406,16 @@ export default function RecordPaymentModal({
                         onChange={(e) => setFormData(prev => ({ ...prev, conversionRateToUSD: e.target.value }))}
                         min="0"
                         step="0.0001"
-                        placeholder="e.g. 1.08 for EUR"
+                        placeholder={`e.g. ${invoice.currency === 'EUR' ? '1.08' : invoice.currency === 'AED' ? '0.27' : '1.0'}`}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                         required
                       />
                       <div className="text-xs text-gray-500">
-                        1 {invoice.currency} = ? USD
+                        1 {invoice.currency} = ? {selectedBank.currency}
                       </div>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">
-                      Required for international payments in {invoice.currency}. This converts the payment to USD for dashboard reporting.
+                      Required when paying {invoice.currency} invoice with {selectedBank.currency} bank account.
                     </p>
                     
                     {/* USD Conversion Display */}
