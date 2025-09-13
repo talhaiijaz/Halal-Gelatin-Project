@@ -77,7 +77,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
       confirmed: "bg-blue-100 text-blue-800",
       in_production: "bg-purple-100 text-purple-800",
       shipped: "bg-indigo-100 text-indigo-800",
-      delivered: "bg-green-100 text-green-800",
+      delivered: "bg-green-500 text-white font-semibold shadow-sm",
       cancelled: "bg-red-100 text-red-800",
     };
     return colors[status] || "bg-gray-100 text-gray-800";

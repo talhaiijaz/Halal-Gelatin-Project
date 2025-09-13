@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Plus, Eye, Package, Clock, CheckCircle, XCircle, Truck, Archive, Download, Search } from "lucide-react";
+import { Plus, Eye, Package, Clock, CheckCircle, CheckCircle2, XCircle, Truck, Archive, Download, Search } from "lucide-react";
 import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 
@@ -61,7 +61,7 @@ function OrdersPageContent() {
       case "shipped":
         return <Truck className="h-4 w-4" />;
       case "delivered":
-        return <Archive className="h-4 w-4" />;
+        return <CheckCircle2 className="h-4 w-4" />;
       case "cancelled":
         return <XCircle className="h-4 w-4" />;
       default:
@@ -80,7 +80,7 @@ function OrdersPageContent() {
       case "shipped":
         return "bg-indigo-100 text-indigo-800";
       case "delivered":
-        return "bg-green-100 text-green-800";
+        return "bg-green-500 text-white font-semibold shadow-sm";
       case "cancelled":
         return "bg-red-100 text-red-800";
       default:

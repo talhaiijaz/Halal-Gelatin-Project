@@ -117,7 +117,7 @@ export default function InternationalClientsPage() {
       case "shipped":
         return "bg-indigo-100 text-indigo-800";
       case "delivered":
-        return "bg-green-100 text-green-800";
+        return "bg-green-500 text-white font-semibold shadow-sm";
       case "cancelled":
         return "bg-red-100 text-red-800";
       default:
