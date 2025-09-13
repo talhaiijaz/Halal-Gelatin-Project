@@ -36,14 +36,19 @@ export default function DashboardPage() {
   const recentActivity = useQuery(api.dashboard.getRecentActivity, { limit: 5 });
   const orders = useQuery(api.orders.list, {});
   const orderItems = useQuery(api.orders.listItems, {});
+  const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
 
-  // Load monthly limit from localStorage
+  // Load monthly limit from database or localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('monthlyShipmentLimit');
-    if (saved) {
-      setMonthlyLimit(parseInt(saved));
+    if (monthlyLimitFromDB !== undefined) {
+      setMonthlyLimit(monthlyLimitFromDB);
+    } else {
+      const saved = localStorage.getItem('monthlyShipmentLimit');
+      if (saved) {
+        setMonthlyLimit(parseInt(saved));
+      }
     }
-  }, []);
+  }, [monthlyLimitFromDB]);
 
   console.log("Dashboard data:", { dashboardStats, recentOrdersData, recentActivity });
 

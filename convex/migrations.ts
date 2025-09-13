@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 
@@ -137,6 +137,63 @@ export const initializeSettings = mutation({
     }
     
     return { created };
+  },
+});
+
+// Get monthly shipment limit (with default fallback)
+export const getMonthlyShipmentLimit = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const setting = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "monthlyShipmentLimit"))
+      .first();
+    
+    // Return setting value or default to 150,000 kg
+    return setting ? (setting.value as number) : 150000;
+  },
+});
+
+// Update monthly shipment limit
+export const setMonthlyShipmentLimit = mutation({
+  args: {
+    limit: v.number(),
+    updatedBy: v.optional(v.string()),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    if (args.limit < 0) {
+      throw new Error("Monthly shipment limit cannot be negative");
+    }
+    
+    const existing = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q) => q.eq("key", "monthlyShipmentLimit"))
+      .first();
+    
+    if (existing) {
+      // Update existing setting
+      await ctx.db.patch(existing._id, {
+        value: args.limit,
+        description: "Maximum allowed shipment quantity per month (in kg)",
+        category: "shipments",
+        updatedAt: Date.now(),
+        updatedBy: args.updatedBy,
+      });
+    } else {
+      // Create new setting
+      await ctx.db.insert("settings", {
+        key: "monthlyShipmentLimit",
+        value: args.limit,
+        description: "Maximum allowed shipment quantity per month (in kg)",
+        category: "shipments",
+        updatedAt: Date.now(),
+        updatedBy: args.updatedBy,
+      });
+    }
+    
+    return { success: true };
   },
 });
 

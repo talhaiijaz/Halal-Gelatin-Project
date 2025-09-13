@@ -52,14 +52,19 @@ export default function ShipmentsPage() {
   const orders = useQuery(api.orders.list, {});
   const clients = useQuery(api.clients.list, {});
   const orderItems = useQuery(api.orders.listItems, {});
+  const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
 
-  // Load monthly limit from localStorage
+  // Load monthly limit from database or localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('monthlyShipmentLimit');
-    if (saved) {
-      setMonthlyLimit(parseInt(saved));
+    if (monthlyLimitFromDB !== undefined) {
+      setMonthlyLimit(monthlyLimitFromDB);
+    } else {
+      const saved = localStorage.getItem('monthlyShipmentLimit');
+      if (saved) {
+        setMonthlyLimit(parseInt(saved));
+      }
     }
-  }, []);
+  }, [monthlyLimitFromDB]);
 
   // Get fiscal year options
   const fiscalYearOptions = getFiscalYearOptions();

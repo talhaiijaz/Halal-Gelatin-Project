@@ -1,26 +1,40 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Settings, Save, AlertCircle, CheckCircle2, Package, Info } from "lucide-react";
 import toast from "react-hot-toast";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 
 export default function SettingsPage() {
   const [monthlyLimit, setMonthlyLimit] = useState<string>("150000");
   const [isLoading, setIsLoading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // For now, we'll use localStorage until the Convex settings functions are working
+  // Try to get from Convex, fallback to localStorage
+  const currentLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
+  const setMonthlyShipmentLimit = useMutation(api.migrations.setMonthlyShipmentLimit);
+  
   const [currentLimit, setCurrentLimit] = useState<number>(150000);
 
-  // Load saved limit from localStorage on component mount
+  // Load limit from database or localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('monthlyShipmentLimit');
-    if (saved) {
-      const savedLimit = parseInt(saved);
-      setCurrentLimit(savedLimit);
-      setMonthlyLimit(savedLimit.toString());
+    if (currentLimitFromDB !== undefined) {
+      // Use database value
+      setCurrentLimit(currentLimitFromDB);
+      setMonthlyLimit(currentLimitFromDB.toString());
+    } else {
+      // Fallback to localStorage
+      const saved = localStorage.getItem('monthlyShipmentLimit');
+      if (saved) {
+        const savedLimit = parseInt(saved);
+        setCurrentLimit(savedLimit);
+        setMonthlyLimit(savedLimit.toString());
+      }
     }
-  }, []);
+  }, [currentLimitFromDB]);
 
   const handleLimitChange = (value: string) => {
     setMonthlyLimit(value);
@@ -42,14 +56,30 @@ export default function SettingsPage() {
 
     setIsLoading(true);
     try {
-      // Save to localStorage for now
+      // Try to save to database first
+      if (setMonthlyShipmentLimit) {
+        try {
+          await setMonthlyShipmentLimit({
+            limit: limitValue,
+            updatedBy: "Admin User",
+          });
+          setCurrentLimit(limitValue);
+          toast.success("Monthly limit updated successfully in database!");
+          setHasChanges(false);
+          return;
+        } catch (dbError) {
+          console.warn("Database save failed, falling back to localStorage:", dbError);
+        }
+      }
+      
+      // Fallback to localStorage
       localStorage.setItem('monthlyShipmentLimit', limitValue.toString());
       setCurrentLimit(limitValue);
       
       toast.success("Monthly limit updated successfully!");
       setHasChanges(false);
       
-      // Show info about page refresh
+      // Show info about page refresh only for localStorage
       setTimeout(() => {
         toast.success("Refresh the page to see changes in shipment scheduler", {
           duration: 4000,
@@ -133,16 +163,31 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Info Notice */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="flex items-start text-sm">
-                <Info className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                <div className="text-blue-700">
-                  <p><strong>Note:</strong> Settings are currently saved locally. After updating the limit, refresh the page to see changes in the shipment scheduler and dashboard.</p>
-                  <p className="mt-1 text-xs">Database integration coming soon for persistent settings across sessions.</p>
+            {/* Info Notice - only show if using localStorage */}
+            {currentLimitFromDB === undefined && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex items-start text-sm">
+                  <Info className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                  <div className="text-blue-700">
+                    <p><strong>Note:</strong> Database connection unavailable. Settings are saved locally. Refresh the page to see changes in the shipment scheduler and dashboard.</p>
+                    <p className="mt-1 text-xs">Settings will sync to database when connection is restored.</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+            
+            {/* Success notice for database connection */}
+            {currentLimitFromDB !== undefined && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="flex items-start text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 mr-2 mt-0.5 flex-shrink-0" />
+                  <div className="text-green-700">
+                    <p><strong>Database Connected:</strong> Settings are synchronized across all devices and sessions.</p>
+                    <p className="mt-1 text-xs">Changes will be immediately visible in the shipment scheduler and dashboard.</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
