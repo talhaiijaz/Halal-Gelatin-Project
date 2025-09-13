@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Calendar, Package, Truck, Ship, Plane, Train, Car, Search, Filter, Eye, Plus } from "lucide-react";
@@ -47,11 +47,19 @@ const getCurrentFiscalMonth = () => {
 export default function ShipmentsPage() {
   const [selectedFiscalYear, setSelectedFiscalYear] = useState(getCurrentFiscalYear());
   const [selectedFiscalMonth, setSelectedFiscalMonth] = useState(getCurrentFiscalMonth());
+  const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
 
   const orders = useQuery(api.orders.list, {});
   const clients = useQuery(api.clients.list, {});
   const orderItems = useQuery(api.orders.listItems, {});
-  const monthlyLimit = useQuery(api.settings.getMonthlyShipmentLimit, {});
+
+  // Load monthly limit from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('monthlyShipmentLimit');
+    if (saved) {
+      setMonthlyLimit(parseInt(saved));
+    }
+  }, []);
 
   // Get fiscal year options
   const fiscalYearOptions = getFiscalYearOptions();

@@ -57,6 +57,11 @@ const navigation: NavItem[] = [
     icon: Truck,
   },
   {
+    name: "Settings",
+    href: "/settings",
+    icon: Settings,
+  },
+  {
     name: "Help Center",
     href: "/help-center",
     icon: HelpCircle,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { 
@@ -28,14 +28,22 @@ export default function DashboardPage() {
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [clientType, setClientType] = useState<"local" | "international">("local");
+  const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
 
   // Fetch real data from Convex
   const dashboardStats = useQuery(api.dashboard.getStats);
   const recentOrdersData = useQuery(api.dashboard.getRecentOrders, { limit: 5 });
   const recentActivity = useQuery(api.dashboard.getRecentActivity, { limit: 5 });
-  const monthlyLimit = useQuery(api.settings.getMonthlyShipmentLimit, {});
   const orders = useQuery(api.orders.list, {});
   const orderItems = useQuery(api.orders.listItems, {});
+
+  // Load monthly limit from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('monthlyShipmentLimit');
+    if (saved) {
+      setMonthlyLimit(parseInt(saved));
+    }
+  }, []);
 
   console.log("Dashboard data:", { dashboardStats, recentOrdersData, recentActivity });
 
