@@ -51,6 +51,7 @@ export default function ShipmentsPage() {
   const orders = useQuery(api.orders.list, {});
   const clients = useQuery(api.clients.list, {});
   const orderItems = useQuery(api.orders.listItems, {});
+  const monthlyLimit = useQuery(api.settings.getMonthlyShipmentLimit, {});
 
   // Get fiscal year options
   const fiscalYearOptions = getFiscalYearOptions();
@@ -246,6 +247,23 @@ export default function ShipmentsPage() {
 
   const next3Months = getNext3Months();
 
+  // Check if a quantity exceeds the monthly limit
+  const exceedsLimit = (quantity: number) => {
+    if (!monthlyLimit) return false;
+    return quantity >= monthlyLimit;
+  };
+
+  // Get styling for quantities based on limit
+  const getQuantityStyle = (quantity: number, isDelivered: boolean = false) => {
+    if (exceedsLimit(quantity)) {
+      return "bg-red-100 text-red-800 font-semibold";
+    }
+    if (isDelivered) {
+      return "text-green-700";
+    }
+    return "text-blue-600";
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -303,9 +321,16 @@ export default function ShipmentsPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Quantity</p>
-              <p className="text-2xl font-bold text-blue-600">{getGrandTotal(selectedFiscalYear, selectedFiscalMonth).toLocaleString()} kg</p>
+              <p className={`text-2xl font-bold ${exceedsLimit(getGrandTotal(selectedFiscalYear, selectedFiscalMonth)) ? 'text-red-600' : 'text-blue-600'}`}>
+                {getGrandTotal(selectedFiscalYear, selectedFiscalMonth).toLocaleString()} kg
+              </p>
+              {exceedsLimit(getGrandTotal(selectedFiscalYear, selectedFiscalMonth)) && (
+                <p className="text-xs text-red-500 mt-1">
+                  Exceeds limit of {monthlyLimit?.toLocaleString()} kg
+                </p>
+              )}
             </div>
-            <Truck className="h-8 w-8 text-blue-500" />
+            <Truck className={`h-8 w-8 ${exceedsLimit(getGrandTotal(selectedFiscalYear, selectedFiscalMonth)) ? 'text-red-500' : 'text-blue-500'}`} />
           </div>
         </div>
       </div>
@@ -484,26 +509,36 @@ export default function ShipmentsPage() {
 
       {/* 3-Month Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {next3Months.map((monthData, index) => (
-          <div key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{monthData.displayName} Shipments</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {getGrandTotal(monthData.fiscalYear, monthData.fiscalMonth).toLocaleString()} kg
-                </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {getFiscalMonthData(monthData.fiscalYear, monthData.fiscalMonth).length} shipments
-                </p>
-              </div>
-              <div className={`h-8 w-8 ${index === 0 ? 'text-green-500' : index === 1 ? 'text-blue-500' : 'text-purple-500'}`}>
-                {index === 0 && <Calendar className="h-8 w-8" />}
-                {index === 1 && <Package className="h-8 w-8" />}
-                {index === 2 && <Truck className="h-8 w-8" />}
+        {next3Months.map((monthData, index) => {
+          const monthTotal = getGrandTotal(monthData.fiscalYear, monthData.fiscalMonth);
+          const isOverLimit = exceedsLimit(monthTotal);
+          
+          return (
+            <div key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className={`rounded-lg shadow p-6 ${isOverLimit ? 'bg-red-50 border-2 border-red-200' : 'bg-white'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{monthData.displayName} Shipments</p>
+                  <p className={`text-2xl font-bold ${isOverLimit ? 'text-red-600' : 'text-blue-600'}`}>
+                    {monthTotal.toLocaleString()} kg
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {getFiscalMonthData(monthData.fiscalYear, monthData.fiscalMonth).length} shipments
+                  </p>
+                  {isOverLimit && (
+                    <p className="text-xs text-red-500 mt-1">
+                      ⚠️ Exceeds limit of {monthlyLimit?.toLocaleString()} kg
+                    </p>
+                  )}
+                </div>
+                <div className={`h-8 w-8 ${isOverLimit ? 'text-red-500' : index === 0 ? 'text-green-500' : index === 1 ? 'text-blue-500' : 'text-purple-500'}`}>
+                  {index === 0 && <Calendar className="h-8 w-8" />}
+                  {index === 1 && <Package className="h-8 w-8" />}
+                  {index === 2 && <Truck className="h-8 w-8" />}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
     </div>

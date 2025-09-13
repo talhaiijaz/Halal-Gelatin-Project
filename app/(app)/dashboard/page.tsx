@@ -20,6 +20,7 @@ import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { getCurrentFiscalYear, getFiscalYearForDate } from "@/app/utils/fiscalYear";
 
 export default function DashboardPage() {
   console.log("DashboardPage rendering...");
@@ -32,8 +33,68 @@ export default function DashboardPage() {
   const dashboardStats = useQuery(api.dashboard.getStats);
   const recentOrdersData = useQuery(api.dashboard.getRecentOrders, { limit: 5 });
   const recentActivity = useQuery(api.dashboard.getRecentActivity, { limit: 5 });
+  const monthlyLimit = useQuery(api.settings.getMonthlyShipmentLimit, {});
+  const orders = useQuery(api.orders.list, {});
+  const orderItems = useQuery(api.orders.listItems, {});
 
   console.log("Dashboard data:", { dashboardStats, recentOrdersData, recentActivity });
+
+  // Helper function to get next 3 months shipment data
+  const getNext3MonthsShipmentData = () => {
+    if (!orders || !orderItems || !monthlyLimit) return [];
+    
+    const now = new Date();
+    const months = [];
+    
+    // Fiscal months array
+    const fiscalMonths = [
+      "July", "August", "September", "October", "November", "December",
+      "January", "February", "March", "April", "May", "June"
+    ];
+    
+    for (let i = 0; i < 3; i++) {
+      const date = new Date(now);
+      date.setMonth(date.getMonth() + i);
+      
+      const fiscalYear = getFiscalYearForDate(date);
+      const month = date.getMonth(); // 0-11
+      const fiscalMonthIndex = month >= 6 ? month - 6 : month + 6;
+      const fiscalMonth = fiscalMonths[fiscalMonthIndex];
+      
+      // Calculate total quantity for this month
+      let totalQuantity = 0;
+      
+      orders.forEach(order => {
+        if (order.orderCreationDate) {
+          const orderDate = new Date(order.orderCreationDate);
+          const orderFiscalYear = getFiscalYearForDate(orderDate);
+          const orderMonth = orderDate.getMonth();
+          const orderFiscalMonthIndex = orderMonth >= 6 ? orderMonth - 6 : orderMonth + 6;
+          const orderFiscalMonth = fiscalMonths[orderFiscalMonthIndex];
+          
+          if (orderFiscalYear === fiscalYear && orderFiscalMonth === fiscalMonth) {
+            const items = orderItems.filter(item => item.orderId === order._id);
+            items.forEach(item => {
+              totalQuantity += item.quantityKg;
+            });
+          }
+        }
+      });
+      
+      months.push({
+        fiscalYear,
+        fiscalMonth,
+        displayName: date.toLocaleString('default', { month: 'long' }),
+        totalQuantity,
+        exceedsLimit: totalQuantity >= monthlyLimit
+      });
+    }
+    
+    return months;
+  };
+
+  const monthsData = getNext3MonthsShipmentData();
+  const hasLimitExceeded = monthsData.some(month => month.exceedsLimit);
 
   // Format currency
   const formatCurrency = (amount: number, currency: string = 'USD') => {
@@ -125,6 +186,35 @@ export default function DashboardPage() {
 
   return (
     <div>
+      {/* Monthly Limit Alert */}
+      {hasLimitExceeded && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-medium text-red-800">Monthly Shipment Limit Exceeded</h3>
+              <div className="mt-2 text-sm text-red-700">
+                {monthsData.filter(month => month.exceedsLimit).map((month, index) => (
+                  <div key={`${month.fiscalYear}-${month.fiscalMonth}`} className="mb-1">
+                    <strong>{month.displayName}:</strong> {month.totalQuantity.toLocaleString()} kg 
+                    (exceeds limit of {monthlyLimit?.toLocaleString()} kg)
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3">
+                <Link
+                  href="/shipments"
+                  className="inline-flex items-center text-sm text-red-600 hover:text-red-500 font-medium"
+                >
+                  View Shipment Schedule
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6 sm:mb-8">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">

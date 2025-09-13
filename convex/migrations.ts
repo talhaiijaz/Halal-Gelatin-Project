@@ -105,6 +105,15 @@ export const migrateInvoiceStatuses = mutation({
   },
 });
 
+// Initialize default application settings
+export const initializeSettings = mutation({
+  args: {},
+  returns: v.object({ created: v.number() }),
+  handler: async (ctx) => {
+    return await ctx.runMutation("settings:initializeDefaults", {});
+  },
+});
+
 // Migration to remove balance fields from bank accounts
 export const migrateRemoveBankBalances = mutation({
   args: {},

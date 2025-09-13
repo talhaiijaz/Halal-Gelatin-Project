@@ -266,4 +266,16 @@ export default defineSchema({
     .index("by_category", ["category"])
     .index("by_priority", ["priority"])
     .index("by_createdAt", ["createdAt"]),
+
+  // Application Settings table
+  settings: defineTable({
+    key: v.string(), // Setting key (e.g., "monthlyShipmentLimit")
+    value: v.union(v.string(), v.number(), v.boolean()), // Setting value
+    description: v.optional(v.string()), // Human-readable description
+    category: v.optional(v.string()), // Setting category (e.g., "shipments", "finance")
+    updatedAt: v.number(),
+    updatedBy: v.optional(v.string()), // User who last updated this setting
+  })
+    .index("by_key", ["key"])
+    .index("by_category", ["category"]),
 });
