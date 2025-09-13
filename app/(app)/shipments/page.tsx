@@ -14,6 +14,8 @@ interface ShipmentEntry {
   bloom: string;
   companyName: string;
   quantity: number;
+  orderStatus: string;
+  orderId: string;
 }
 
 import { BLOOM_RANGES, BLOOM_INDIVIDUAL_VALUES } from "@/app/utils/bloomRanges";
@@ -110,7 +112,9 @@ export default function ShipmentsPage() {
           fiscalMonth,
           bloom: bloomKey,
           companyName: clientName,
-          quantity: item.quantityKg
+          quantity: item.quantityKg,
+          orderStatus: order.status,
+          orderId: order._id
         });
         
         entryId++;
@@ -172,6 +176,43 @@ export default function ShipmentsPage() {
     return shipmentData
       .filter(item => item.fiscalYear === fiscalYear && item.fiscalMonth === fiscalMonth)
       .reduce((sum, item) => sum + item.quantity, 0);
+  };
+
+  // Check if all orders for a specific bloom/company combination are delivered
+  const isBloomCompanyDelivered = (bloom: string, company: string, fiscalYear: number, fiscalMonth: string) => {
+    const entries = shipmentData.filter(item => 
+      item.bloom === bloom && 
+      item.companyName === company && 
+      item.fiscalYear === fiscalYear &&
+      item.fiscalMonth === fiscalMonth
+    );
+    
+    if (entries.length === 0) return false;
+    return entries.every(entry => entry.orderStatus === "delivered");
+  };
+
+  // Check if all orders for a specific bloom range are delivered
+  const isBloomDelivered = (bloom: string, fiscalYear: number, fiscalMonth: string) => {
+    const entries = shipmentData.filter(item => 
+      item.bloom === bloom && 
+      item.fiscalYear === fiscalYear &&
+      item.fiscalMonth === fiscalMonth
+    );
+    
+    if (entries.length === 0) return false;
+    return entries.every(entry => entry.orderStatus === "delivered");
+  };
+
+  // Check if all orders for a company are delivered
+  const isCompanyDelivered = (company: string, fiscalYear: number, fiscalMonth: string) => {
+    const entries = shipmentData.filter(item => 
+      item.companyName === company && 
+      item.fiscalYear === fiscalYear &&
+      item.fiscalMonth === fiscalMonth
+    );
+    
+    if (entries.length === 0) return false;
+    return entries.every(entry => entry.orderStatus === "delivered");
   };
 
   // Get active companies and bloom ranges for current fiscal month
@@ -292,38 +333,43 @@ export default function ShipmentsPage() {
               </tr>
             </thead>
             <tbody>
-              {activeBloomRanges.map((bloom) => (
-                <tr key={bloom} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium text-gray-900 sticky left-0 bg-white z-10">
-                    {bloom}
-                  </td>
-                  {activeCompanies.map((company) => {
-                    const quantity = getQuantity(bloom, company, selectedFiscalYear, selectedFiscalMonth);
-                    return (
-                      <td key={company} className="text-center py-3 px-2">
-                        {quantity > 0 ? (
-                          <div className="font-medium text-blue-600">
-                            {quantity.toLocaleString()} kg
-                          </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                  <td className="text-center py-3 px-4 font-bold text-gray-900 bg-gray-100">
-                    {getBloomTotal(bloom, selectedFiscalYear, selectedFiscalMonth).toLocaleString()} kg
-                  </td>
-                </tr>
-              ))}
+              {activeBloomRanges.map((bloom) => {
+                const isRowDelivered = isBloomDelivered(bloom, selectedFiscalYear, selectedFiscalMonth);
+                return (
+                  <tr key={bloom} className={`border-b hover:bg-gray-50 ${isRowDelivered ? 'bg-green-50' : ''}`}>
+                    <td className={`py-3 px-4 font-medium sticky left-0 z-10 ${isRowDelivered ? 'bg-green-50 text-green-800' : 'bg-white text-gray-900'}`}>
+                      {bloom}
+                    </td>
+                    {activeCompanies.map((company) => {
+                      const quantity = getQuantity(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                      const isCellDelivered = isBloomCompanyDelivered(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                      return (
+                        <td key={company} className="text-center py-3 px-2">
+                          {quantity > 0 ? (
+                            <div className={`font-medium ${isCellDelivered ? 'text-green-700' : 'text-blue-600'}`}>
+                              {quantity.toLocaleString()} kg
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className={`text-center py-3 px-4 font-bold ${isRowDelivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-900'}`}>
+                      {getBloomTotal(bloom, selectedFiscalYear, selectedFiscalMonth).toLocaleString()} kg
+                    </td>
+                  </tr>
+                );
+              })}
               <tr className="bg-gray-100 border-t-2 border-gray-300">
                 <td className="py-3 px-4 font-bold text-gray-900 sticky left-0 bg-gray-100 z-10">
                   Company Total
                 </td>
                 {activeCompanies.map((company) => {
                   const companyTotal = getCompanyTotal(company, selectedFiscalYear, selectedFiscalMonth);
+                  const isCompanyFullyDelivered = isCompanyDelivered(company, selectedFiscalYear, selectedFiscalMonth);
                   return (
-                    <td key={company} className="text-center py-3 px-2 font-bold text-gray-900">
+                    <td key={company} className={`text-center py-3 px-2 font-bold ${isCompanyFullyDelivered ? 'text-green-700' : 'text-gray-900'}`}>
                       {companyTotal > 0 ? `${companyTotal.toLocaleString()} kg` : '-'}
                     </td>
                   );
@@ -374,34 +420,42 @@ export default function ShipmentsPage() {
                 
                 const sortedBloomRanges = Array.from(allBloomRanges).sort();
                 
-                return sortedBloomRanges.map((bloom) => (
-                  <tr key={bloom} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-4 font-medium text-gray-900 sticky left-0 bg-white z-10">
-                      {bloom}
-                    </td>
-                    {next3Months.map((monthData) => {
-                      const monthTotal = getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth);
-                      return (
-                        <td key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="text-center py-3 px-4">
-                          {monthTotal > 0 ? (
-                            <div className="font-medium text-blue-600">
-                              {monthTotal.toLocaleString()} kg
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className="text-center py-3 px-4 font-bold text-gray-900 bg-gray-100">
-                      {(() => {
-                        const threeMonthTotal = next3Months.reduce((sum, monthData) => 
-                          sum + getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth), 0);
-                        return threeMonthTotal > 0 ? `${threeMonthTotal.toLocaleString()} kg` : '-';
-                      })()}
-                    </td>
-                  </tr>
-                ));
+                return sortedBloomRanges.map((bloom) => {
+                  // Check if bloom is delivered across any of the 3 months
+                  const isAnyMonthDelivered = next3Months.some(monthData => 
+                    isBloomDelivered(bloom, monthData.fiscalYear, monthData.fiscalMonth)
+                  );
+                  
+                  return (
+                    <tr key={bloom} className={`border-b hover:bg-gray-50 ${isAnyMonthDelivered ? 'bg-green-50' : ''}`}>
+                      <td className={`py-3 px-4 font-medium sticky left-0 z-10 ${isAnyMonthDelivered ? 'bg-green-50 text-green-800' : 'bg-white text-gray-900'}`}>
+                        {bloom}
+                      </td>
+                      {next3Months.map((monthData) => {
+                        const monthTotal = getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth);
+                        const isMonthDelivered = isBloomDelivered(bloom, monthData.fiscalYear, monthData.fiscalMonth);
+                        return (
+                          <td key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="text-center py-3 px-4">
+                            {monthTotal > 0 ? (
+                              <div className={`font-medium ${isMonthDelivered ? 'text-green-700' : 'text-blue-600'}`}>
+                                {monthTotal.toLocaleString()} kg
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className={`text-center py-3 px-4 font-bold ${isAnyMonthDelivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-900'}`}>
+                        {(() => {
+                          const threeMonthTotal = next3Months.reduce((sum, monthData) => 
+                            sum + getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth), 0);
+                          return threeMonthTotal > 0 ? `${threeMonthTotal.toLocaleString()} kg` : '-';
+                        })()}
+                      </td>
+                    </tr>
+                  );
+                });
               })()}
               <tr className="bg-gray-100 border-t-2 border-gray-300">
                 <td className="py-3 px-4 font-bold text-gray-900 sticky left-0 bg-gray-100 z-10">
