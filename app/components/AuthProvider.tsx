@@ -12,8 +12,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const CREDENTIALS = {
-  username: "admin_halal",
-  password: "halal_crm@2025"
+  username: "local",
+  password: "local"
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

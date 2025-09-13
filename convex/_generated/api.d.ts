@@ -19,6 +19,7 @@ import type * as clearData from "../clearData.js";
 import type * as clients from "../clients.js";
 import type * as dashboard from "../dashboard.js";
 import type * as deliveries from "../deliveries.js";
+import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
 import type * as finance from "../finance.js";
 import type * as invoices from "../invoices.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   clients: typeof clients;
   dashboard: typeof dashboard;
   deliveries: typeof deliveries;
+  feedback: typeof feedback;
   files: typeof files;
   finance: typeof finance;
   invoices: typeof invoices;

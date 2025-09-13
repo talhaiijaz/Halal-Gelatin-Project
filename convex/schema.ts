@@ -25,6 +25,8 @@ export default defineSchema({
     taxId: v.optional(v.string()),
     type: v.union(v.literal("local"), v.literal("international")),
     status: v.union(v.literal("active"), v.literal("inactive")),
+    // Historical outstanding balance from previous years (used in finance and payments flows)
+    outstandingBalance: v.optional(v.number()),
     approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     approvalNotes: v.optional(v.string()),
     approvedAt: v.optional(v.number()),
@@ -231,5 +233,37 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_entity", ["entityTable", "entityId"]) 
+    .index("by_createdAt", ["createdAt"]),
+
+  // User Feedback table
+  feedback: defineTable({
+    title: v.string(),
+    description: v.string(),
+    category: v.union(
+      v.literal("bug_report"),
+      v.literal("feature_request"),
+      v.literal("improvement"),
+      v.literal("general_feedback")
+    ),
+    priority: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+      v.literal("urgent")
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in_progress"),
+      v.literal("completed"),
+      v.literal("rejected")
+    ),
+    submittedBy: v.string(), // User name or identifier
+    adminNotes: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_priority", ["priority"])
     .index("by_createdAt", ["createdAt"]),
 });
