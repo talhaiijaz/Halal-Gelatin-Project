@@ -178,6 +178,33 @@ export default function ShipmentsPage() {
   const activeCompanies = getActiveCompanies(selectedFiscalYear, selectedFiscalMonth);
   const activeBloomRanges = getActiveBloomRanges(selectedFiscalYear, selectedFiscalMonth);
 
+  // Get the next 3 months from current date
+  const getNext3Months = () => {
+    const now = new Date();
+    const months = [];
+    
+    for (let i = 0; i < 3; i++) {
+      const date = new Date(now);
+      date.setMonth(date.getMonth() + i);
+      
+      const fiscalYear = getFiscalYearForDate(date);
+      const month = date.getMonth(); // 0-11
+      const fiscalMonthIndex = month >= 6 ? month - 6 : month + 6;
+      const fiscalMonth = fiscalMonths[fiscalMonthIndex];
+      
+      months.push({
+        fiscalYear,
+        fiscalMonth,
+        displayName: date.toLocaleString('default', { month: 'long' }),
+        shortName: date.toLocaleString('default', { month: 'short' })
+      });
+    }
+    
+    return months;
+  };
+
+  const next3Months = getNext3Months();
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -310,6 +337,120 @@ export default function ShipmentsPage() {
         </div>
       </div>
 
+      {/* 3-Month View */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold">3-Month Outlook: {next3Months.map(m => m.displayName).join(', ')}</h2>
+          <p className="text-sm text-gray-600 mt-1">Upcoming shipments across the next three months</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-gray-50 border-b">
+                <th className="text-left py-3 px-4 font-medium text-gray-900 sticky left-0 bg-gray-50 z-10 min-w-[120px]">
+                  Bloom Range
+                </th>
+                {next3Months.map((monthData) => (
+                  <th key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="text-center py-3 px-4 font-medium text-gray-900 min-w-[150px]">
+                    <div>
+                      <div className="font-semibold">{monthData.displayName}</div>
+                      <div className="text-xs text-gray-500 font-normal">{getFiscalYearLabel(monthData.fiscalYear)}</div>
+                    </div>
+                  </th>
+                ))}
+                <th className="text-center py-3 px-4 font-medium text-gray-900 bg-gray-100 min-w-[120px]">
+                  3-Month Total
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                // Get all unique bloom ranges across all 3 months
+                const allBloomRanges = new Set<string>();
+                next3Months.forEach(monthData => {
+                  const monthBloomRanges = getActiveBloomRanges(monthData.fiscalYear, monthData.fiscalMonth);
+                  monthBloomRanges.forEach(bloom => allBloomRanges.add(bloom));
+                });
+                
+                const sortedBloomRanges = Array.from(allBloomRanges).sort();
+                
+                return sortedBloomRanges.map((bloom) => (
+                  <tr key={bloom} className="border-b hover:bg-gray-50">
+                    <td className="py-3 px-4 font-medium text-gray-900 sticky left-0 bg-white z-10">
+                      {bloom}
+                    </td>
+                    {next3Months.map((monthData) => {
+                      const monthTotal = getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth);
+                      return (
+                        <td key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="text-center py-3 px-4">
+                          {monthTotal > 0 ? (
+                            <div className="font-medium text-blue-600">
+                              {monthTotal.toLocaleString()} kg
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="text-center py-3 px-4 font-bold text-gray-900 bg-gray-100">
+                      {(() => {
+                        const threeMonthTotal = next3Months.reduce((sum, monthData) => 
+                          sum + getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth), 0);
+                        return threeMonthTotal > 0 ? `${threeMonthTotal.toLocaleString()} kg` : '-';
+                      })()}
+                    </td>
+                  </tr>
+                ));
+              })()}
+              <tr className="bg-gray-100 border-t-2 border-gray-300">
+                <td className="py-3 px-4 font-bold text-gray-900 sticky left-0 bg-gray-100 z-10">
+                  Monthly Total
+                </td>
+                {next3Months.map((monthData) => {
+                  const monthGrandTotal = getGrandTotal(monthData.fiscalYear, monthData.fiscalMonth);
+                  return (
+                    <td key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="text-center py-3 px-4 font-bold text-gray-900">
+                      {monthGrandTotal > 0 ? `${monthGrandTotal.toLocaleString()} kg` : '-'}
+                    </td>
+                  );
+                })}
+                <td className="text-center py-3 px-4 font-bold text-gray-900 bg-gray-200">
+                  {(() => {
+                    const overallTotal = next3Months.reduce((sum, monthData) => 
+                      sum + getGrandTotal(monthData.fiscalYear, monthData.fiscalMonth), 0);
+                    return `${overallTotal.toLocaleString()} kg`;
+                  })()}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 3-Month Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {next3Months.map((monthData, index) => (
+          <div key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">{monthData.displayName} Shipments</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {getGrandTotal(monthData.fiscalYear, monthData.fiscalMonth).toLocaleString()} kg
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {getFiscalMonthData(monthData.fiscalYear, monthData.fiscalMonth).length} shipments
+                </p>
+              </div>
+              <div className={`h-8 w-8 ${index === 0 ? 'text-green-500' : index === 1 ? 'text-blue-500' : 'text-purple-500'}`}>
+                {index === 0 && <Calendar className="h-8 w-8" />}
+                {index === 1 && <Package className="h-8 w-8" />}
+                {index === 2 && <Truck className="h-8 w-8" />}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
     </div>
   );
