@@ -209,8 +209,10 @@ export default function BankAccountModal({
                 onChange={(e) => setCurrency(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
               >
-                <option value="PKR">PKR</option>
-                <option value="USD">USD</option>
+                <option value="PKR">PKR - Pakistani Rupee</option>
+                <option value="USD">USD - US Dollar</option>
+                <option value="EUR">EUR - Euro</option>
+                <option value="AED">AED - UAE Dirham</option>
               </select>
             </div>
 

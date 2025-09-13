@@ -34,13 +34,18 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
 
   if (!isOpen || !paymentId) return null;
 
-  const formatCurrency = (amount: number, currency?: string) =>
-    new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', { 
+  const formatCurrency = (amount: number, currency?: string) => {
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 
+                   currency === 'EUR' ? 'en-DE' :
+                   currency === 'AED' ? 'en-AE' : 'en-US';
+    return new Intl.NumberFormat(locale, { 
       style: "currency", 
       currency: currency || "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount || 0);
+  };
 
   const formatDate = (ts?: number) => (ts ? new Date(ts).toLocaleDateString() : "-");
 

@@ -93,11 +93,17 @@ export const recordPayment = mutation({
       if (args.bankAccountId) {
         const bank = await ctx.db.get(args.bankAccountId);
         if (bank) {
-          // For international payments, bank account should be USD (since payments get converted to USD)
           // For local payments, bank account should match invoice currency (PKR)
-          const expectedBankCurrency = clientOfInvoice?.type === "local" ? currency : "USD";
-          if (bank.currency !== expectedBankCurrency) {
-            throw new Error(`Bank account currency (${bank.currency}) must be ${expectedBankCurrency} for ${clientOfInvoice?.type === "local" ? "local" : "international"} payments`);
+          // For international payments, allow USD, EUR, and AED bank accounts
+          if (clientOfInvoice?.type === "local") {
+            if (bank.currency !== currency) {
+              throw new Error(`Bank account currency (${bank.currency}) must match invoice currency (${currency}) for local payments`);
+            }
+          } else {
+            // International payments - allow USD, EUR, AED bank accounts
+            if (!['USD', 'EUR', 'AED'].includes(bank.currency)) {
+              throw new Error(`Bank account currency (${bank.currency}) must be USD, EUR, or AED for international payments`);
+            }
           }
         }
       }
@@ -114,6 +120,13 @@ export const recordPayment = mutation({
         convertedAmountUSD = args.amount * conversionRateToUSD;
       } else if (currency === "USD") {
         convertedAmountUSD = args.amount;
+      }
+      
+      // For EUR and AED payments, ensure conversion rate is provided
+      if (clientOfInvoice?.type === "international" && (currency === "EUR" || currency === "AED")) {
+        if (!args.conversionRateToUSD) {
+          throw new Error(`Conversion rate to USD is required for ${currency} payments`);
+        }
       }
 
       // Create payment record (respect requested type; default to 'invoice')

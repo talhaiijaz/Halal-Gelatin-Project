@@ -95,7 +95,9 @@ export default function CreateOrderModal({
   const formatCurrency = (amount: number) => {
     // Use appropriate locale based on currency
     const locale = currentCurrency === 'USD' ? 'en-US' : 
-                   currentCurrency === 'PKR' ? 'en-PK' : 'en-US';
+                   currentCurrency === 'PKR' ? 'en-PK' : 
+                   currentCurrency === 'EUR' ? 'en-DE' :
+                   currentCurrency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: currentCurrency,

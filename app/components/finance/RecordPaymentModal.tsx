@@ -185,7 +185,9 @@ export default function RecordPaymentModal({
     const invoice = unpaidInvoices?.find(inv => inv._id === selectedInvoiceId);
     const currencyToUse = currency || invoice?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
     const locale = currencyToUse === 'USD' ? 'en-US' : 
-                   currencyToUse === 'PKR' ? 'en-PK' : 'en-US';
+                   currencyToUse === 'PKR' ? 'en-PK' : 
+                   currencyToUse === 'EUR' ? 'en-DE' :
+                   currencyToUse === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: currencyToUse,
@@ -442,10 +444,13 @@ export default function RecordPaymentModal({
                 >
                   <option value="">Select a bank account</option>
                   {bankAccounts?.filter(account => {
-                    // For international payments, always use USD bank accounts (since payments get converted to USD)
                     // For local payments, use PKR bank accounts
-                    const requiredCurrency = selectedClient?.type === 'local' ? 'PKR' : 'USD';
-                    return account.status === 'active' && account.currency === requiredCurrency;
+                    // For international payments, allow USD, EUR, and AED bank accounts
+                    if (selectedClient?.type === 'local') {
+                      return account.status === 'active' && account.currency === 'PKR';
+                    } else {
+                      return account.status === 'active' && ['USD', 'EUR', 'AED'].includes(account.currency);
+                    }
                   }).map(account => (
                     <option key={account._id} value={account._id}>
                       {account.accountName} - {account.bankName} ({account.currency})
