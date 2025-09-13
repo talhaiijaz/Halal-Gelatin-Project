@@ -249,8 +249,8 @@ export default function ShipmentsPage() {
 
   // Check if a quantity exceeds the monthly limit
   const exceedsLimit = (quantity: number) => {
-    if (!monthlyLimit) return false;
-    return quantity >= monthlyLimit;
+    const limit = monthlyLimit || 150000; // Default to 150,000 kg if setting not available
+    return quantity >= limit;
   };
 
   // Get styling for quantities based on limit
@@ -326,7 +326,7 @@ export default function ShipmentsPage() {
               </p>
               {exceedsLimit(getGrandTotal(selectedFiscalYear, selectedFiscalMonth)) && (
                 <p className="text-xs text-red-500 mt-1">
-                  Exceeds limit of {monthlyLimit?.toLocaleString()} kg
+                  Exceeds limit of {(monthlyLimit || 150000).toLocaleString()} kg
                 </p>
               )}
             </div>
@@ -526,7 +526,7 @@ export default function ShipmentsPage() {
                   </p>
                   {isOverLimit && (
                     <p className="text-xs text-red-500 mt-1">
-                      ⚠️ Exceeds limit of {monthlyLimit?.toLocaleString()} kg
+                      ⚠️ Exceeds limit of {(monthlyLimit || 150000).toLocaleString()} kg
                     </p>
                   )}
                 </div>

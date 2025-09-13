@@ -41,8 +41,9 @@ export default function DashboardPage() {
 
   // Helper function to get next 3 months shipment data
   const getNext3MonthsShipmentData = () => {
-    if (!orders || !orderItems || !monthlyLimit) return [];
+    if (!orders || !orderItems) return [];
     
+    const limit = monthlyLimit || 150000; // Default to 150,000 kg if setting not available
     const now = new Date();
     const months = [];
     
@@ -86,7 +87,7 @@ export default function DashboardPage() {
         fiscalMonth,
         displayName: date.toLocaleString('default', { month: 'long' }),
         totalQuantity,
-        exceedsLimit: totalQuantity >= monthlyLimit
+        exceedsLimit: totalQuantity >= limit
       });
     }
     
@@ -197,7 +198,7 @@ export default function DashboardPage() {
                 {monthsData.filter(month => month.exceedsLimit).map((month, index) => (
                   <div key={`${month.fiscalYear}-${month.fiscalMonth}`} className="mb-1">
                     <strong>{month.displayName}:</strong> {month.totalQuantity.toLocaleString()} kg 
-                    (exceeds limit of {monthlyLimit?.toLocaleString()} kg)
+                    (exceeds limit of {(monthlyLimit || 150000).toLocaleString()} kg)
                   </div>
                 ))}
               </div>
