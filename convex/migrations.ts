@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 // Backfill missing fiscalYear on orders using createdAt (or orderCreationDate if present)
 export const backfillFiscalYear = mutation({
@@ -110,7 +111,32 @@ export const initializeSettings = mutation({
   args: {},
   returns: v.object({ created: v.number() }),
   handler: async (ctx) => {
-    return await ctx.runMutation("settings:initializeDefaults", {});
+    const defaults = [
+      {
+        key: "monthlyShipmentLimit",
+        value: 150000,
+        description: "Maximum allowed shipment quantity per month (in kg)",
+        category: "shipments",
+      },
+    ];
+    
+    let created = 0;
+    for (const setting of defaults) {
+      const existing = await ctx.db
+        .query("settings")
+        .withIndex("by_key", (q) => q.eq("key", setting.key))
+        .first();
+      
+      if (!existing) {
+        await ctx.db.insert("settings", {
+          ...setting,
+          updatedAt: Date.now(),
+        });
+        created++;
+      }
+    }
+    
+    return { created };
   },
 });
 

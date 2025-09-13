@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 
 // Get a setting by key
 export const get = query({
@@ -51,13 +52,14 @@ export const list = query({
     updatedBy: v.optional(v.string()),
   })),
   handler: async (ctx, args) => {
-    let query = ctx.db.query("settings");
-    
     if (args.category) {
-      query = query.withIndex("by_category", (q) => q.eq("category", args.category));
+      return await ctx.db
+        .query("settings")
+        .withIndex("by_category", (q) => q.eq("category", args.category))
+        .collect();
     }
     
-    return await query.collect();
+    return await ctx.db.query("settings").collect();
   },
 });
 
@@ -147,7 +149,7 @@ export const setMonthlyShipmentLimit = mutation({
       throw new Error("Monthly shipment limit cannot be negative");
     }
     
-    await ctx.runMutation("settings:set", {
+    await ctx.runMutation(api.settings.set, {
       key: "monthlyShipmentLimit",
       value: args.limit,
       description: "Maximum allowed shipment quantity per month (in kg)",
