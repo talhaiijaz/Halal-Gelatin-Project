@@ -56,16 +56,6 @@ const navigation: NavItem[] = [
     href: "/shipments",
     icon: Truck,
   },
-  {
-    name: "Settings",
-    href: "/settings",
-    icon: Settings,
-  },
-  {
-    name: "Help Center",
-    href: "/help-center",
-    icon: HelpCircle,
-  },
 ];
 
 export default function Sidebar() {
@@ -201,6 +191,22 @@ export default function Sidebar() {
             >
               <Activity className="mr-3 h-4 w-4 text-gray-400" />
               Logs
+            </Link>
+            <Link
+              href="/settings"
+              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <Settings className="mr-3 h-4 w-4 text-gray-400" />
+              Settings
+            </Link>
+            <Link
+              href="/help-center"
+              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <HelpCircle className="mr-3 h-4 w-4 text-gray-400" />
+              Help Center
             </Link>
             <button
               onClick={() => {
