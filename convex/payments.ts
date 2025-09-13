@@ -411,6 +411,24 @@ export const getStats = query({
     endDate: v.optional(v.number()),
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
   },
+  returns: v.object({
+    totalAmount: v.number(),
+    totalAmountUSD: v.number(),
+    totalAmountPKR: v.number(),
+    totalAmountEUR: v.number(),
+    totalAmountAED: v.number(),
+    amountByCurrency: v.record(v.string(), v.number()),
+    totalCount: v.number(),
+    dailyAverage: v.number(),
+    methodStats: v.object({
+      bank_transfer: v.object({ count: v.number(), amount: v.number() }),
+      check: v.object({ count: v.number(), amount: v.number() }),
+      cash: v.object({ count: v.number(), amount: v.number() }),
+      credit_card: v.object({ count: v.number(), amount: v.number() }),
+      other: v.object({ count: v.number(), amount: v.number() }),
+    }),
+    averagePayment: v.number(),
+  }),
   handler: async (ctx, args) => {
     // Default to current fiscal year if no start date provided
     const now = new Date();
