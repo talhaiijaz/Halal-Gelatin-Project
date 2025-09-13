@@ -108,7 +108,9 @@ export default function FinancePage() {
   const formatCurrency = (amount: number, currency: string = 'USD') => {
     // Use appropriate locale based on currency
     const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 'en-US';
+                   currency === 'PKR' ? 'en-PK' : 
+                   currency === 'EUR' ? 'en-DE' :
+                   currency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
@@ -299,6 +301,12 @@ export default function FinancePage() {
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
                 <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                {(dashboardStats?.totalRevenueEUR || 0) > 0 && (
+                  <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')} <span className="text-xs text-gray-500">EUR</span></p>
+                )}
+                {(dashboardStats?.totalRevenueAED || 0) > 0 && (
+                  <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')} <span className="text-xs text-gray-500">AED</span></p>
+                )}
               </div>
             </div>
             <div className="card p-4">
@@ -306,6 +314,12 @@ export default function FinancePage() {
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
                 <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
+                {(dashboardStats?.totalPaidEUR || 0) > 0 && (
+                  <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidEUR || 0, 'EUR')} <span className="text-xs text-gray-500">EUR</span></p>
+                )}
+                {(dashboardStats?.totalPaidAED || 0) > 0 && (
+                  <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidAED || 0, 'AED')} <span className="text-xs text-gray-500">AED</span></p>
+                )}
               </div>
             </div>
             <div className="card p-4">
@@ -649,7 +663,7 @@ export default function FinancePage() {
         <div className="space-y-6">
           {/* Payment Statistics */}
           {paymentStats && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="card p-4">
                 <p className="text-sm text-gray-500">Total Payments</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -668,6 +682,24 @@ export default function FinancePage() {
                   {formatCurrency(paymentStats.totalAmountPKR || 0, 'PKR')}
                 </p>
               </div>
+              {/* Show EUR and AED only if there are amounts */}
+              {((paymentStats.totalAmountEUR || 0) > 0 || (paymentStats.totalAmountAED || 0) > 0) && (
+                <div className="card p-4">
+                  <p className="text-sm text-gray-500">Other Currencies</p>
+                  <div className="mt-1 space-y-1">
+                    {(paymentStats.totalAmountEUR || 0) > 0 && (
+                      <p className="text-lg font-bold text-green-600">
+                        {formatCurrency(paymentStats.totalAmountEUR || 0, 'EUR')}
+                      </p>
+                    )}
+                    {(paymentStats.totalAmountAED || 0) > 0 && (
+                      <p className="text-lg font-bold text-green-600">
+                        {formatCurrency(paymentStats.totalAmountAED || 0, 'AED')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

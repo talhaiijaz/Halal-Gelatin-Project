@@ -458,22 +458,23 @@ export const getStats = query({
     // Get clients for currency classification
     const clients = await ctx.db.query("clients").collect();
     
-    // Calculate totals using converted amounts for international payments
-    const totalAmountUSD = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "international" && p.convertedAmountUSD;
-      })
-      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    // Calculate totals by currency
+    const amountByCurrency: Record<string, number> = {};
     
-    const totalAmountPKR = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "local";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
+    payments.forEach(payment => {
+      const currency = payment.currency;
+      const amount = payment.amount;
+      
+      amountByCurrency[currency] = (amountByCurrency[currency] || 0) + amount;
+    });
     
-    const totalAmount = totalAmountUSD + totalAmountPKR; // Use converted amounts
+    // For backward compatibility, extract individual currency totals
+    const totalAmountUSD = amountByCurrency["USD"] || 0;
+    const totalAmountPKR = amountByCurrency["PKR"] || 0;
+    const totalAmountEUR = amountByCurrency["EUR"] || 0;
+    const totalAmountAED = amountByCurrency["AED"] || 0;
+    
+    const totalAmount = totalAmountUSD + totalAmountPKR + totalAmountEUR + totalAmountAED;
     const totalCount = payments.length;
 
     // Calculate daily average
@@ -484,6 +485,9 @@ export const getStats = query({
       totalAmount,
       totalAmountUSD,
       totalAmountPKR,
+      totalAmountEUR,
+      totalAmountAED,
+      amountByCurrency,
       totalCount,
       dailyAverage,
       methodStats,

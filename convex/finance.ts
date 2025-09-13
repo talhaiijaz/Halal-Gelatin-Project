@@ -92,35 +92,29 @@ export const getDashboardStats = query({
     // Get clients for currency classification
     const clients = await ctx.db.query("clients").collect();
     
-    // Calculate revenue by currency using payments (with conversion for international)
-    const totalRevenueUSD = yearPayments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "international" && p.convertedAmountUSD;
-      })
-      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    // Calculate revenue by currency using payments
+    const revenueByCurrency: Record<string, number> = {};
+    const paidByCurrency: Record<string, number> = {};
     
-    const totalRevenuePKR = yearPayments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "local";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
+    yearPayments.forEach(payment => {
+      const currency = payment.currency;
+      const amount = payment.amount;
+      
+      // Add to revenue totals
+      revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + amount;
+      paidByCurrency[currency] = (paidByCurrency[currency] || 0) + amount;
+    });
     
-    // Calculate paid amounts by currency using payments
-    const totalPaidUSD = yearPayments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "international" && p.convertedAmountUSD;
-      })
-      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    // For backward compatibility, extract individual currency totals
+    const totalRevenueUSD = revenueByCurrency["USD"] || 0;
+    const totalRevenuePKR = revenueByCurrency["PKR"] || 0;
+    const totalRevenueEUR = revenueByCurrency["EUR"] || 0;
+    const totalRevenueAED = revenueByCurrency["AED"] || 0;
     
-    const totalPaidPKR = yearPayments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "local";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
+    const totalPaidUSD = paidByCurrency["USD"] || 0;
+    const totalPaidPKR = paidByCurrency["PKR"] || 0;
+    const totalPaidEUR = paidByCurrency["EUR"] || 0;
+    const totalPaidAED = paidByCurrency["AED"] || 0;
     
     // Calculate outstanding by currency (using invoices - original currency until payment)
     const outstandingByCurrency: Record<string, number> = {};
@@ -157,11 +151,17 @@ export const getDashboardStats = query({
       totalOutstanding,
       totalRevenueUSD,
       totalRevenuePKR,
+      totalRevenueEUR,
+      totalRevenueAED,
       totalPaidUSD,
       totalPaidPKR,
+      totalPaidEUR,
+      totalPaidAED,
       totalOutstandingUSD,
       totalOutstandingPKR,
       outstandingByCurrency,
+      revenueByCurrency,
+      paidByCurrency,
       overdueInvoices: overdueInvoices.length,
       // Payment statistics
       totalPaymentsReceived,
