@@ -42,8 +42,8 @@ export default defineSchema({
 
   // Orders table
   orders: defineTable({
-    orderNumber: v.string(),
-    invoiceNumber: v.optional(v.string()), // Optional invoice number (can be added later)
+    orderNumber: v.string(), // Internal use only
+    invoiceNumber: v.string(), // Required - main identifier for tracking
     clientId: v.id("clients"),
     status: v.union(
       v.literal("pending"),

@@ -197,7 +197,7 @@ export const get = query({
 export const create = mutation({
   args: {
     clientId: v.id("clients"),
-    invoiceNumber: v.optional(v.string()), // Optional invoice number
+    invoiceNumber: v.string(), // Required invoice number for tracking
     fiscalYear: v.optional(v.number()), // Optional fiscal year for order number
     currency: v.optional(v.string()), // Currency for international clients (defaults to USD)
     notes: v.optional(v.string()),
@@ -232,16 +232,14 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     
-    // Check if invoice number already exists in orders table (only if provided)
-    if (args.invoiceNumber) {
-      const existingOrder = await ctx.db
-        .query("orders")
-        .withIndex("by_invoice_number", q => q.eq("invoiceNumber", args.invoiceNumber))
-        .first();
-      
-      if (existingOrder) {
-        throw new Error(`Invoice number ${args.invoiceNumber} already exists. Please use a unique invoice number.`);
-      }
+    // Check if invoice number already exists in orders table
+    const existingOrder = await ctx.db
+      .query("orders")
+      .withIndex("by_invoice_number", q => q.eq("invoiceNumber", args.invoiceNumber))
+      .first();
+    
+    if (existingOrder) {
+      throw new Error(`Invoice number ${args.invoiceNumber} already exists. Please use a unique invoice number.`);
     }
 
     // Calculate total using inclusive total (with GST) plus freight cost
@@ -268,7 +266,7 @@ export const create = mutation({
     const orderNumber = await generateOrderNumber(ctx, args.fiscalYear);
     const orderId = await ctx.db.insert("orders", {
       orderNumber,
-      invoiceNumber: args.invoiceNumber || undefined,
+      invoiceNumber: args.invoiceNumber,
       clientId: args.clientId,
       status: "pending",
       // Timeline fields

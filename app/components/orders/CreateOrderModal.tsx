@@ -195,6 +195,10 @@ export default function CreateOrderModal({
       return;
     }
     if (currentStep === 2) {
+      if (!invoiceNumber.trim()) {
+        alert("Please enter an invoice number");
+        return;
+      }
       if (!orderItem.product || orderItem.quantityKg <= 0 || orderItem.unitPrice <= 0) {
         alert("Please fill in all order details with valid values");
         return;
@@ -287,7 +291,7 @@ export default function CreateOrderModal({
     try {
       const result = await createOrder({
         clientId: selectedClientId,
-        invoiceNumber: invoiceNumber.trim() || undefined,
+        invoiceNumber: invoiceNumber.trim(),
         fiscalYear: selectedFiscalYear,
         currency: selectedClient?.type === 'international' ? selectedCurrency : undefined,
         notes,
@@ -531,14 +535,15 @@ export default function CreateOrderModal({
                   {/* Invoice Number */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Invoice Number <span className="text-gray-500">(Optional)</span>
+                      Invoice Number <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={invoiceNumber}
                       onChange={(e) => setInvoiceNumber(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="Enter invoice number (e.g., INV-2025-0001) or leave blank for auto-generation"
+                      placeholder="Enter invoice number (e.g., INV-2025-0001)"
+                      required
                     />
                   </div>
 

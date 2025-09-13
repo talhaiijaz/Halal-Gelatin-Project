@@ -413,7 +413,7 @@ export default function InternationalClientsPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-                      Order Number
+                      Invoice Number
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
                       Client
@@ -451,9 +451,14 @@ export default function InternationalClientsPage() {
                         onClick={() => setSelectedOrderId(order._id)}
                       >
                         <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                          <div className="truncate" title={order.orderNumber}>
-                            {order.orderNumber}
+                          <div className="truncate" title={order.invoiceNumber || order.orderNumber}>
+                            {order.invoiceNumber || order.orderNumber}
                           </div>
+                          {order.invoiceNumber && (
+                            <div className="text-xs text-gray-500 truncate">
+                              Order: {order.orderNumber}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-4 max-w-0">
                           <div className="w-full">

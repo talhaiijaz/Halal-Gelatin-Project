@@ -94,9 +94,9 @@ function OrdersPageContent() {
     if (!orders) return;
 
     const csvContent = [
-      ["Order Number", "Client", "Status", "Total Amount", "Currency", "Delivery Date", "Created Date"],
+      ["Invoice Number", "Client", "Status", "Total Amount", "Currency", "Delivery Date", "Created Date"],
       ...orders.map(order => [
-        order.orderNumber,
+        order.invoiceNumber || order.orderNumber,
         order.client?.name || "",
         order.status,
         order.totalAmount.toFixed(2),
@@ -123,7 +123,7 @@ function OrdersPageContent() {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
-      order.orderNumber.toLowerCase().includes(searchLower) ||
+      (order.invoiceNumber || order.orderNumber).toLowerCase().includes(searchLower) ||
       order.client?.name?.toLowerCase().includes(searchLower) ||
       order.status.toLowerCase().includes(searchLower)
     );
@@ -247,7 +247,7 @@ function OrdersPageContent() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order Number
+                  Invoice Number
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Client
@@ -292,8 +292,13 @@ function OrdersPageContent() {
                   >
                     <td className="px-4 py-4">
                       <div className="text-sm font-medium text-gray-900">
-                        {order.orderNumber}
+                        {order.invoiceNumber || order.orderNumber}
                       </div>
+                      {order.invoiceNumber && (
+                        <div className="text-xs text-gray-500">
+                          Order: {order.orderNumber}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-4">
                       <div className="text-sm text-gray-900">{order.client?.name || "Unknown Client"}</div>
@@ -512,9 +517,14 @@ function OrdersPageContent() {
                 filteredOrders.map((order) => (
                 <tr key={order._id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
                   <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                    <div className="truncate" title={order.orderNumber}>
-                      {order.orderNumber}
+                    <div className="truncate" title={order.invoiceNumber || order.orderNumber}>
+                      {order.invoiceNumber || order.orderNumber}
                     </div>
+                    {order.invoiceNumber && (
+                      <div className="text-xs text-gray-500 truncate">
+                        Order: {order.orderNumber}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-4 max-w-0">
                     <div className="w-full">
