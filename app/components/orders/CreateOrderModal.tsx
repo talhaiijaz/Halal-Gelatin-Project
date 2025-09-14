@@ -42,7 +42,7 @@ export default function CreateOrderModal({
 }: CreateOrderModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedClientId, setSelectedClientId] = useState<Id<"clients"> | null>(preselectedClientId || null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([{
+  const [orderItem, setOrderItem] = useState<OrderItem>({
     product: "",
     quantityKg: 0,
     unitPrice: 0,
@@ -57,10 +57,10 @@ export default function CreateOrderModal({
     bloom: undefined,
     mesh: undefined,
     lotNumbers: [],
-  }]);
-  // Keep separate input strings for each item
-  const [lotNumbersInputs, setLotNumbersInputs] = useState<string[]>([""]);
-  const [gstRateInputs, setGstRateInputs] = useState<string[]>(["0"]); // Track GST rate input as string for each item
+  });
+  // Keep a separate raw input string so users can type commas naturally
+  const [lotNumbersInput, setLotNumbersInput] = useState("");
+  const [gstRateInput, setGstRateInput] = useState("0"); // Track GST rate input as string
   const [selectedFiscalYear, setSelectedFiscalYear] = useState(getCurrentFiscalYear()); // Default to current fiscal year
   // Timeline fields
   const [orderCreationDate, setOrderCreationDate] = useState(() => {
@@ -114,35 +114,77 @@ export default function CreateOrderModal({
     }
   }, [preselectedClientId]);
 
-  // Calculate order total from all items
-  const orderTotal = orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0) + freightCost;
+  // Calculate order total
+  const orderTotal = (orderItem.inclusiveTotal || 0) + freightCost;
 
-  // Helper function to handle lot numbers input for a specific item
-  const handleLotNumbersChange = (index: number, value: string) => {
-    const newInputs = [...lotNumbersInputs];
-    newInputs[index] = value;
-    setLotNumbersInputs(newInputs);
+  const handleUpdateItem = (field: keyof OrderItem, value: string | number) => {
+    const updatedItem = { ...orderItem };
     
-    const tokens = value.split(",").map(v => v.trim()).filter(v => v.length > 0);
-    updateOrderItem(index, "lotNumbers", tokens);
-  };
-
-  // Helper function to handle GST rate input for a specific item
-  const handleGstRateChange = (index: number, value: string) => {
-    const newInputs = [...gstRateInputs];
-    newInputs[index] = value;
-    setGstRateInputs(newInputs);
-    
-    // If the value is empty or just a decimal point, set to 0
-    if (value === "" || value === ".") {
-      updateOrderItem(index, "gstRate", 0);
+    if (field === "product") {
+      updatedItem.product = value as string;
+    } else if (field === "bloom") {
+      updatedItem.bloom = typeof value === "string" ? (value === "" ? undefined : value) : value.toString();
+      setOrderItem(updatedItem);
+      return;
+    } else if (field === "mesh") {
+      updatedItem.mesh = typeof value === "string" ? (value === "" ? undefined : parseFloat(value)) : (value as number);
+      setOrderItem(updatedItem);
+      return;
     } else {
-      const numValue = parseFloat(value);
-      // Allow any valid number (including over 100) for input, but validate later
-      if (!isNaN(numValue) && numValue >= 0) {
-        updateOrderItem(index, "gstRate", numValue);
+      // Handle GST rate specially to avoid string concatenation issues
+      if (field === "gstRate") {
+        const stringValue = value.toString();
+        setGstRateInput(stringValue); // Update the input string
+        
+        // If the value is empty or just a decimal point, set to 0
+        if (stringValue === "" || stringValue === ".") {
+          updatedItem.gstRate = 0;
+        } else {
+          const numValue = parseFloat(stringValue);
+          // Allow any valid number (including over 100) for input, but validate later
+          if (!isNaN(numValue) && numValue >= 0) {
+            updatedItem.gstRate = numValue;
+          } else {
+            // If invalid, keep the current value but don't update the number
+            return;
+          }
+        }
+      } else {
+        const numValue = typeof value === "string" ? parseFloat(value) || 0 : value;
+        
+        // Update the specific field
+        if (field === "quantityKg") {
+          updatedItem.quantityKg = numValue;
+        } else if (field === "unitPrice") {
+          updatedItem.unitPrice = numValue;
+        } else if (field === "discountType") {
+          updatedItem.discountType = value === "" ? undefined : (value as "amount" | "percentage");
+        } else if (field === "discountValue") {
+          updatedItem.discountValue = numValue;
+        }
       }
+      
+      // Recalculate all values
+      updatedItem.exclusiveValue = updatedItem.quantityKg * updatedItem.unitPrice;
+      updatedItem.gstAmount = updatedItem.gstRate ? (updatedItem.exclusiveValue * updatedItem.gstRate) / 100 : 0;
+      const totalBeforeDiscount = updatedItem.exclusiveValue + updatedItem.gstAmount;
+      
+      // Calculate discount on total (after GST)
+      let discountAmount = 0;
+      if (updatedItem.discountType && updatedItem.discountValue) {
+        if (updatedItem.discountType === "amount") {
+          discountAmount = updatedItem.discountValue;
+        } else if (updatedItem.discountType === "percentage") {
+          discountAmount = (totalBeforeDiscount * updatedItem.discountValue) / 100;
+        }
+      }
+      updatedItem.discountAmount = discountAmount;
+      
+      // Apply discount to total
+      updatedItem.inclusiveTotal = totalBeforeDiscount - discountAmount;
     }
+    
+    setOrderItem(updatedItem);
   };
 
   const handleNext = async () => {
@@ -157,22 +199,17 @@ export default function CreateOrderModal({
         alert("Please enter an invoice number");
         return;
       }
-      
-      // Validate all order items
-      for (let i = 0; i < orderItems.length; i++) {
-        const item = orderItems[i];
-        if (!item.product || item.quantityKg <= 0 || item.unitPrice <= 0) {
-          alert(`Please fill in all details for product ${i + 1} with valid values`);
-          return;
-        }
-        if (item.gstRate < 0) {
-          alert(`GST rate cannot be negative for product ${i + 1}`);
-          return;
-        }
-        if (item.gstRate > 100) {
-          alert(`GST rate cannot be more than 100% for product ${i + 1}`);
-          return;
-        }
+      if (!orderItem.product || orderItem.quantityKg <= 0 || orderItem.unitPrice <= 0) {
+        alert("Please fill in all order details with valid values");
+        return;
+      }
+      if (orderItem.gstRate < 0) {
+        alert("GST rate cannot be negative");
+        return;
+      }
+      if (orderItem.gstRate > 100) {
+        alert("GST rate cannot be more than 100%");
+        return;
       }
     }
     if (currentStep === 3) {
@@ -198,93 +235,29 @@ export default function CreateOrderModal({
     setCurrentStep(currentStep - 1);
   };
 
-  // Helper functions for managing multiple order items
-  const addNewProduct = () => {
-    setOrderItems([...orderItems, {
-      product: "",
-      quantityKg: 0,
-      unitPrice: 0,
-      exclusiveValue: 0,
-      gstRate: 0,
-      gstAmount: 0,
-      inclusiveTotal: 0,
-      discountType: undefined,
-      discountValue: undefined,
-      discountAmount: 0,
-      bloom: undefined,
-      mesh: undefined,
-      lotNumbers: [],
-    }]);
-    setLotNumbersInputs([...lotNumbersInputs, ""]);
-    setGstRateInputs([...gstRateInputs, "0"]);
-  };
-
-  const removeProduct = (index: number) => {
-    if (orderItems.length > 1) {
-      const newItems = orderItems.filter((_, i) => i !== index);
-      const newLotInputs = lotNumbersInputs.filter((_, i) => i !== index);
-      const newGstInputs = gstRateInputs.filter((_, i) => i !== index);
-      setOrderItems(newItems);
-      setLotNumbersInputs(newLotInputs);
-      setGstRateInputs(newGstInputs);
-    }
-  };
-
-  const updateOrderItem = (index: number, field: keyof OrderItem, value: any) => {
-    const newItems = [...orderItems];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    // Recalculate totals for this item
-    const item = newItems[index];
-    const exclusiveValue = item.quantityKg * item.unitPrice;
-    const gstAmount = (exclusiveValue * item.gstRate) / 100;
-    
-    // Calculate discount
-    let discountAmount = 0;
-    if (item.discountType && item.discountValue) {
-      const totalBeforeDiscount = exclusiveValue + gstAmount;
-      if (item.discountType === "amount") {
-        discountAmount = item.discountValue;
-      } else if (item.discountType === "percentage") {
-        discountAmount = (totalBeforeDiscount * item.discountValue) / 100;
-      }
-    }
-    
-    const inclusiveTotal = exclusiveValue + gstAmount - discountAmount;
-    
-    newItems[index] = {
-      ...newItems[index],
-      exclusiveValue,
-      gstAmount,
-      discountAmount,
-      inclusiveTotal,
-    };
-    
-    setOrderItems(newItems);
-  };
-
   const resetForm = () => {
     setCurrentStep(preselectedClientId ? 2 : 1);
     setSelectedClientId(preselectedClientId || null);
-    setOrderItems([{
+    setOrderItem({
       product: "",
       quantityKg: 0,
       unitPrice: 0,
       exclusiveValue: 0,
-      gstRate: 0,
+      gstRate: 0, // Default to 0 instead of undefined
       gstAmount: 0,
       inclusiveTotal: 0,
+      // Discount fields
       discountType: undefined,
       discountValue: undefined,
       discountAmount: 0,
       bloom: undefined,
       mesh: undefined,
       lotNumbers: [],
-    }]);
-    setLotNumbersInputs([""]);
-    setGstRateInputs(["0"]);
-    setSelectedFiscalYear(getCurrentFiscalYear());
+    });
+    setGstRateInput("0"); // Reset the GST rate input string
+    setSelectedFiscalYear(getCurrentFiscalYear()); // Reset to current fiscal year
     setOrderCreationDate(() => {
+      // Reset to today's date in YYYY-MM-DD format
       const today = new Date();
       return today.toISOString().split('T')[0];
     });
@@ -292,6 +265,7 @@ export default function CreateOrderModal({
     setEstimatedDepartureDate("");
     setEstimatedArrivalDate("");
     setTimelineNotes("");
+    // Shipment information
     setShipmentMethod("");
     setShippingCompany("");
     setShippingOrderNumber("");
@@ -301,6 +275,7 @@ export default function CreateOrderModal({
     setOrderCreationAttempted(false);
     setClientSearchQuery("");
     setInvoiceNumber("");
+    setLotNumbersInput("");
   };
 
   const handleClose = () => {
@@ -331,22 +306,22 @@ export default function CreateOrderModal({
         shipmentMethod: shipmentMethod || undefined,
         shippingCompany: shippingCompany || undefined,
         shippingOrderNumber: shippingOrderNumber || undefined,
-        items: orderItems.map(item => ({
-          product: item.product,
-          bloom: item.bloom,
-          mesh: item.mesh,
-          lotNumbers: item.lotNumbers && item.lotNumbers.length ? item.lotNumbers : undefined,
-          quantityKg: item.quantityKg,
-          unitPrice: item.unitPrice,
-          exclusiveValue: item.exclusiveValue,
-          gstRate: item.gstRate,
-          gstAmount: item.gstAmount,
-          inclusiveTotal: item.inclusiveTotal,
+        items: [{
+          product: orderItem.product,
+          bloom: orderItem.bloom,
+          mesh: orderItem.mesh,
+          lotNumbers: orderItem.lotNumbers && orderItem.lotNumbers.length ? orderItem.lotNumbers : undefined,
+          quantityKg: orderItem.quantityKg,
+          unitPrice: orderItem.unitPrice,
+          exclusiveValue: orderItem.exclusiveValue,
+          gstRate: orderItem.gstRate,
+          gstAmount: orderItem.gstAmount,
+          inclusiveTotal: orderItem.inclusiveTotal,
           // Discount fields
-          discountType: item.discountType,
-          discountValue: item.discountValue,
-          discountAmount: item.discountAmount,
-        })),
+          discountType: orderItem.discountType,
+          discountValue: orderItem.discountValue,
+          discountAmount: orderItem.discountAmount,
+        }],
       });
 
       const orderId = (result as any).orderId;
@@ -619,226 +594,199 @@ export default function CreateOrderModal({
                     </div>
                   )}
 
-                  {/* Multiple Products */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium text-gray-900">Products</h3>
-                      <button
-                        type="button"
-                        onClick={addNewProduct}
-                        className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  {/* Product Name */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Product Name
+                    </label>
+                    <input
+                      type="text"
+                      value={orderItem.product}
+                      onChange={(e) => handleUpdateItem("product", e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      placeholder="Enter product name"
+                    />
+                  </div>
+                  {/* Product specs: Bloom, Mesh */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
+                      <select
+                        value={orderItem.bloom ?? ""}
+                        onChange={(e) => handleUpdateItem("bloom", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                       >
-                        + Add Product
-                      </button>
+                        <option value="">Select Bloom Value</option>
+                        {ALL_BLOOM_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>
+                      <input
+                        type="number"
+                        value={orderItem.mesh ?? ""}
+                        onChange={(e) => handleUpdateItem("mesh", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        placeholder="e.g., 80"
+                        min="0"
+                        step="1"
+                      />
+                    </div>
+                  </div>
+                  {/* Lot numbers */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Lot Numbers (comma-separated)</label>
+                    <input
+                      type="text"
+                      value={lotNumbersInput}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setLotNumbersInput(val);
+                        const tokens = val.split(",").map(v => v.trim()).filter(v => v.length > 0);
+                        setOrderItem({ ...orderItem, lotNumbers: tokens });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      placeholder="e.g., 12345, 67890"
+                    />
+                  </div>
 
-                    {orderItems.map((item, index) => (
-                      <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
-                        <div className="flex items-center justify-between mb-3">
-                          <h4 className="text-md font-medium text-gray-800">Product {index + 1}</h4>
-                          {orderItems.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeProduct(index)}
-                              className="text-red-600 hover:text-red-800 text-sm"
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
+                  {/* Quantity and Rate */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Quantity (kg)
+                      </label>
+                      <input
+                        type="number"
+                        value={orderItem.quantityKg || ""}
+                        onChange={(e) => handleUpdateItem("quantityKg", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {`Rate (${currentCurrency} per kg)`}
+                      </label>
+                      <input
+                        type="number"
+                        value={orderItem.unitPrice || ""}
+                        onChange={(e) => handleUpdateItem("unitPrice", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        placeholder="0.00"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
 
-                        {/* Product Name */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Product Name
-                          </label>
-                          <input
-                            type="text"
-                            value={item.product}
-                            onChange={(e) => updateOrderItem(index, "product", e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                            placeholder="Enter product name"
-                          />
-                        </div>
-                        {/* Product specs: Bloom, Mesh */}
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
-                            <select
-                              value={item.bloom ?? ""}
-                              onChange={(e) => updateOrderItem(index, "bloom", e.target.value === "" ? undefined : e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Select Bloom Value</option>
-                              {ALL_BLOOM_OPTIONS.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>
-                            <input
-                              type="number"
-                              value={item.mesh ?? ""}
-                              onChange={(e) => updateOrderItem(index, "mesh", e.target.value === "" ? undefined : parseFloat(e.target.value))}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                              placeholder="e.g., 80"
-                              min="0"
-                              step="1"
-                            />
-                          </div>
-                        </div>
-                        {/* Lot numbers */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Lot Numbers (comma-separated)</label>
-                          <input
-                            type="text"
-                            value={lotNumbersInputs[index] || ""}
-                            onChange={(e) => handleLotNumbersChange(index, e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                            placeholder="e.g., 12345, 67890"
-                          />
-                        </div>
-
-                        {/* Quantity and Rate */}
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Quantity (kg)
-                            </label>
-                            <input
-                              type="number"
-                              value={item.quantityKg || ""}
-                              onChange={(e) => updateOrderItem(index, "quantityKg", parseFloat(e.target.value) || 0)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                              placeholder="0.00"
-                              min="0"
-                              step="0.01"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {`Rate (${currentCurrency} per kg)`}
-                            </label>
-                            <input
-                              type="number"
-                              value={item.unitPrice || ""}
-                              onChange={(e) => updateOrderItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                              placeholder="0.00"
-                              min="0"
-                              step="0.01"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Calculations */}
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Ex. Value (Before GST)
-                            </label>
-                            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                              {formatCurrency(item.exclusiveValue)}
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              GST Rate (%)
-                            </label>
-                            <input
-                              type="number"
-                              value={gstRateInputs[index] || "0"}
-                              onChange={(e) => handleGstRateChange(index, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                              placeholder="0"
-                              min="0"
-                              step="0.1"
-                            />
-                          </div>
-                        </div>
+                  {/* Calculations */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ex. Value (Before GST)
+                      </label>
+                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
+                        {formatCurrency(orderItem.exclusiveValue)}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        GST Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={gstRateInput}
+                        onChange={(e) => handleUpdateItem("gstRate", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        placeholder="0"
+                        min="0"
+                        step="0.1"
+                      />
+                    </div>
+                  </div>
 
                   {/* Discount Section */}
                   <div className="border-t pt-4 mt-4">
                     <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
                     
                     <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Discount Type
-                              </label>
-                              <select
-                                value={item.discountType || ""}
-                                onChange={(e) => updateOrderItem(index, "discountType", e.target.value === "" ? undefined : e.target.value as "amount" | "percentage")}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                              >
-                                <option value="">No discount</option>
-                                <option value="amount">Fixed Amount</option>
-                                <option value="percentage">Percentage</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                {item.discountType === "amount" ? `Discount Amount (${currentCurrency})` : 
-                                 item.discountType === "percentage" ? "Discount Percentage (%)" : 
-                                 "Discount Value"}
-                              </label>
-                              <input
-                                type="number"
-                                value={item.discountValue || ""}
-                                onChange={(e) => updateOrderItem(index, "discountValue", parseFloat(e.target.value) || 0)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                                placeholder={item.discountType === "amount" ? "0.00" : 
-                                            item.discountType === "percentage" ? "0" : ""}
-                                min="0"
-                                step={item.discountType === "amount" ? "0.01" : "0.1"}
-                                disabled={!item.discountType}
-                              />
-                            </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Discount Type
+                        </label>
+                        <select
+                          value={orderItem.discountType || ""}
+                          onChange={(e) => handleUpdateItem("discountType", e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                        >
+                          <option value="">No discount</option>
+                          <option value="amount">Fixed Amount</option>
+                          <option value="percentage">Percentage</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          {orderItem.discountType === "amount" ? `Discount Amount (${currentCurrency})` : 
+                           orderItem.discountType === "percentage" ? "Discount Percentage (%)" : 
+                           "Discount Value"}
+                        </label>
+                        <input
+                          type="number"
+                          value={orderItem.discountValue || ""}
+                          onChange={(e) => handleUpdateItem("discountValue", e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                          placeholder={orderItem.discountType === "amount" ? "0.00" : 
+                                      orderItem.discountType === "percentage" ? "0" : ""}
+                          min="0"
+                          step={(orderItem.discountType === "amount" ? "0.01" : "0.1") as any}
+                          disabled={!orderItem.discountType}
+                        />
+                      </div>
                     </div>
 
-                          {item.discountType && item.discountValue && (
-                            <div className="mb-4">
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Total Before Discount
-                              </label>
-                              <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
-                                {formatCurrency(item.exclusiveValue + item.gstAmount)}
-                              </div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
-                                Calculated Discount Amount
-                              </label>
-                              <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
-                                {formatCurrency(item.discountAmount || 0)}
-                              </div>
-                            </div>
-                          )}
-                  </div>
-
-                          {/* GST Amount and Total */}
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                GST Amount
-                              </label>
-                              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                                {formatCurrency(item.gstAmount)}
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Inclusive Total (Including GST)
-                              </label>
-                              <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
-                                {formatCurrency(item.inclusiveTotal)}
-                              </div>
-                            </div>
-                          </div>
+                    {orderItem.discountType && orderItem.discountValue && (
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Total Before Discount
+                        </label>
+                        <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
+                          {formatCurrency(orderItem.exclusiveValue + orderItem.gstAmount)}
+                        </div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
+                          Calculated Discount Amount
+                        </label>
+                        <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
+                          {formatCurrency(orderItem.discountAmount || 0)}
                         </div>
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* GST Amount and Total */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        GST Amount
+                      </label>
+                      <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
+                        {formatCurrency(orderItem.gstAmount)}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Inclusive Total (Including GST)
+                      </label>
+                      <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
+                        {formatCurrency(orderItem.inclusiveTotal)}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Freight Cost */}
@@ -864,7 +812,7 @@ export default function CreateOrderModal({
                           Product Total
                         </label>
                         <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                          {formatCurrency(orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0))}
+                          {formatCurrency(orderItem.inclusiveTotal)}
                         </div>
                       </div>
                     </div>
@@ -875,7 +823,7 @@ export default function CreateOrderModal({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Product Total:</span>
-                      <span>{formatCurrency(orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0))}</span>
+                      <span>{formatCurrency(orderItem.inclusiveTotal)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Freight Cost:</span>
@@ -1062,17 +1010,15 @@ export default function CreateOrderModal({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {orderItems.map((item, index) => (
-                            <tr key={index}>
-                              <td className="px-2 py-2 text-xs">{item.product}</td>
-                              <td className="px-2 py-2 text-xs text-right">{item.quantityKg} kg</td>
-                              <td className="px-2 py-2 text-xs text-right">{formatCurrency(item.unitPrice)}</td>
-                              <td className="px-2 py-2 text-xs text-right">{formatCurrency(item.exclusiveValue)}</td>
-                              <td className="px-2 py-2 text-xs text-right">{item.gstRate}%</td>
-                              <td className="px-2 py-2 text-xs text-right">{formatCurrency(item.gstAmount)}</td>
-                              <td className="px-2 py-2 text-xs text-right font-medium">{formatCurrency(item.inclusiveTotal)}</td>
-                            </tr>
-                          ))}
+                          <tr>
+                            <td className="px-2 py-2 text-xs">{orderItem.product}</td>
+                            <td className="px-2 py-2 text-xs text-right">{orderItem.quantityKg} kg</td>
+                            <td className="px-2 py-2 text-xs text-right">{formatCurrency(orderItem.unitPrice)}</td>
+                            <td className="px-2 py-2 text-xs text-right">{formatCurrency(orderItem.exclusiveValue)}</td>
+                            <td className="px-2 py-2 text-xs text-right">{orderItem.gstRate}%</td>
+                            <td className="px-2 py-2 text-xs text-right">{formatCurrency(orderItem.gstAmount)}</td>
+                            <td className="px-2 py-2 text-xs text-right font-medium">{formatCurrency(orderItem.inclusiveTotal)}</td>
+                          </tr>
                           <tr className="bg-gray-100 font-medium">
                             <td colSpan={6} className="px-2 py-2 text-xs text-right">Grand Total:</td>
                             <td className="px-2 py-2 text-xs text-right text-primary font-bold">{formatCurrency(orderTotal)}</td>
