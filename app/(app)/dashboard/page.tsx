@@ -154,7 +154,7 @@ export default function DashboardPage() {
       icon: Package,
       color: "text-gray-600",
       bgColor: "bg-gray-100",
-      subtitle: "Total order value",
+      subtitle: "Total value of all orders",
     },
     {
       name: "Revenue (USD)",
@@ -162,7 +162,7 @@ export default function DashboardPage() {
       icon: DollarSign,
       color: "text-green-600",
       bgColor: "bg-green-100",
-      subtitle: "Payments received",
+      subtitle: "Total payments received",
     },
     {
       name: "Revenue (PKR)",
@@ -170,7 +170,7 @@ export default function DashboardPage() {
       icon: DollarSign,
       color: "text-green-600",
       bgColor: "bg-green-100",
-      subtitle: "Payments received",
+      subtitle: "Total payments received",
     },
     {
       name: "Advance Payments (USD)",
@@ -194,7 +194,7 @@ export default function DashboardPage() {
       icon: AlertCircle,
       color: "text-red-600",
       bgColor: "bg-red-100",
-      subtitle: "Shipped/delivered unpaid",
+      subtitle: "Shipped orders awaiting payment",
     },
     {
       name: "Outstanding (PKR)",
@@ -202,7 +202,7 @@ export default function DashboardPage() {
       icon: AlertCircle,
       color: "text-red-600",
       bgColor: "bg-red-100",
-      subtitle: "Shipped/delivered unpaid",
+      subtitle: "Shipped orders awaiting payment",
     },
   ] : [];
 
