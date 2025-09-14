@@ -24,7 +24,11 @@ import {
   Phone,
   MapPin,
   Edit,
-  Trash2
+  Trash2,
+  DollarSign,
+  AlertCircle,
+  Users,
+  CheckCircle
 } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";

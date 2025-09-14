@@ -48,7 +48,6 @@ export default function DashboardPage() {
     }
   }, [monthlyLimitFromDB]);
 
-  console.log("Dashboard data:", { dashboardStats, recentOrdersData, recentActivity });
 
   // Helper function to get next 3 months shipment data
   const getNext3MonthsShipmentData = () => {

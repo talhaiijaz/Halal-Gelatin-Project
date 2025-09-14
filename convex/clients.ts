@@ -309,6 +309,17 @@ export const getStats = query({
   args: {
     type: v.optional(v.union(v.literal("local"), v.literal("international"))),
   },
+  returns: v.object({
+    totalClients: v.number(),
+    activeClients: v.number(),
+    totalOrders: v.number(),
+    activeOrders: v.number(),
+    totalRevenue: v.number(),
+    outstandingAmount: v.number(),
+    outstandingByCurrency: v.record(v.string(), v.number()),
+    totalOrderValue: v.number(),
+    advancePayments: v.number(),
+  }),
   handler: async (ctx, args) => {
     const clients = await (args.type
       ? ctx.db.query("clients").withIndex("by_type", (q) => q.eq("type", args.type!))
@@ -365,16 +376,28 @@ export const getStats = query({
       .filter(inv => inv.status !== "paid")
       .reduce((sum, inv) => sum + inv.outstandingBalance, 0);
 
+    // Calculate total order value
+    const totalOrderValue = clientOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+
+    // Calculate advance payments (payments for orders not yet shipped)
+    const advancePaymentInvoices = clientInvoices.filter(inv => {
+      const order = clientOrders.find(o => o._id === inv.orderId);
+      return order && ["pending", "in_production"].includes(order.status);
+    });
+    const advancePayments = advancePaymentInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+
     return {
       totalClients: clients.length,
       activeClients: activeClients.length,
       totalOrders: clientOrders.length,
       activeOrders: clientOrders.filter(o => 
-        ["pending", "confirmed", "in_production", "shipped"].includes(o.status)
+        ["pending", "in_production", "shipped"].includes(o.status)
       ).length,
       totalRevenue,
       outstandingAmount,
       outstandingByCurrency,
+      totalOrderValue,
+      advancePayments,
     };
   },
 });
