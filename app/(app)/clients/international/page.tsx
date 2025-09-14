@@ -165,71 +165,169 @@ export default function InternationalClientsPage() {
 
       {/* Dashboard Tab */}
       {activeTab === "dashboard" && (
-        <div className="space-y-6">
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Customers</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {stats?.totalClients || 0}
-              </p>
+        <div className="space-y-8">
+          {/* Financial Performance Summary */}
+          <div className="card p-8">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-gray-900">International Client Financial Performance</h2>
+              <div className="text-sm text-gray-500 bg-green-100 px-3 py-1 rounded-full">Multi-Currency</div>
             </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Active Orders</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {stats?.activeOrders || 0}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Total Orders: {stats?.totalOrders || 0}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {formatCurrency(stats?.totalRevenue || 0)}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Outstanding</p>
-              <div className="text-2xl font-bold text-gray-900 mt-1">
-                {(stats as any)?.outstandingByCurrency ? 
-                  Object.entries((stats as any).outstandingByCurrency)
-                    .filter(([currency, amount]) => (amount as number) > 0)
-                    .map(([currency, amount]) => (
-                      <div key={currency} className="text-lg">
-                        {formatCurrency(amount as number, currency)}
-                      </div>
-                    ))
-                  : formatCurrency(stats?.outstandingAmount || 0, 'USD')
-                }
+            
+            {/* Key Metrics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Order Value */}
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-200 rounded-lg">
+                    <Package className="h-6 w-6 text-blue-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Pipeline</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-700 mb-1">Order Value</p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {formatCurrency(stats?.totalOrderValue || 0)}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">All international orders</p>
+                </div>
               </div>
-            </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Quantity (kg)</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {(orderStats?.totalQuantity || 0).toLocaleString()}
-              </p>
+
+              {/* Revenue */}
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-green-200 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-green-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Received</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-green-700 mb-1">Revenue</p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {formatCurrency(stats?.totalRevenue || 0)}
+                  </p>
+                  <p className="text-xs text-green-600 mt-1">International payments</p>
+                </div>
+              </div>
+
+              {/* Advance Payments */}
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-purple-200 rounded-lg">
+                    <TrendingUp className="h-6 w-6 text-purple-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-purple-600 font-medium uppercase tracking-wide">Advance</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-purple-700 mb-1">Advance Payments</p>
+                  <p className="text-2xl font-bold text-purple-900">
+                    {formatCurrency(stats?.advancePayments || 0)}
+                  </p>
+                  <p className="text-xs text-purple-600 mt-1">Pre-shipment payments</p>
+                </div>
+              </div>
+
+              {/* Outstanding */}
+              <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-red-200 rounded-lg">
+                    <AlertCircle className="h-6 w-6 text-red-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-red-600 font-medium uppercase tracking-wide">Pending</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
+                  <div className="text-2xl font-bold text-red-900">
+                    {(stats as any)?.outstandingByCurrency ? 
+                      Object.entries((stats as any).outstandingByCurrency)
+                        .filter(([currency, amount]) => (amount as number) > 0)
+                        .map(([currency, amount]) => (
+                          <div key={currency} className="text-lg">
+                            {formatCurrency(amount as number, currency)}
+                          </div>
+                        ))
+                      : formatCurrency(stats?.outstandingAmount || 0, 'USD')
+                    }
+                  </div>
+                  <p className="text-xs text-red-600 mt-1">Shipped awaiting payment</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Order Status Overview */}
-          {orderStats && (
+          {/* Business Insights */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Client & Order Overview */}
             <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Order Status Overview
-              </h2>
-              <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-                {Object.entries(orderStats.statusCounts).map(([status, count]) => (
-                  <div key={status} className="text-center">
-                    <div className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(status)} mb-2`}>
-                      {status.replace("_", " ")}
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">{count}</p>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">Client Overview</h3>
+                <Users className="h-5 w-5 text-gray-400" />
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <span className="text-sm font-medium text-green-700">Total Clients</span>
+                  <span className="text-lg font-bold text-green-600">{stats?.totalClients || 0}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Active Orders</span>
+                  <span className="text-lg font-bold text-gray-900">{stats?.activeOrders || 0}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Total Orders</span>
+                  <span className="text-lg font-bold text-gray-900">{stats?.totalOrders || 0}</span>
+                </div>
               </div>
             </div>
-          )}
+
+            {/* Product Volume */}
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-semibold text-gray-900">Production Volume</h3>
+                <Package className="h-5 w-5 text-gray-400" />
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
+                  <span className="text-sm font-medium text-indigo-700">Total Quantity</span>
+                  <span className="text-lg font-bold text-indigo-600">{(orderStats?.totalQuantity || 0).toLocaleString()} kg</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <span className="text-sm font-medium text-gray-700">Avg Order Size</span>
+                  <span className="text-lg font-bold text-gray-900">
+                    {stats?.totalOrders ? Math.round((orderStats?.totalQuantity || 0) / stats.totalOrders).toLocaleString() : 0} kg
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Order Status Distribution */}
+            {orderStats && (
+              <div className="card p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900">Order Status</h3>
+                  <CheckCircle className="h-5 w-5 text-gray-400" />
+                </div>
+                <div className="space-y-3">
+                  {Object.entries(orderStats.statusCounts).map(([status, count]) => (
+                    <div key={status} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div className="flex items-center">
+                        <div className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(status)} mr-3`}>
+                          {status.replace("_", " ")}
+                        </div>
+                      </div>
+                      <span className="text-lg font-bold text-gray-900">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
 
 

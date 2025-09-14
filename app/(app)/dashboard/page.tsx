@@ -32,8 +32,6 @@ export default function DashboardPage() {
 
   // Fetch real data from Convex
   const dashboardStats = useQuery(api.dashboard.getStats);
-  const recentOrdersData = useQuery(api.dashboard.getRecentOrders, { limit: 5 });
-  const recentActivity = useQuery(api.dashboard.getRecentActivity, { limit: 5 });
   const orders = useQuery(api.orders.list, {});
   const orderItems = useQuery(api.orders.listItems, {});
   const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
@@ -206,33 +204,6 @@ export default function DashboardPage() {
     },
   ] : [];
 
-  // Format recent orders data
-  const recentOrders = recentOrdersData ? recentOrdersData.map(order => ({
-    id: order.orderNumber,
-    client: order.client?.name || "Unknown Client",
-    amount: formatCurrency(order.totalAmount, order.currency),
-    status: order.status,
-    date: new Date(order.createdAt).toLocaleDateString(),
-  })) : [];
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Clock className="h-4 w-4 text-yellow-500" />;
-      case "in_production":
-        return <AlertCircle className="h-4 w-4 text-blue-500" />;
-      case "shipped":
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      default:
-        return null;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    return status.split("_").map(word => 
-      word.charAt(0).toUpperCase() + word.slice(1)
-    ).join(" ");
-  };
 
   return (
     <div>
@@ -354,164 +325,176 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Recent Orders */}
-        <div className="card p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Orders</h2>
-            <Link
-              href="/orders"
-              className="text-sm text-primary hover:text-primary-dark flex items-center"
-            >
-              View all
-              <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
+      {/* Modern Financial Overview */}
+      <div className="space-y-8">
+        {/* Financial Performance Summary */}
+        <div className="card p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">Financial Performance</h2>
+            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">Current Fiscal Year</div>
           </div>
-          <div className="space-y-3">
-            {!recentOrdersData ? (
-              // Loading skeletons
-              [...Array(3)].map((_, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    <Skeleton width={16} height={16} />
-                    <div className="min-w-0 flex-1">
-                      <Skeleton width={100} height={16} />
-                      <Skeleton width={80} height={12} className="mt-1" />
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-3">
-                    <Skeleton width={60} height={16} />
-                    <Skeleton width={50} height={12} className="mt-1" />
-                  </div>
+          
+          {/* Key Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Order Value */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-blue-200 rounded-lg">
+                  <Package className="h-6 w-6 text-blue-700" />
                 </div>
-              ))
-            ) : recentOrders.length === 0 ? (
-              <div className="text-center py-8">
-                <Package className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No recent orders</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Start by creating your first order.
+                <div className="text-right">
+                  <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Pipeline</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-700 mb-1">Total Order Value</p>
+                <p className="text-2xl font-bold text-blue-900">
+                  {dashboardStats ? formatCurrency(((dashboardStats as any).totalOrderValueUSD || 0) + ((dashboardStats as any).totalOrderValuePKR || 0), 'USD') : <Skeleton width={100} height={32} />}
                 </p>
+                <p className="text-xs text-blue-600 mt-1">All orders in pipeline</p>
               </div>
-            ) : (
-              recentOrders.map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center space-x-3 min-w-0 flex-1">
-                    {getStatusIcon(order.status)}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {order.id}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate" title={order.client}>
-                        {order.client}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0 ml-3">
-                    <p className="text-sm font-medium text-gray-900">
-                      {order.amount}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {getStatusLabel(order.status)}
-                    </p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="card p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              onClick={() => {
-                setIsAddClientOpen(true);
-                // Set client type to local
-                setClientType("local");
-              }}
-              className="btn-primary text-center py-3"
-            >
-              New Local Client
-            </button>
-            <button
-              onClick={() => {
-                setIsAddClientOpen(true);
-                // Set client type to international
-                setClientType("international");
-              }}
-              className="btn-primary text-center py-3"
-            >
-              New International Client
-            </button>
-            <button
-              onClick={() => setIsCreateOrderOpen(true)}
-              className="btn-primary text-center py-3"
-            >
-              New Order
-            </button>
-            <button
-              onClick={() => router.push("/finance")}
-              className="btn-secondary text-center py-3"
-            >
-              Record Payment
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Activity Feed */}
-      <div className="mt-6 card p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Recent Activity
-        </h2>
-        <div className="space-y-3">
-          {!recentActivity ? (
-            // Loading skeletons
-            [...Array(3)].map((_, i) => (
-              <div key={i} className="flex items-start space-x-3">
-                <Skeleton width={8} height={8} className="mt-1.5 rounded-full" />
-                <div className="flex-1">
-                  <Skeleton width={200} height={16} />
-                  <Skeleton width={80} height={12} className="mt-1" />
-                </div>
-              </div>
-            ))
-          ) : recentActivity.length === 0 ? (
-            <div className="text-center py-8">
-              <TrendingUp className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No recent activity</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Activity will appear here as you use the system.
-              </p>
             </div>
-          ) : (
-            recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3">
-                <div className={`w-2 h-2 mt-1.5 rounded-full ${activity.color}`}></div>
-                <div className="flex-1">
-                  <p className="text-sm text-gray-900">
-                    {activity.message}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(activity.timestamp).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </p>
+
+            {/* Revenue */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-green-200 rounded-lg">
+                  <DollarSign className="h-6 w-6 text-green-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Received</p>
                 </div>
               </div>
-            ))
-          )}
+              <div>
+                <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
+                <p className="text-2xl font-bold text-green-900">
+                  {dashboardStats ? formatCurrency(((dashboardStats as any).revenueUSD || 0) + ((dashboardStats as any).revenuePKR || 0), 'USD') : <Skeleton width={100} height={32} />}
+                </p>
+                <p className="text-xs text-green-600 mt-1">All payments received</p>
+              </div>
+            </div>
+
+            {/* Advance Payments */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-purple-200 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-purple-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-purple-600 font-medium uppercase tracking-wide">Advance</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-700 mb-1">Advance Payments</p>
+                <p className="text-2xl font-bold text-purple-900">
+                  {dashboardStats ? formatCurrency(((dashboardStats as any).advancePaymentsUSD || 0) + ((dashboardStats as any).advancePaymentsPKR || 0), 'USD') : <Skeleton width={100} height={32} />}
+                </p>
+                <p className="text-xs text-purple-600 mt-1">Pre-shipment payments</p>
+              </div>
+            </div>
+
+            {/* Outstanding */}
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-red-200 rounded-lg">
+                  <AlertCircle className="h-6 w-6 text-red-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-red-600 font-medium uppercase tracking-wide">Pending</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
+                <p className="text-2xl font-bold text-red-900">
+                  {dashboardStats ? formatCurrency(((dashboardStats as any).outstandingUSD || 0) + ((dashboardStats as any).outstandingPKR || 0), 'USD') : <Skeleton width={100} height={32} />}
+                </p>
+                <p className="text-xs text-red-600 mt-1">Shipped awaiting payment</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Business Insights */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Order Status Distribution */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Order Status</h3>
+              <Package className="h-5 w-5 text-gray-400" />
+            </div>
+            <div className="space-y-4">
+              {dashboardStats ? (
+                <>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Active Orders</span>
+                    <span className="text-lg font-bold text-blue-600">{(dashboardStats as any).activeOrders?.value || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Total Orders</span>
+                    <span className="text-lg font-bold text-gray-900">{(dashboardStats as any).totalOrders?.value || 0}</span>
+                  </div>
+                </>
+              ) : (
+                <Skeleton count={2} height={48} />
+              )}
+            </div>
+          </div>
+
+          {/* Client Overview */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Client Base</h3>
+              <Users className="h-5 w-5 text-gray-400" />
+            </div>
+            <div className="space-y-4">
+              {dashboardStats ? (
+                <>
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                    <span className="text-sm font-medium text-blue-700">Local Clients</span>
+                    <span className="text-lg font-bold text-blue-600">{(dashboardStats as any).localClients || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <span className="text-sm font-medium text-green-700">International</span>
+                    <span className="text-lg font-bold text-green-600">{(dashboardStats as any).internationalClients || 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Active Total</span>
+                    <span className="text-lg font-bold text-gray-900">{(dashboardStats as any).activeClients || 0}</span>
+                  </div>
+                </>
+              ) : (
+                <Skeleton count={3} height={48} />
+              )}
+            </div>
+          </div>
+
+          {/* Payment Health */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Payment Health</h3>
+              <CheckCircle className="h-5 w-5 text-gray-400" />
+            </div>
+            <div className="space-y-4">
+              {dashboardStats ? (
+                <>
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                    <span className="text-sm font-medium text-green-700">Collection Rate</span>
+                    <span className="text-lg font-bold text-green-600">
+                      {((dashboardStats as any).totalPaid / Math.max((dashboardStats as any).totalRevenue, 1) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                    <span className="text-sm font-medium text-red-700">Outstanding Ratio</span>
+                    <span className="text-lg font-bold text-red-600">
+                      {(((dashboardStats as any).outstandingUSD + (dashboardStats as any).outstandingPKR) / Math.max((dashboardStats as any).totalRevenue, 1) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <Skeleton count={2} height={48} />
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
