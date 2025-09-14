@@ -47,7 +47,6 @@ export default defineSchema({
     clientId: v.id("clients"),
     status: v.union(
       v.literal("pending"),
-      v.literal("confirmed"),
       v.literal("in_production"),
       v.literal("shipped"),
       v.literal("delivered"),

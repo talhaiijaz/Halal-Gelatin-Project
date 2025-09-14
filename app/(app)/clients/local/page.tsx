@@ -104,10 +104,9 @@ export default function LocalClientsPage() {
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: "bg-yellow-100 text-yellow-800",
-      confirmed: "bg-blue-100 text-blue-800",
-      in_production: "bg-purple-100 text-purple-800",
-      shipped: "bg-indigo-100 text-indigo-800",
+      pending: "bg-gray-100 text-gray-800",
+      in_production: "bg-blue-100 text-blue-800",
+      shipped: "bg-orange-100 text-orange-800",
       delivered: "bg-green-500 text-white font-semibold shadow-sm",
       cancelled: "bg-red-100 text-red-800",
     };
@@ -330,12 +329,11 @@ export default function LocalClientsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 >
                   <option value="">All Status</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="in_production">In Production</option>
                   <option value="pending">Pending</option>
+                  <option value="in_production">In Production</option>
                   <option value="shipped">Shipped</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
 

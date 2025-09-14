@@ -430,7 +430,6 @@ export const updateStatus = mutation({
     orderId: v.id("orders"),
     status: v.union(
       v.literal("pending"),
-      v.literal("confirmed"),
       v.literal("in_production"),
       v.literal("shipped"),
       v.literal("delivered"),
@@ -447,8 +446,8 @@ export const updateStatus = mutation({
     });
     await logOrderEvent(ctx, { entityId: String(args.orderId), action: "update", message: `Order status updated to ${args.status}` });
 
-    // If order is confirmed, create invoice
-    if (args.status === "confirmed") {
+    // If order moves to in_production, create invoice
+    if (args.status === "in_production") {
       const order = await ctx.db.get(args.orderId);
       if (!order) throw new Error("Order not found");
 

@@ -109,13 +109,11 @@ export default function InternationalClientsPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "confirmed":
-        return "bg-blue-100 text-blue-800";
+        return "bg-gray-100 text-gray-800";
       case "in_production":
-        return "bg-purple-100 text-purple-800";
+        return "bg-blue-100 text-blue-800";
       case "shipped":
-        return "bg-indigo-100 text-indigo-800";
+        return "bg-orange-100 text-orange-800";
       case "delivered":
         return "bg-green-500 text-white font-semibold shadow-sm";
       case "cancelled":
@@ -360,12 +358,11 @@ export default function InternationalClientsPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 >
                   <option value="">All Status</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="in_production">In Production</option>
                   <option value="pending">Pending</option>
+                  <option value="in_production">In Production</option>
                   <option value="shipped">Shipped</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
 

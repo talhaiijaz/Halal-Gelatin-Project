@@ -259,4 +259,33 @@ export const migrateBloomValues = mutation({
   },
 });
 
+// Migration: Convert existing 'confirmed' orders to 'in_production'
+export const migrateConfirmedOrders = mutation({
+  args: {},
+  returns: v.object({
+    migratedCount: v.number(),
+    message: v.string(),
+  }),
+  handler: async (ctx) => {
+    const confirmedOrders = await ctx.db
+      .query("orders")
+      .filter((q) => q.eq(q.field("status"), "confirmed"))
+      .collect();
+    
+    let migratedCount = 0;
+    for (const order of confirmedOrders) {
+      await ctx.db.patch(order._id, {
+        status: "in_production",
+        updatedAt: Date.now(),
+      });
+      migratedCount++;
+    }
+    
+    return {
+      migratedCount,
+      message: `Successfully migrated ${migratedCount} orders from 'confirmed' to 'in_production' status`,
+    };
+  },
+});
+
 

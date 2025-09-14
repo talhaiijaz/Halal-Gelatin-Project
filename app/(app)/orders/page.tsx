@@ -54,8 +54,6 @@ function OrdersPageContent() {
     switch (status) {
       case "pending":
         return <Clock className="h-4 w-4" />;
-      case "confirmed":
-        return <CheckCircle className="h-4 w-4" />;
       case "in_production":
         return <Package className="h-4 w-4" />;
       case "shipped":
@@ -72,13 +70,11 @@ function OrdersPageContent() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
-        return "bg-yellow-100 text-yellow-800";
-      case "confirmed":
-        return "bg-blue-100 text-blue-800";
+        return "bg-gray-100 text-gray-800";
       case "in_production":
-        return "bg-purple-100 text-purple-800";
+        return "bg-blue-100 text-blue-800";
       case "shipped":
-        return "bg-indigo-100 text-indigo-800";
+        return "bg-orange-100 text-orange-800";
       case "delivered":
         return "bg-green-500 text-white font-semibold shadow-sm";
       case "cancelled":

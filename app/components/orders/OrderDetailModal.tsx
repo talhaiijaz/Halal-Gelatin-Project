@@ -73,10 +73,9 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: "bg-yellow-100 text-yellow-800",
-      confirmed: "bg-blue-100 text-blue-800",
-      in_production: "bg-purple-100 text-purple-800",
-      shipped: "bg-indigo-100 text-indigo-800",
+      pending: "bg-gray-100 text-gray-800",
+      in_production: "bg-blue-100 text-blue-800",
+      shipped: "bg-orange-100 text-orange-800",
       delivered: "bg-green-500 text-white font-semibold shadow-sm",
       cancelled: "bg-red-100 text-red-800",
     };
@@ -197,7 +196,6 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                           className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)} cursor-pointer`}
                         >
                           <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
                           <option value="in_production">In Production</option>
                           <option value="shipped">Shipped</option>
                           <option value="delivered">Delivered</option>

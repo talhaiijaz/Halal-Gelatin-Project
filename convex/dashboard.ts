@@ -111,7 +111,7 @@ export const getStats = query({
     // Calculate order stats
     const totalOrders = orders.length;
     const activeOrders = orders.filter(o => 
-      ["pending", "confirmed", "in_production", "shipped"].includes(o.status)
+      ["pending", "in_production", "shipped"].includes(o.status)
     ).length;
     
     // Calculate orders by client type
@@ -227,10 +227,10 @@ export const getStats = query({
       })
       .reduce((sum, order) => sum + order.totalAmount, 0);
 
-    // 2. Advance Payments - payments for orders not yet shipped (pending/confirmed/in_production)
+    // 2. Advance Payments - payments for orders not yet shipped (pending/in_production)
     const advancePaymentInvoices = invoices.filter(inv => {
       const order = orders.find(o => o._id === inv.orderId);
-      return order && ["pending", "confirmed", "in_production"].includes(order.status);
+      return order && ["pending", "in_production"].includes(order.status);
     });
     const advancePayments = advancePaymentInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     const advancePaymentsUSD = advancePaymentInvoices
