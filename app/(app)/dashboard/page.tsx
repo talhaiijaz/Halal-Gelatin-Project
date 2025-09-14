@@ -123,7 +123,7 @@ export default function DashboardPage() {
     }).format(amount);
   };
 
-  // Create stats array with real data
+  // Create stats array with real data and improved financial metrics
   const stats = dashboardStats ? [
     {
       name: "Total Clients",
@@ -141,32 +141,68 @@ export default function DashboardPage() {
       subtitle: `Total Orders: ${dashboardStats.totalOrders?.value?.toString() || "0"}`,
     },
     {
+      name: "Order Value (USD)",
+      value: formatCurrency((dashboardStats as any).totalOrderValueUSD ?? 0, 'USD'),
+      icon: Package,
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
+      subtitle: "Total value of all orders",
+    },
+    {
+      name: "Order Value (PKR)",
+      value: formatCurrency((dashboardStats as any).totalOrderValuePKR ?? 0, 'PKR'),
+      icon: Package,
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
+      subtitle: "Total order value",
+    },
+    {
       name: "Revenue (USD)",
       value: formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD'),
       icon: DollarSign,
-      color: "text-primary",
-      bgColor: "bg-orange-100",
+      color: "text-green-600",
+      bgColor: "bg-green-100",
+      subtitle: "Payments received",
     },
     {
       name: "Revenue (PKR)",
       value: formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR'),
       icon: DollarSign,
-      color: "text-primary",
-      bgColor: "bg-orange-100",
+      color: "text-green-600",
+      bgColor: "bg-green-100",
+      subtitle: "Payments received",
+    },
+    {
+      name: "Advance Payments (USD)",
+      value: formatCurrency((dashboardStats as any).advancePaymentsUSD ?? 0, 'USD'),
+      icon: TrendingUp,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+      subtitle: "Pre-shipment payments",
+    },
+    {
+      name: "Advance Payments (PKR)",
+      value: formatCurrency((dashboardStats as any).advancePaymentsPKR ?? 0, 'PKR'),
+      icon: TrendingUp,
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+      subtitle: "Pre-shipment payments",
     },
     {
       name: "Outstanding (USD)",
       value: formatCurrency((dashboardStats as any).outstandingUSD ?? 0, 'USD'),
-      icon: TrendingUp,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
+      icon: AlertCircle,
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+      subtitle: "Shipped/delivered unpaid",
     },
     {
       name: "Outstanding (PKR)",
       value: formatCurrency((dashboardStats as any).outstandingPKR ?? 0, 'PKR'),
-      icon: TrendingUp,
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
+      icon: AlertCircle,
+      color: "text-red-600",
+      bgColor: "bg-red-100",
+      subtitle: "Shipped/delivered unpaid",
     },
   ] : [];
 

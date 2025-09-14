@@ -87,6 +87,13 @@ export const getStats = query({
     totalOrders: v.optional(v.object({
       value: v.number(),
     })),
+    // New financial metrics
+    totalOrderValue: v.number(),
+    totalOrderValueUSD: v.number(),
+    totalOrderValuePKR: v.number(),
+    advancePayments: v.number(),
+    advancePaymentsUSD: v.number(),
+    advancePaymentsPKR: v.number(),
   }),
   handler: async (ctx) => {
     // Get all data
@@ -120,7 +127,13 @@ export const getStats = query({
     // Calculate financial stats using payments with converted amounts
     const totalRevenue = invoices.reduce((sum, inv) => sum + inv.amount, 0);
     const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
-    const outstandingAmount = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    
+    // Calculate outstanding only for shipped/delivered orders
+    const shippedOrDeliveredInvoices = invoices.filter(inv => {
+      const order = orders.find(o => o._id === inv.orderId);
+      return order && (order.status === "shipped" || order.status === "delivered");
+    });
+    const outstandingAmount = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
     
     // Calculate revenue by currency using payments (with conversion for international)
     const revenueUSD = payments
@@ -137,9 +150,9 @@ export const getStats = query({
       })
       .reduce((sum, p) => sum + p.amount, 0);
     
-    // Calculate outstanding by currency (using invoices - original currency until payment)
+    // Calculate outstanding by currency (only for shipped/delivered orders)
     const outstandingByCurrency: Record<string, number> = {};
-    invoices.forEach(invoice => {
+    shippedOrDeliveredInvoices.forEach(invoice => {
       const currency = invoice.currency;
       if (invoice.outstandingBalance > 0) {
         outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
@@ -198,6 +211,35 @@ export const getStats = query({
     const currentYearRevenue = currentYearInvoices.reduce((sum, inv) => sum + inv.amount, 0);
     const prevYearRevenue = prevYearInvoices.reduce((sum, inv) => sum + inv.amount, 0);
 
+    // Calculate new financial metrics
+    // 1. Total Order Value - sum of all orders regardless of status
+    const totalOrderValue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const totalOrderValueUSD = orders
+      .filter(o => {
+        const client = clients.find(c => c._id === o.clientId);
+        return client?.type === "international";
+      })
+      .reduce((sum, order) => sum + order.totalAmount, 0);
+    const totalOrderValuePKR = orders
+      .filter(o => {
+        const client = clients.find(c => c._id === o.clientId);
+        return client?.type === "local";
+      })
+      .reduce((sum, order) => sum + order.totalAmount, 0);
+
+    // 2. Advance Payments - payments for orders not yet shipped (pending/confirmed/in_production)
+    const advancePaymentInvoices = invoices.filter(inv => {
+      const order = orders.find(o => o._id === inv.orderId);
+      return order && ["pending", "confirmed", "in_production"].includes(order.status);
+    });
+    const advancePayments = advancePaymentInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+    const advancePaymentsUSD = advancePaymentInvoices
+      .filter(inv => inv.currency === "USD")
+      .reduce((sum, inv) => sum + inv.totalPaid, 0);
+    const advancePaymentsPKR = advancePaymentInvoices
+      .filter(inv => inv.currency === "PKR")
+      .reduce((sum, inv) => sum + inv.totalPaid, 0);
+
     return {
       totalClients: {
         value: totalClients,
@@ -222,6 +264,13 @@ export const getStats = query({
       totalOrders: {
         value: totalOrders,
       },
+      // New financial metrics
+      totalOrderValue,
+      totalOrderValueUSD,
+      totalOrderValuePKR,
+      advancePayments,
+      advancePaymentsUSD,
+      advancePaymentsPKR,
     };
   },
 });

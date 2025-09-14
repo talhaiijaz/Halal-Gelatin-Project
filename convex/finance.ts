@@ -81,7 +81,13 @@ export const getDashboardStats = query({
     );
 
     const totalPaid = yearInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
-    const totalOutstanding = yearInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    
+    // Calculate outstanding only for shipped/delivered orders
+    const shippedOrDeliveredInvoices = yearInvoices.filter(inv => {
+      const order = allOrders.find(o => o._id === inv.orderId);
+      return order && (order.status === "shipped" || order.status === "delivered");
+    });
+    const totalOutstanding = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
     
     // Get payment statistics for the year
     const payments = await ctx.db.query("payments").collect();
@@ -122,9 +128,9 @@ export const getDashboardStats = query({
     const totalPaidEUR = paidByCurrency["EUR"] || 0;
     const totalPaidAED = paidByCurrency["AED"] || 0;
     
-    // Calculate outstanding by currency (using invoices - original currency until payment)
+    // Calculate outstanding by currency (only for shipped/delivered orders)
     const outstandingByCurrency: Record<string, number> = {};
-    yearInvoices.forEach(invoice => {
+    shippedOrDeliveredInvoices.forEach(invoice => {
       const currency = invoice.currency;
       if (invoice.outstandingBalance > 0) {
         outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;

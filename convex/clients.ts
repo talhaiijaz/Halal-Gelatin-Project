@@ -69,17 +69,26 @@ export const get = query({
       .order("desc")
       .take(10);
 
-    // Get outstanding invoices
+    // Get outstanding invoices for shipped/delivered orders only
     const invoices = await ctx.db
       .query("invoices")
       .withIndex("by_client", (q) => q.eq("clientId", args.id))
       .filter((q) => q.neq(q.field("status"), "paid"))
       .collect();
 
-    const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
-    // Group outstanding by original invoice currency
+    // Filter to only include invoices for shipped/delivered orders
+    const shippedOrDeliveredInvoices = [];
+    for (const invoice of invoices) {
+      const order = await ctx.db.get(invoice.orderId);
+      if (order && (order.status === "shipped" || order.status === "delivered")) {
+        shippedOrDeliveredInvoices.push(invoice);
+      }
+    }
+
+    const totalOutstanding = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    // Group outstanding by original invoice currency (only for shipped/delivered orders)
     const outstandingByCurrency: Record<string, number> = {};
-    invoices.forEach(inv => {
+    shippedOrDeliveredInvoices.forEach(inv => {
       const currency = inv.currency;
       if (inv.outstandingBalance > 0) {
         outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + inv.outstandingBalance;
