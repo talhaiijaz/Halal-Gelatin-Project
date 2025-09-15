@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, ChevronLeft, ChevronRight, Search, Plus } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import DocumentUpload from "./DocumentUpload";
-import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, isDateInFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
+import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 
 interface OrderItem {
@@ -47,7 +47,7 @@ export default function CreateOrderModal({
     quantityKg: 0,
     unitPrice: 0,
     exclusiveValue: 0,
-    gstRate: 0, // Default to 0% GST
+    gstRate: 0, // Default to 0 instead of undefined
     gstAmount: 0,
     inclusiveTotal: 0,
     // Discount fields
@@ -71,7 +71,6 @@ export default function CreateOrderModal({
   const [factoryDepartureDate, setFactoryDepartureDate] = useState("");
   const [estimatedDepartureDate, setEstimatedDepartureDate] = useState("");
   const [estimatedArrivalDate, setEstimatedArrivalDate] = useState("");
-  const [deliveryDate, setDeliveryDate] = useState("");
   const [timelineNotes, setTimelineNotes] = useState("");
   // Shipment information
   const [shipmentMethod, setShipmentMethod] = useState<"air" | "sea" | "road" | "train" | "">("");
@@ -85,7 +84,6 @@ export default function CreateOrderModal({
   const [orderCreationAttempted, setOrderCreationAttempted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [selectedCurrency, setSelectedCurrency] = useState("USD");
-  const [dateValidationError, setDateValidationError] = useState("");
 
   const clients = useQuery(api.clients.list, {});
   const bankAccounts = useQuery(api.banks.list);
@@ -94,56 +92,11 @@ export default function CreateOrderModal({
   // Currency helpers
   const selectedClient = clients?.find(c => c._id === selectedClientId);
   const currentCurrency: string = selectedClient?.type === 'local' ? 'PKR' : selectedCurrency;
-
-  // Date validation helper
-  const validateOrderCreationDate = (date: string, fiscalYear: number): boolean => {
-    if (!date) return true; // Empty date is valid (will use current date)
-    
-    const dateTimestamp = new Date(date).getTime();
-    return isDateInFiscalYear(dateTimestamp, fiscalYear);
-  };
-
-  // Update order creation date when fiscal year changes
-  const handleFiscalYearChange = (newFiscalYear: number) => {
-    setSelectedFiscalYear(newFiscalYear);
-    
-    // If order creation date is set and outside the new fiscal year, reset it
-    if (orderCreationDate && !validateOrderCreationDate(orderCreationDate, newFiscalYear)) {
-      const fiscalYearRange = getFiscalYearRange(newFiscalYear);
-      const startDate = new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
-      setOrderCreationDate(startDate);
-      setDateValidationError("");
-    }
-  };
-
-  // Handle order creation date change with validation
-  const handleOrderCreationDateChange = (newDate: string) => {
-    setOrderCreationDate(newDate);
-    
-    // Validate the date against the selected fiscal year
-    if (newDate && !validateOrderCreationDate(newDate, selectedFiscalYear)) {
-      const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
-      const startDate = new Date(fiscalYearRange.startDate);
-      const endDate = new Date(fiscalYearRange.endDate);
-      setDateValidationError(
-        `Order creation date must be within ${getFiscalYearLabel(selectedFiscalYear)} (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`
-      );
-    } else {
-      setDateValidationError("");
-    }
-  };
   const formatCurrency = (amount: number) => {
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currentCurrency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount || 0)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
+    // Use appropriate locale based on currency
     const locale = currentCurrency === 'USD' ? 'en-US' : 
                    currentCurrency === 'PKR' ? 'en-PK' : 
+                   currentCurrency === 'EUR' ? 'en-DE' :
                    currentCurrency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
@@ -163,39 +116,6 @@ export default function CreateOrderModal({
 
   // Calculate order total from all items
   const orderTotal = orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0) + freightCost;
-
-  const updateOrderItem = (index: number, field: keyof OrderItem, value: any) => {
-    const newItems = [...orderItems];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    // Recalculate totals for this item
-    const item = newItems[index];
-    const exclusiveValue = item.quantityKg * item.unitPrice;
-    const gstAmount = (exclusiveValue * item.gstRate) / 100;
-    
-    // Calculate discount
-    let discountAmount = 0;
-    if (item.discountType && item.discountValue) {
-      const totalBeforeDiscount = exclusiveValue + gstAmount;
-      if (item.discountType === "amount") {
-        discountAmount = item.discountValue;
-      } else if (item.discountType === "percentage") {
-        discountAmount = (totalBeforeDiscount * item.discountValue) / 100;
-      }
-    }
-    
-    const inclusiveTotal = exclusiveValue + gstAmount - discountAmount;
-    
-    newItems[index] = {
-      ...newItems[index],
-      exclusiveValue,
-      gstAmount,
-      discountAmount,
-      inclusiveTotal,
-    };
-    
-    setOrderItems(newItems);
-  };
 
   // Helper function to handle lot numbers input for a specific item
   const handleLotNumbersChange = (index: number, value: string) => {
@@ -225,37 +145,6 @@ export default function CreateOrderModal({
     }
   };
 
-  const addNewProduct = () => {
-    setOrderItems([...orderItems, {
-      product: "",
-      quantityKg: 0,
-      unitPrice: 0,
-      exclusiveValue: 0,
-      gstRate: 0,
-      gstAmount: 0,
-      inclusiveTotal: 0,
-      discountType: undefined,
-      discountValue: undefined,
-      discountAmount: 0,
-      bloom: undefined,
-      mesh: undefined,
-      lotNumbers: [],
-    }]);
-    setLotNumbersInputs([...lotNumbersInputs, ""]);
-    setGstRateInputs([...gstRateInputs, "0"]);
-  };
-
-  const removeProduct = (index: number) => {
-    if (orderItems.length > 1) {
-      const newItems = orderItems.filter((_, i) => i !== index);
-      const newLotInputs = lotNumbersInputs.filter((_, i) => i !== index);
-      const newGstInputs = gstRateInputs.filter((_, i) => i !== index);
-      setOrderItems(newItems);
-      setLotNumbersInputs(newLotInputs);
-      setGstRateInputs(newGstInputs);
-    }
-  };
-
   const handleNext = async () => {
     if (isCreating) return; // Prevent multiple calls while creating
     
@@ -268,6 +157,7 @@ export default function CreateOrderModal({
         alert("Please enter an invoice number");
         return;
       }
+      
       // Validate all order items
       for (let i = 0; i < orderItems.length; i++) {
         const item = orderItems[i];
@@ -308,6 +198,71 @@ export default function CreateOrderModal({
     setCurrentStep(currentStep - 1);
   };
 
+  // Helper functions for managing multiple order items
+  const addNewProduct = () => {
+    setOrderItems([...orderItems, {
+      product: "",
+      quantityKg: 0,
+      unitPrice: 0,
+      exclusiveValue: 0,
+      gstRate: 0,
+      gstAmount: 0,
+      inclusiveTotal: 0,
+      discountType: undefined,
+      discountValue: undefined,
+      discountAmount: 0,
+      bloom: undefined,
+      mesh: undefined,
+      lotNumbers: [],
+    }]);
+    setLotNumbersInputs([...lotNumbersInputs, ""]);
+    setGstRateInputs([...gstRateInputs, "0"]);
+  };
+
+  const removeProduct = (index: number) => {
+    if (orderItems.length > 1) {
+      const newItems = orderItems.filter((_, i) => i !== index);
+      const newLotInputs = lotNumbersInputs.filter((_, i) => i !== index);
+      const newGstInputs = gstRateInputs.filter((_, i) => i !== index);
+      setOrderItems(newItems);
+      setLotNumbersInputs(newLotInputs);
+      setGstRateInputs(newGstInputs);
+    }
+  };
+
+  const updateOrderItem = (index: number, field: keyof OrderItem, value: any) => {
+    const newItems = [...orderItems];
+    newItems[index] = { ...newItems[index], [field]: value };
+    
+    // Recalculate totals for this item
+    const item = newItems[index];
+    const exclusiveValue = item.quantityKg * item.unitPrice;
+    const gstAmount = (exclusiveValue * item.gstRate) / 100;
+    
+    // Calculate discount
+    let discountAmount = 0;
+    if (item.discountType && item.discountValue) {
+      const totalBeforeDiscount = exclusiveValue + gstAmount;
+      if (item.discountType === "amount") {
+        discountAmount = item.discountValue;
+      } else if (item.discountType === "percentage") {
+        discountAmount = (totalBeforeDiscount * item.discountValue) / 100;
+      }
+    }
+    
+    const inclusiveTotal = exclusiveValue + gstAmount - discountAmount;
+    
+    newItems[index] = {
+      ...newItems[index],
+      exclusiveValue,
+      gstAmount,
+      discountAmount,
+      inclusiveTotal,
+    };
+    
+    setOrderItems(newItems);
+  };
+
   const resetForm = () => {
     setCurrentStep(preselectedClientId ? 2 : 1);
     setSelectedClientId(preselectedClientId || null);
@@ -316,10 +271,9 @@ export default function CreateOrderModal({
       quantityKg: 0,
       unitPrice: 0,
       exclusiveValue: 0,
-      gstRate: 18, // Default to 18% GST
+      gstRate: 0,
       gstAmount: 0,
       inclusiveTotal: 0,
-      // Discount fields
       discountType: undefined,
       discountValue: undefined,
       discountAmount: 0,
@@ -328,20 +282,16 @@ export default function CreateOrderModal({
       lotNumbers: [],
     }]);
     setLotNumbersInputs([""]);
-    setGstRateInputs(["18"]); // Reset the GST rate input strings
-    setSelectedFiscalYear(getCurrentFiscalYear()); // Reset to current fiscal year
+    setGstRateInputs(["0"]);
+    setSelectedFiscalYear(getCurrentFiscalYear());
     setOrderCreationDate(() => {
-      // Reset to today's date in YYYY-MM-DD format
       const today = new Date();
       return today.toISOString().split('T')[0];
     });
-    setDateValidationError(""); // Reset date validation error
     setFactoryDepartureDate("");
     setEstimatedDepartureDate("");
     setEstimatedArrivalDate("");
-    setDeliveryDate("");
     setTimelineNotes("");
-    // Shipment information
     setShipmentMethod("");
     setShippingCompany("");
     setShippingOrderNumber("");
@@ -351,7 +301,6 @@ export default function CreateOrderModal({
     setOrderCreationAttempted(false);
     setClientSearchQuery("");
     setInvoiceNumber("");
-    setLotNumbersInputs([]);
   };
 
   const handleClose = () => {
@@ -360,15 +309,9 @@ export default function CreateOrderModal({
   };
 
   const handleSubmit = async (shouldClose: boolean = true) => {
-    if (!selectedClientId || isCreating || dateValidationError) return;
+    if (!selectedClientId || isCreating) return;
 
     console.log('Creating order...', { shouldClose, currentStep, createdOrderId });
-    console.log('Order data being sent:', {
-      clientId: selectedClientId,
-      invoiceNumber: invoiceNumber.trim(),
-      orderItems: orderItems,
-      selectedClient: selectedClient
-    });
     setIsCreating(true);
     try {
       const result = await createOrder({
@@ -383,7 +326,6 @@ export default function CreateOrderModal({
         factoryDepartureDate: factoryDepartureDate ? new Date(factoryDepartureDate).getTime() : undefined,
         estimatedDepartureDate: estimatedDepartureDate ? new Date(estimatedDepartureDate).getTime() : undefined,
         estimatedArrivalDate: estimatedArrivalDate ? new Date(estimatedArrivalDate).getTime() : undefined,
-        deliveryDate: deliveryDate ? new Date(deliveryDate).getTime() : undefined,
         timelineNotes,
         // Shipment information
         shipmentMethod: shipmentMethod || undefined,
@@ -423,12 +365,6 @@ export default function CreateOrderModal({
       }
     } catch (error) {
       console.error("Failed to create order:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        errorType: typeof error,
-        errorConstructor: error?.constructor?.name
-      });
       
       // Provide more specific error messages based on the error type
       let errorMessage = "Failed to create order. Please try again.";
@@ -482,7 +418,7 @@ export default function CreateOrderModal({
         .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
     : [];
 
-  // selectedClient computed above
+  // selectedClient is computed above (line 93)
 
   if (!isOpen) return null;
 
@@ -617,7 +553,7 @@ export default function CreateOrderModal({
 
             {/* Step 2: Order Details */}
             {currentStep === 2 && (
-              <div>
+              <div className="space-y-4">
                 <h3 className="text-lg font-medium mb-4">Order Details</h3>
 
                 <div className="border rounded-lg p-4">
@@ -643,7 +579,7 @@ export default function CreateOrderModal({
                     </label>
                     <select
                       value={selectedFiscalYear}
-                      onChange={(e) => handleFiscalYearChange(Number(e.target.value))}
+                      onChange={(e) => setSelectedFiscalYear(Number(e.target.value))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                     >
                       {getFiscalYearOptions().map(option => (
@@ -683,24 +619,23 @@ export default function CreateOrderModal({
                     </div>
                   )}
 
-                  {/* Products Section */}
+                  {/* Multiple Products */}
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-lg font-medium text-gray-900">Products</h4>
+                      <h3 className="text-lg font-medium text-gray-900">Products</h3>
                       <button
                         type="button"
                         onClick={addNewProduct}
-                        className="flex items-center px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark text-sm"
+                        className="px-3 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Product
+                        + Add Product
                       </button>
                     </div>
 
                     {orderItems.map((item, index) => (
-                      <div key={index} className="border rounded-lg p-4 mb-4 bg-gray-50">
-                        <div className="flex items-center justify-between mb-4">
-                          <h5 className="font-medium text-gray-900">Product {index + 1}</h5>
+                      <div key={index} className="border border-gray-200 rounded-lg p-4 mb-4 bg-gray-50">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-md font-medium text-gray-800">Product {index + 1}</h4>
                           {orderItems.length > 1 && (
                             <button
                               type="button"
@@ -725,13 +660,69 @@ export default function CreateOrderModal({
                             placeholder="Enter product name"
                           />
                         </div>
+
+                        {/* Quantity and Rate */}
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Quantity (kg)
+                            </label>
+                            <input
+                              type="number"
+                              value={item.quantityKg || ""}
+                              onChange={(e) => updateOrderItem(index, "quantityKg", parseFloat(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                              placeholder="0.00"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Rate ({currentCurrency} per kg)
+                            </label>
+                            <input
+                              type="number"
+                              value={item.unitPrice || ""}
+                              onChange={(e) => updateOrderItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                              placeholder="0.00"
+                              min="0"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Product Total */}
+                        <div className="mt-4 pt-4 border-t">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-700">Product Total:</span>
+                            <span className="text-lg font-bold text-primary">{formatCurrency(item.inclusiveTotal)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                        {/* Product Name */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Product Name
+                          </label>
+                          <input
+                            type="text"
+                            value={item.product}
+                            onChange={(e) => updateOrderItem(index, "product", e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                            placeholder="Enter product name"
+                          />
+                        </div>
                         {/* Product specs: Bloom, Mesh */}
                         <div className="grid grid-cols-2 gap-4 mb-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
                             <select
                               value={item.bloom ?? ""}
-                              onChange={(e) => updateOrderItem(index, "bloom", e.target.value)}
+                              onChange={(e) => updateOrderItem(index, "bloom", e.target.value === "" ? undefined : e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                             >
                               <option value="">Select Bloom Value</option>
@@ -815,7 +806,7 @@ export default function CreateOrderModal({
                             </label>
                             <input
                               type="number"
-                              value={gstRateInputs[index] || ""}
+                              value={gstRateInputs[index] || "0"}
                               onChange={(e) => handleGstRateChange(index, e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                               placeholder="0"
@@ -825,18 +816,18 @@ export default function CreateOrderModal({
                           </div>
                         </div>
 
-                        {/* Discount Section */}
-                        <div className="border-t pt-4 mt-4">
-                          <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
-                          
-                          <div className="grid grid-cols-2 gap-4 mb-4">
+                  {/* Discount Section */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-4">
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Discount Type
                               </label>
                               <select
                                 value={item.discountType || ""}
-                                onChange={(e) => updateOrderItem(index, "discountType", e.target.value)}
+                                onChange={(e) => updateOrderItem(index, "discountType", e.target.value === "" ? undefined : e.target.value as "amount" | "percentage")}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                               >
                                 <option value="">No discount</option>
@@ -853,16 +844,16 @@ export default function CreateOrderModal({
                               <input
                                 type="number"
                                 value={item.discountValue || ""}
-                                onChange={(e) => updateOrderItem(index, "discountValue", parseFloat(e.target.value) || undefined)}
+                                onChange={(e) => updateOrderItem(index, "discountValue", parseFloat(e.target.value) || 0)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                                 placeholder={item.discountType === "amount" ? "0.00" : 
                                             item.discountType === "percentage" ? "0" : ""}
                                 min="0"
-                                step={(item.discountType === "amount" ? "0.01" : "0.1") as any}
+                                step={item.discountType === "amount" ? "0.01" : "0.1"}
                                 disabled={!item.discountType}
                               />
                             </div>
-                          </div>
+                    </div>
 
                           {item.discountType && item.discountValue && (
                             <div className="mb-4">
@@ -880,24 +871,25 @@ export default function CreateOrderModal({
                               </div>
                             </div>
                           )}
-                        </div>
+                  </div>
 
-                        {/* GST Amount and Total */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              GST Amount
-                            </label>
-                            <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                              {formatCurrency(item.gstAmount)}
+                          {/* GST Amount and Total */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                GST Amount
+                              </label>
+                              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
+                                {formatCurrency(item.gstAmount)}
+                              </div>
                             </div>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Product Total
-                            </label>
-                            <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
-                              {formatCurrency(item.inclusiveTotal)}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Inclusive Total (Including GST)
+                              </label>
+                              <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
+                                {formatCurrency(item.inclusiveTotal)}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -970,27 +962,9 @@ export default function CreateOrderModal({
                     <input
                       type="date"
                       value={orderCreationDate}
-                      onChange={(e) => handleOrderCreationDateChange(e.target.value)}
-                      min={(() => {
-                        const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
-                        return new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
-                      })()}
-                      max={(() => {
-                        const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
-                        return new Date(fiscalYearRange.endDate).toISOString().split('T')[0];
-                      })()}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
-                        dateValidationError ? 'border-red-500' : 'border-gray-300'
-                      }`}
+                      onChange={(e) => setOrderCreationDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Must be within {getFiscalYearLabel(selectedFiscalYear)} ({new Date(getFiscalYearRange(selectedFiscalYear).startDate).toLocaleDateString()} - {new Date(getFiscalYearRange(selectedFiscalYear).endDate).toLocaleDateString()})
-                    </p>
-                    {dateValidationError && (
-                      <p className="text-xs text-red-500 mt-1">
-                        {dateValidationError}
-                      </p>
-                    )}
                   </div>
 
                   <div>
@@ -1025,18 +999,6 @@ export default function CreateOrderModal({
                       type="date"
                       value={estimatedArrivalDate}
                       onChange={(e) => setEstimatedArrivalDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Delivery Date
-                    </label>
-                    <input
-                      type="date"
-                      value={deliveryDate}
-                      onChange={(e) => setDeliveryDate(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                     />
                   </div>
@@ -1204,13 +1166,7 @@ export default function CreateOrderModal({
                           {new Date(estimatedArrivalDate).toLocaleDateString()}
                         </p>
                       )}
-                      {deliveryDate && (
-                        <p className="text-sm">
-                          <span className="font-medium">Delivery Date:</span>{" "}
-                          {new Date(deliveryDate).toLocaleDateString()}
-                        </p>
-                      )}
-                      {!orderCreationDate && !factoryDepartureDate && !estimatedDepartureDate && !estimatedArrivalDate && !deliveryDate && (
+                      {!orderCreationDate && !factoryDepartureDate && !estimatedDepartureDate && !estimatedArrivalDate && (
                         <p className="text-sm text-gray-500">No timeline dates set</p>
                       )}
                       {timelineNotes && (
@@ -1283,7 +1239,7 @@ export default function CreateOrderModal({
             ) : currentStep === 4 ? (
               <button
                 onClick={() => handleSubmit()}
-                disabled={isCreating || !!dateValidationError}
+                disabled={isCreating}
                 className="flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCreating ? "Creating..." : "Create Order"}

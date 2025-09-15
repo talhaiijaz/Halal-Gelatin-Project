@@ -118,6 +118,7 @@ export const create = mutation({
     taxId: v.optional(v.string()),
     type: v.union(v.literal("local"), v.literal("international")),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
+    profilePictureId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     // Check for duplicate email only if email is provided
@@ -143,6 +144,7 @@ export const create = mutation({
       taxId: args.taxId || "",
       type: args.type,
       status: args.status || "active",
+      profilePictureId: args.profilePictureId,
       createdAt: Date.now(),
       // createdBy is now optional - omitted for now
     });
@@ -228,6 +230,7 @@ export const remove = mutation({
 export const getClientSummary = query({
   args: {
     type: v.union(v.literal("local"), v.literal("international")),
+    fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Get all clients of the specified type
@@ -238,10 +241,15 @@ export const getClientSummary = query({
 
     // Get all orders for these clients
     const clientIds = clients.map(client => client._id);
-    const orders = await ctx.db
+    let orders = await ctx.db
       .query("orders")
       .filter(q => q.or(...clientIds.map(id => q.eq(q.field("clientId"), id))))
       .collect();
+
+    // Filter by fiscal year if specified
+    if (args.fiscalYear) {
+      orders = orders.filter(order => order.fiscalYear === args.fiscalYear);
+    }
 
     // Get all order items for these orders
     const orderIds = orders.map(order => order._id);
@@ -272,11 +280,18 @@ export const getClientSummary = query({
       // Get invoices for this client
       const clientInvoices = invoices.filter(invoice => invoice.clientId === client._id);
       
-      // Calculate outstanding amount by currency
+      // Calculate outstanding amount by currency (only for shipped/delivered orders)
+      const shippedOrDeliveredInvoices = clientInvoices.filter(invoice => {
+        const order = clientOrders.find(o => o._id === invoice.orderId);
+        return order && (order.status === "shipped" || order.status === "delivered");
+      });
+
       const outstandingByCurrency: Record<string, number> = {};
-      clientInvoices.forEach(invoice => {
+      shippedOrDeliveredInvoices.forEach(invoice => {
         const currency = invoice.currency;
-        outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
+        if (invoice.outstandingBalance > 0) {
+          outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
+        }
       });
 
       // Get the primary currency (most outstanding amount) or default to USD for international
@@ -308,6 +323,7 @@ export const getClientSummary = query({
 export const getStats = query({
   args: {
     type: v.optional(v.union(v.literal("local"), v.literal("international"))),
+    fiscalYear: v.optional(v.number()),
   },
   returns: v.object({
     totalClients: v.number(),
@@ -318,7 +334,11 @@ export const getStats = query({
     outstandingAmount: v.number(),
     outstandingByCurrency: v.record(v.string(), v.number()),
     totalOrderValue: v.number(),
+    totalOrderValueByCurrency: v.record(v.string(), v.number()),
+    orderValueByCurrency: v.record(v.string(), v.number()),
+    revenueByCurrency: v.record(v.string(), v.number()),
     advancePayments: v.number(),
+    advancePaymentsByCurrency: v.record(v.string(), v.number()),
   }),
   handler: async (ctx, args) => {
     const clients = await (args.type
@@ -329,62 +349,108 @@ export const getStats = query({
 
     // Get order counts
     const orders = await ctx.db.query("orders").collect();
-    const clientOrders = args.type 
+    let clientOrders = args.type 
       ? orders.filter(o => {
           const client = clients.find(c => c._id === o.clientId);
           return client && client.type === args.type;
         })
       : orders;
 
+    // Filter by fiscal year if specified
+    if (args.fiscalYear) {
+      clientOrders = clientOrders.filter(order => order.fiscalYear === args.fiscalYear);
+    }
+
     // Calculate revenue from actual payments (not invoices)
     const payments = await ctx.db.query("payments").collect();
-    const clientPayments = args.type
+    let clientPayments = args.type
       ? payments.filter(p => {
           const client = clients.find(c => c._id === p.clientId);
           return client && client.type === args.type;
         })
       : payments;
 
-    // Calculate revenue from payments
-    const totalRevenue = clientPayments.reduce((sum, payment) => {
-      if (args.type === 'international' && payment.convertedAmountUSD) {
-        return sum + payment.convertedAmountUSD;
-      } else {
-        return sum + payment.amount;
-      }
-    }, 0);
-
     // Calculate outstanding from invoices
     const invoices = await ctx.db.query("invoices").collect();
-    const clientInvoices = args.type
+
+    // Filter payments by fiscal year if specified
+    if (args.fiscalYear) {
+      clientPayments = clientPayments.filter(payment => {
+        // Get the order for this payment to check fiscal year
+        const invoice = invoices.find(i => i._id === payment.invoiceId);
+        if (invoice) {
+          const order = clientOrders.find(o => o._id === invoice.orderId);
+          return order && order.fiscalYear === args.fiscalYear;
+        }
+        return false;
+      });
+    }
+
+    // Calculate revenue from payments (use original amounts, not converted)
+    const totalRevenue = clientPayments.reduce((sum, payment) => {
+      return sum + payment.amount;
+    }, 0);
+    let clientInvoices = args.type
       ? invoices.filter(i => {
           const client = clients.find(c => c._id === i.clientId);
           return client && client.type === args.type;
         })
       : invoices;
 
-    // Calculate outstanding by currency
+    // Filter invoices by fiscal year if specified
+    if (args.fiscalYear) {
+      clientInvoices = clientInvoices.filter(invoice => {
+        const order = clientOrders.find(o => o._id === invoice.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
+    // Calculate outstanding by currency (only for shipped/delivered orders)
+    const shippedOrDeliveredInvoices = clientInvoices.filter(inv => {
+      const order = clientOrders.find(o => o._id === inv.orderId);
+      return order && (order.status === "shipped" || order.status === "delivered");
+    });
+
     const outstandingByCurrency: Record<string, number> = {};
-    clientInvoices.forEach(invoice => {
+    shippedOrDeliveredInvoices.forEach(invoice => {
       const currency = invoice.currency;
       if (invoice.outstandingBalance > 0) {
         outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
       }
     });
 
-    const outstandingAmount = clientInvoices
-      .filter(inv => inv.status !== "paid")
+    const outstandingAmount = shippedOrDeliveredInvoices
       .reduce((sum, inv) => sum + inv.outstandingBalance, 0);
 
     // Calculate total order value
     const totalOrderValue = clientOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
-    // Calculate advance payments (payments for orders not yet shipped)
-    const advancePaymentInvoices = clientInvoices.filter(inv => {
-      const order = clientOrders.find(o => o._id === inv.orderId);
-      return order && ["pending", "in_production"].includes(order.status);
+    // Calculate total order value by currency
+    const totalOrderValueByCurrency: Record<string, number> = {};
+    clientOrders.forEach(order => {
+      const currency = order.currency;
+      totalOrderValueByCurrency[currency] = (totalOrderValueByCurrency[currency] || 0) + order.totalAmount;
     });
-    const advancePayments = advancePaymentInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+
+    // Calculate advance payments from actual advance payments in payments table
+    const advancePaymentsFromPayments = clientPayments.filter(p => p.type === "advance");
+    const advancePayments = advancePaymentsFromPayments.reduce((sum, payment) => {
+      return sum + payment.amount; // Always use original amount, not converted
+    }, 0);
+
+    // Calculate advance payments by currency (show actual currencies received)
+    const advancePaymentsByCurrency: Record<string, number> = {};
+    advancePaymentsFromPayments.forEach(payment => {
+      const currency = payment.currency;
+      advancePaymentsByCurrency[currency] = (advancePaymentsByCurrency[currency] || 0) + payment.amount;
+    });
+
+    // Calculate revenue by currency from payments (show actual currencies received)
+    const revenueByCurrency: Record<string, number> = {};
+    clientPayments.forEach(payment => {
+      const currency = payment.currency;
+      revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + payment.amount;
+    });
 
     return {
       totalClients: clients.length,
@@ -397,7 +463,11 @@ export const getStats = query({
       outstandingAmount,
       outstandingByCurrency,
       totalOrderValue,
+      totalOrderValueByCurrency,
+      orderValueByCurrency: totalOrderValueByCurrency, // Alias for dashboard compatibility
+      revenueByCurrency,
       advancePayments,
+      advancePaymentsByCurrency,
     };
   },
 });

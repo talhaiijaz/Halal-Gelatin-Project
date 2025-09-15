@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
@@ -34,7 +34,9 @@ import { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
-import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, formatFiscalYear } from "@/app/utils/fiscalYear";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
 
 export default function LocalClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +50,51 @@ export default function LocalClientsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [customerFilter, setCustomerFilter] = useState<string>("");
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | undefined>(undefined);
+  
+  // Get fiscal year for dashboard display (from settings or smart default)
+  const [dashboardFiscalYear, setDashboardFiscalYear] = useState<number>(Math.max(2025, getCurrentFiscalYear()));
+  const [isCustomFiscalYear, setIsCustomFiscalYear] = useState<boolean>(false);
+  
+  // Load fiscal year setting from localStorage and listen for changes
+  useEffect(() => {
+    const loadFiscalYear = () => {
+      const saved = localStorage.getItem('selectedFiscalYear');
+      if (saved) {
+        const savedYear = parseInt(saved);
+        setDashboardFiscalYear(savedYear);
+        setIsCustomFiscalYear(savedYear !== getCurrentFiscalYear());
+      } else {
+        const defaultYear = Math.max(2025, getCurrentFiscalYear());
+        setDashboardFiscalYear(defaultYear);
+        setIsCustomFiscalYear(false);
+      }
+    };
+
+    // Load initial value
+    loadFiscalYear();
+
+    // Listen for localStorage changes (when settings are updated)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'selectedFiscalYear') {
+        loadFiscalYear();
+      }
+    };
+
+    // Listen for custom events (for same-tab updates)
+    const handleCustomStorageChange = (e: CustomEvent) => {
+      if (e.detail.key === 'selectedFiscalYear') {
+        loadFiscalYear();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+    };
+  }, []);
 
   const router = useRouter();
 
@@ -57,7 +104,7 @@ export default function LocalClientsPage() {
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <TrendingUp className="h-4 w-4" /> },
     { id: "orders", label: "Orders", icon: <Package className="h-4 w-4" /> },
-    { id: "customers", label: "Customers", icon: <LayoutGrid className="h-4 w-4" /> },
+    { id: "customers", label: "Clients", icon: <LayoutGrid className="h-4 w-4" /> },
   ];
 
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
@@ -73,15 +120,60 @@ export default function LocalClientsPage() {
     fiscalYear: selectedFiscalYear,
   });
 
-  const stats = useQuery(api.clients.getStats, { type: "local" });
-  const orderStats = useQuery(api.orders.getStats, { clientType: "local" });
-  const clientSummary = useQuery(api.clients.getClientSummary, { type: "local" });
+  const stats = useQuery(api.clients.getStats, { 
+    type: "local",
+    fiscalYear: dashboardFiscalYear,
+  });
+  const orderStats = useQuery(api.orders.getStats, { 
+    clientType: "local",
+    fiscalYear: dashboardFiscalYear,
+  });
+  const clientSummary = useQuery(api.clients.getClientSummary, { 
+    type: "local",
+    fiscalYear: dashboardFiscalYear,
+  });
 
   // Filter orders
   const filteredOrders = orders?.filter(order => {
-    if (statusFilter && order.status !== statusFilter) return false;
-    if (customerFilter && order.client?.name !== customerFilter) return false;
+    // Search filter
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = (
+        (order.invoiceNumber || order.orderNumber).toLowerCase().includes(searchLower) ||
+        order.client?.name?.toLowerCase().includes(searchLower) ||
+        order.client?.city?.toLowerCase().includes(searchLower) ||
+        order.client?.country?.toLowerCase().includes(searchLower) ||
+        order.status.toLowerCase().includes(searchLower) ||
+        order.currency.toLowerCase().includes(searchLower)
+      );
+      if (!matchesSearch) return false;
+    }
+    
     return true;
+  });
+
+  // Sort filtered orders by status priority
+  const statusPriority = {
+    pending: 1,
+    in_production: 2,
+    shipped: 3,
+    delivered: 4,
+    cancelled: 5
+  };
+
+  const sortedOrders = filteredOrders?.sort((a, b) => {
+    // First sort by fiscal year (descending - latest year first)
+    if (a.fiscalYear !== b.fiscalYear) {
+      return (b.fiscalYear || 0) - (a.fiscalYear || 0);
+    }
+    // Then sort by status priority (pending first, then in_production, shipped, delivered, cancelled)
+    const statusA = statusPriority[a.status as keyof typeof statusPriority] || 6;
+    const statusB = statusPriority[b.status as keyof typeof statusPriority] || 6;
+    if (statusA !== statusB) {
+      return statusA - statusB;
+    }
+    // Finally sort by creation date (descending - latest first)
+    return b.createdAt - a.createdAt;
   });
 
   // Get unique values for filters
@@ -132,21 +224,14 @@ export default function LocalClientsPage() {
   return (
     <div>
       {/* Header */}
-              <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Local Clients</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Manage your domestic client relationships
-            </p>
-          </div>
-        <button
-          onClick={() => setIsAddCustomerOpen(true)}
-          className="btn-primary flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Customer
-        </button>
-              </div>
+      <div className="mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Local Clients</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Manage your domestic client relationships
+          </p>
+        </div>
+      </div>
 
         {/* Tab Navigation */}
         <TabNavigation
@@ -159,16 +244,102 @@ export default function LocalClientsPage() {
       {/* Dashboard Tab */}
       {activeTab === "dashboard" && (
         <div className="space-y-8">
+          {/* Overview Summary */}
+          <div className="card p-8">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-bold text-gray-900">Overview</h2>
+              <div className={`text-sm px-3 py-1 rounded-full ${
+                isCustomFiscalYear 
+                  ? 'text-purple-700 bg-purple-100 border border-purple-200' 
+                  : 'text-gray-500 bg-gray-100'
+              }`}>
+                {formatFiscalYear(dashboardFiscalYear)} Fiscal Year
+                {isCustomFiscalYear && (
+                  <span className="ml-1 text-xs">(Custom)</span>
+                )}
+              </div>
+            </div>
+            
+            {/* Overview Metrics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Total Quantity */}
+              <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-indigo-200 rounded-lg">
+                    <Package className="h-6 w-6 text-indigo-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-indigo-600 font-medium uppercase tracking-wide">Volume</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-indigo-700 mb-1">Total Quantity</p>
+                  <p className="text-2xl font-bold text-indigo-900">
+                    {orderStats ? `${(orderStats.totalQuantity || 0).toLocaleString()} kg` : <Skeleton width={100} height={32} />}
+                  </p>
+                  <p className="text-xs text-indigo-600 mt-1">Local production volume</p>
+                </div>
+              </div>
+
+              {/* Orders Count */}
+              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 border border-emerald-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-emerald-200 rounded-lg">
+                    <Users className="h-6 w-6 text-emerald-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide">Orders</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-emerald-700 mb-1">Total Orders</p>
+                  <p className="text-2xl font-bold text-emerald-900">
+                    {stats ? `${stats.totalOrders || 0}` : <Skeleton width={100} height={32} />}
+                  </p>
+                  <p className="text-xs text-emerald-600 mt-1">Local orders</p>
+                </div>
+              </div>
+
+              {/* Active Orders */}
+              <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-amber-200 rounded-lg">
+                    <CheckCircle className="h-6 w-6 text-amber-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Active</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-amber-700 mb-1">Active Orders</p>
+                  <p className="text-2xl font-bold text-amber-900">
+                    {stats ? `${stats.activeOrders || 0}` : <Skeleton width={100} height={32} />}
+                  </p>
+                  <p className="text-xs text-amber-600 mt-1">Currently processing</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Financial Performance Summary */}
           <div className="card p-8">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">Local Client Financial Performance</h2>
-              <div className="text-sm text-gray-500 bg-blue-100 px-3 py-1 rounded-full">PKR Currency</div>
+              <h2 className="text-2xl font-bold text-gray-900">Financial Performance</h2>
+              <div className={`text-sm px-3 py-1 rounded-full ${
+                isCustomFiscalYear 
+                  ? 'text-purple-700 bg-purple-100 border border-purple-200' 
+                  : 'text-gray-500 bg-gray-100'
+              }`}>
+                {formatFiscalYear(dashboardFiscalYear)} Fiscal Year
+                {isCustomFiscalYear && (
+                  <span className="ml-1 text-xs">(Custom)</span>
+                )}
+              </div>
             </div>
             
             {/* Key Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Order Value */}
+              {/* Total Order Value */}
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-blue-200 rounded-lg">
@@ -179,11 +350,11 @@ export default function LocalClientsPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-blue-700 mb-1">Order Value</p>
+                  <p className="text-sm font-medium text-blue-700 mb-1">Total Order Value</p>
                   <p className="text-2xl font-bold text-blue-900">
-                    {formatCurrency(stats?.totalOrderValue || 0)}
+                    {stats ? formatCurrency(stats.totalOrderValue || 0) : <Skeleton width={100} height={32} />}
                   </p>
-                  <p className="text-xs text-blue-600 mt-1">All local orders</p>
+                  <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
                 </div>
               </div>
 
@@ -198,9 +369,9 @@ export default function LocalClientsPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-green-700 mb-1">Revenue</p>
+                  <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
                   <p className="text-2xl font-bold text-green-900">
-                    {formatCurrency(stats?.totalRevenue || 0)}
+                    {stats ? formatCurrency(stats.totalRevenue || 0) : <Skeleton width={100} height={32} />}
                   </p>
                   <p className="text-xs text-green-600 mt-1">Local payments received</p>
                 </div>
@@ -219,7 +390,7 @@ export default function LocalClientsPage() {
                 <div>
                   <p className="text-sm font-medium text-purple-700 mb-1">Advance Payments</p>
                   <p className="text-2xl font-bold text-purple-900">
-                    {formatCurrency(stats?.advancePayments || 0)}
+                    {stats ? formatCurrency(stats.advancePayments || 0) : <Skeleton width={100} height={32} />}
                   </p>
                   <p className="text-xs text-purple-600 mt-1">Pre-shipment payments</p>
                 </div>
@@ -238,7 +409,7 @@ export default function LocalClientsPage() {
                 <div>
                   <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
                   <p className="text-2xl font-bold text-red-900">
-                    {formatCurrency(stats?.outstandingAmount || 0)}
+                    {stats ? formatCurrency(stats.outstandingAmount || 0) : <Skeleton width={100} height={32} />}
                   </p>
                   <p className="text-xs text-red-600 mt-1">Shipped awaiting payment</p>
                 </div>
@@ -246,84 +417,26 @@ export default function LocalClientsPage() {
             </div>
           </div>
 
-          {/* Business Insights */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Client & Order Overview */}
-            <div className="card p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Client Overview</h3>
-                <Users className="h-5 w-5 text-gray-400" />
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <span className="text-sm font-medium text-blue-700">Total Clients</span>
-                  <span className="text-lg font-bold text-blue-600">{stats?.totalClients || 0}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Active Orders</span>
-                  <span className="text-lg font-bold text-gray-900">{stats?.activeOrders || 0}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Total Orders</span>
-                  <span className="text-lg font-bold text-gray-900">{stats?.totalOrders || 0}</span>
-                </div>
-              </div>
-            </div>
 
-            {/* Product Volume */}
-            <div className="card p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Production Volume</h3>
-                <Package className="h-5 w-5 text-gray-400" />
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg">
-                  <span className="text-sm font-medium text-indigo-700">Total Quantity</span>
-                  <span className="text-lg font-bold text-indigo-600">{(orderStats?.totalQuantity || 0).toLocaleString()} kg</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <span className="text-sm font-medium text-gray-700">Avg Order Size</span>
-                  <span className="text-lg font-bold text-gray-900">
-                    {stats?.totalOrders ? Math.round((orderStats?.totalQuantity || 0) / stats.totalOrders).toLocaleString() : 0} kg
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Order Status Distribution */}
-            {orderStats && (
-              <div className="card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900">Order Status</h3>
-                  <CheckCircle className="h-5 w-5 text-gray-400" />
-                </div>
-                <div className="space-y-3">
-                  {Object.entries(orderStats.statusCounts).map(([status, count]) => (
-                    <div key={status} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center">
-                        <div className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(status)} mr-3`}>
-                          {status.replace("_", " ")}
-                        </div>
-                      </div>
-                      <span className="text-lg font-bold text-gray-900">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
 
 
           {/* Client Summary Table */}
           <div className="card overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Client Summary
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Outstanding amounts and total quantities by client
-              </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Client Summary
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Outstanding amounts and total quantities by client
+                  </p>
+                </div>
+                <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                  {formatFiscalYear(dashboardFiscalYear)} Fiscal Year
+                </div>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full table-fixed divide-y divide-gray-200">
@@ -363,9 +476,11 @@ export default function LocalClientsPage() {
                     <tr>
                       <td colSpan={3} className="px-6 py-12 text-center">
                         <Building2 className="mx-auto h-12 w-12 text-gray-400" />
-                        <h3 className="mt-2 text-sm font-medium text-gray-900">No clients found</h3>
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">
+                          No clients with data for {dashboardFiscalYear}
+                        </h3>
                         <p className="mt-1 text-sm text-gray-500">
-                          Start by adding your first local client.
+                          Start by adding your first local client or check if there are orders for this fiscal year.
                         </p>
                       </td>
                     </tr>
@@ -417,161 +532,223 @@ export default function LocalClientsPage() {
 
       {/* Orders Tab */}
       {activeTab === "orders" && (
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Local Orders</h2>
+              <p className="text-gray-600 mt-1">
+                Manage and track all local customer orders
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => setIsCreateOrderOpen(true)}
+                className="btn-primary flex items-center"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Order
+              </button>
+            </div>
+          </div>
+
           {/* Filters */}
-          <div className="card p-4">
-            <div className="flex flex-wrap gap-3">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Processing Status
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                >
-                  <option value="">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_production">In Production</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+          <div className="card p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Universal Search */}
+              <div className="flex flex-col">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search orders, invoices, clients..."
+                    className="pl-10 pr-3 py-2 w-full h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
               </div>
 
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer
-                </label>
-                <select
-                  value={customerFilter}
-                  onChange={(e) => setCustomerFilter(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                >
-                  <option value="">All Customers</option>
-                  {uniqueCustomers.map(customer => (
-                    <option key={customer} value={customer}>
-                      {customer}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fiscal Year
-                </label>
+              {/* Fiscal Year Filter */}
+              <div className="flex flex-col">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fiscal Year</label>
                 <select
                   value={selectedFiscalYear || ""}
                   onChange={(e) => setSelectedFiscalYear(e.target.value ? Number(e.target.value) : undefined)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                 >
-                  <option value="">All Fiscal Years</option>
+                  <option value="">All Years</option>
                   {getFiscalYearOptions().map(option => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
                 </select>
               </div>
-
             </div>
           </div>
 
           {/* Orders Table */}
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full table-fixed divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Invoice Number
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Client
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-                      Total Amount
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      AMOUNT
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Quantity
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Delivery Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[13%]">
-                      Created
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[7%]">
-                      Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredOrders?.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
-                        <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                        <p className="text-gray-500">No orders found</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredOrders?.map((order) => (
-                      <tr
-                        key={order._id}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
-                        onClick={() => setSelectedOrderId(order._id)}
-                      >
-                        <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                          <div className="truncate" title={order.invoiceNumber || order.orderNumber}>
-                            {order.invoiceNumber || order.orderNumber}
-                          </div>
-                          {order.invoiceNumber && (
-                            <div className="text-xs text-gray-500 truncate">
-                              Order: {order.orderNumber}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 max-w-0">
-                          <div className="w-full">
-                            <div className="text-sm font-medium text-gray-900 truncate" title={order.client?.name}>
-                              {order.client?.name}
-                            </div>
-                            <div className="text-sm text-gray-500 truncate" title={`${order.client?.city}, ${order.client?.country}`}>
-                              {order.client?.city}, {order.client?.country}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                            {order.status.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(order.totalAmount)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900">
-                          <div className="truncate" title={order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}>
-                            {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-900">
-                          <div className="truncate" title={formatDate(order.createdAt)}>
-                            {formatDate(order.createdAt)}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 text-sm font-medium">
-                          <div className="flex items-center justify-center">
-                            <div className="text-primary p-1 rounded">
-                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </div>
-                          </div>
-                        </td>
+                  {!orders ? (
+                    // Loading state
+                    Array.from({ length: 5 }).map((_, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-4"><Skeleton /></td>
+                        <td className="px-4 py-4"><Skeleton /></td>
+                        <td className="px-4 py-4"><Skeleton /></td>
+                        <td className="px-4 py-4"><Skeleton /></td>
+                        <td className="px-4 py-4"><Skeleton /></td>
+                        <td className="px-4 py-4"><Skeleton /></td>
                       </tr>
                     ))
+                  ) : (sortedOrders && sortedOrders.length > 0) ? (
+                    sortedOrders.map((order) => {
+                      // Calculate financial metrics for local orders
+                      const calculateFinancialMetrics = (order: any) => {
+                        if (!order.invoice) {
+                          return {
+                            total: order.totalAmount,
+                            paid: 0,
+                            advancePaid: 0,
+                            invoicePaid: 0,
+                            outstanding: order.totalAmount
+                          };
+                        }
+
+                        const payments = order.payments || [];
+                        const advancePaid = payments
+                          .filter((p: any) => p.type === "advance")
+                          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+                        
+                        const invoicePaid = payments
+                          .filter((p: any) => p.type !== "advance")
+                          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+                        
+                        const totalPaid = advancePaid + invoicePaid;
+                        
+                        // Outstanding balance should only be calculated for shipped/delivered orders
+                        const outstanding = (order.status === "shipped" || order.status === "delivered") 
+                          ? Math.max(0, order.invoice.amount - totalPaid)
+                          : 0;
+                        
+                        return {
+                          total: order.invoice.amount,
+                          paid: totalPaid,
+                          advancePaid: advancePaid,
+                          invoicePaid: invoicePaid,
+                          outstanding: outstanding
+                        };
+                      };
+
+                      const metrics = calculateFinancialMetrics(order);
+                      return (
+                        <tr 
+                          key={order._id} 
+                          className="hover:bg-gray-50 cursor-pointer transition-colors"
+                          onClick={() => setSelectedOrderId(order._id)}
+                        >
+                          <td className="px-4 py-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {order.invoiceNumber || order.orderNumber}
+                            </div>
+                            {order.invoiceNumber && (
+                              <div className="text-xs text-gray-500">
+                                Order: {order.orderNumber}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="text-sm text-gray-900">{order.client?.name || "Unknown Client"}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                              <span className="ml-1 capitalize">
+                                {order.status.replace("_", " ")}
+                              </span>
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <div className="space-y-1">
+                              <div className="text-sm font-medium text-gray-900">
+                                {formatCurrency(metrics.total)}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                Paid: {formatCurrency(metrics.paid)}
+                                {metrics.advancePaid > 0 && (
+                                  <span className="text-blue-600">
+                                    {" "}({formatCurrency(metrics.advancePaid)} advance)
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`text-xs font-medium ${metrics.outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                                Outstanding: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding) : 
+                                             order.status === "shipped" || order.status === "delivered" ? formatCurrency(0) : 
+                                             "Not due"}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            <div className="text-sm font-medium text-gray-900">
+                              {order.items?.reduce((total, item) => total + (item.quantityKg || 0), 0).toLocaleString()} kg
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900">
+                            <div className="truncate" title={order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}>
+                              {order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    // Empty state when no orders match filters
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center">
+                        <Package className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No local orders found</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          {searchQuery || selectedFiscalYear 
+                            ? "Try adjusting your filters"
+                            : "Get started by creating a new order."}
+                        </p>
+                        {(!searchQuery && !selectedFiscalYear) && (
+                          <div className="mt-6">
+                            <button
+                              onClick={() => setIsCreateOrderOpen(true)}
+                              className="btn-primary flex items-center mx-auto"
+                            >
+                              <Plus className="h-5 w-5 mr-2" />
+                              Create Order
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -583,6 +760,21 @@ export default function LocalClientsPage() {
       {/* Customers Tab */}
       {activeTab === "customers" && (
         <div className="space-y-4">
+          {/* Header with Add Customer Button */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900">Customers</h2>
+              <p className="text-sm text-gray-600 mt-1">Manage your local customers</p>
+            </div>
+            <button
+              onClick={() => setIsAddCustomerOpen(true)}
+              className="btn-primary flex items-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Customer
+            </button>
+          </div>
+
           {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -599,11 +791,33 @@ export default function LocalClientsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {clients?.map((client) => (
               <div key={client._id} className="card-hover p-6 flex flex-col h-full">
-                {/* Header with icon, name and status */}
+                {/* Header with profile picture, name and status */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-start space-x-3 flex-1 min-w-0">
-                    <div className="flex-shrink-0 p-3 bg-primary/10 rounded-lg">
-                      <Building2 className="h-6 w-6 text-primary" />
+                    <div className="flex-shrink-0">
+                      {client.profilePictureId ? (
+                        <div className="relative">
+                          <img
+                            src={`/api/files/${client.profilePictureId}`}
+                            alt={client.name}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                            onError={(e) => {
+                              // Hide the image and show fallback
+                              const img = e.currentTarget;
+                              const fallback = img.nextElementSibling as HTMLElement;
+                              img.style.display = 'none';
+                              if (fallback) fallback.classList.remove('hidden');
+                            }}
+                          />
+                          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center hidden">
+                            <Building2 className="h-6 w-6 text-primary" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Building2 className="h-6 w-6 text-primary" />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold text-gray-900 truncate">

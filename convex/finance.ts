@@ -11,7 +11,6 @@ export const getDashboardStats = query({
     numberOfOrders: v.number(),
     activeOrders: v.number(),
     totalQuantityKg: v.number(),
-    averageOrderAmount: v.number(),
     totalRevenue: v.number(),
     totalPaid: v.number(),
     totalOutstanding: v.number(),
@@ -25,9 +24,15 @@ export const getDashboardStats = query({
     totalPaidAED: v.number(),
     totalOutstandingUSD: v.number(),
     totalOutstandingPKR: v.number(),
+    totalOutstandingEUR: v.number(),
+    totalOutstandingAED: v.number(),
     outstandingByCurrency: v.record(v.string(), v.number()),
     revenueByCurrency: v.record(v.string(), v.number()),
     paidByCurrency: v.record(v.string(), v.number()),
+    advancePaymentsUSD: v.number(),
+    advancePaymentsPKR: v.number(),
+    advancePaymentsEUR: v.number(),
+    advancePaymentsAED: v.number(),
     overdueInvoices: v.number(),
     totalPaymentsReceived: v.number(),
     averagePaymentAmount: v.number(),
@@ -65,10 +70,6 @@ export const getDashboardStats = query({
     const activeYearOrders = yearOrders.filter(o => o.status !== "cancelled");
     const totalRevenue = activeYearOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
-    // Calculate average order amount
-    const averageOrderAmount = activeYearOrders.length > 0 
-      ? totalRevenue / activeYearOrders.length 
-      : 0;
 
     // Get invoices for payment statistics
     const invoices = await ctx.db.query("invoices").collect();
@@ -107,6 +108,7 @@ export const getDashboardStats = query({
     // Calculate revenue by currency using payments
     const revenueByCurrency: Record<string, number> = {};
     const paidByCurrency: Record<string, number> = {};
+    const advancePaymentsByCurrency: Record<string, number> = {};
     
     yearPayments.forEach(payment => {
       const currency = payment.currency;
@@ -115,6 +117,11 @@ export const getDashboardStats = query({
       // Add to revenue totals
       revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + amount;
       paidByCurrency[currency] = (paidByCurrency[currency] || 0) + amount;
+      
+      // Track advance payments separately
+      if (payment.type === "advance") {
+        advancePaymentsByCurrency[currency] = (advancePaymentsByCurrency[currency] || 0) + amount;
+      }
     });
     
     // For backward compatibility, extract individual currency totals
@@ -128,6 +135,12 @@ export const getDashboardStats = query({
     const totalPaidEUR = paidByCurrency["EUR"] || 0;
     const totalPaidAED = paidByCurrency["AED"] || 0;
     
+    // Extract advance payment totals
+    const advancePaymentsUSD = advancePaymentsByCurrency["USD"] || 0;
+    const advancePaymentsPKR = advancePaymentsByCurrency["PKR"] || 0;
+    const advancePaymentsEUR = advancePaymentsByCurrency["EUR"] || 0;
+    const advancePaymentsAED = advancePaymentsByCurrency["AED"] || 0;
+    
     // Calculate outstanding by currency (only for shipped/delivered orders)
     const outstandingByCurrency: Record<string, number> = {};
     shippedOrDeliveredInvoices.forEach(invoice => {
@@ -137,9 +150,11 @@ export const getDashboardStats = query({
       }
     });
 
-    // For backward compatibility, also calculate USD and PKR totals
+    // For backward compatibility, also calculate individual currency totals
     const totalOutstandingUSD = outstandingByCurrency["USD"] || 0;
     const totalOutstandingPKR = outstandingByCurrency["PKR"] || 0;
+    const totalOutstandingEUR = outstandingByCurrency["EUR"] || 0;
+    const totalOutstandingAED = outstandingByCurrency["AED"] || 0;
 
     // No due/overdue concept in this system
     const overdueInvoices: any[] = [];
@@ -157,7 +172,6 @@ export const getDashboardStats = query({
         ["pending", "confirmed", "in_production", "shipped"].includes(o.status)
       ).length,
       totalQuantityKg: Math.round(totalQuantity),
-      averageOrderAmount,
       totalRevenue,
       totalPaid,
       totalOutstanding,
@@ -171,9 +185,15 @@ export const getDashboardStats = query({
       totalPaidAED,
       totalOutstandingUSD,
       totalOutstandingPKR,
+      totalOutstandingEUR,
+      totalOutstandingAED,
       outstandingByCurrency,
       revenueByCurrency,
       paidByCurrency,
+      advancePaymentsUSD,
+      advancePaymentsPKR,
+      advancePaymentsEUR,
+      advancePaymentsAED,
       overdueInvoices: overdueInvoices.length,
       // Payment statistics
       totalPaymentsReceived,
@@ -310,10 +330,18 @@ export const getInvoiceStats = query({
     totalCount: v.number(),
     totalOutstandingUSD: v.number(),
     totalOutstandingPKR: v.number(),
+    totalOutstandingEUR: v.number(),
+    totalOutstandingAED: v.number(),
     totalPaidUSD: v.number(),
     totalPaidPKR: v.number(),
+    totalPaidEUR: v.number(),
+    totalPaidAED: v.number(),
     outstandingByCurrency: v.record(v.string(), v.number()),
     paidByCurrency: v.record(v.string(), v.number()),
+    advancePaymentsUSD: v.number(),
+    advancePaymentsPKR: v.number(),
+    advancePaymentsEUR: v.number(),
+    advancePaymentsAED: v.number(),
   }),
   handler: async (ctx, args) => {
     let invoices = await ctx.db.query("invoices").collect();
@@ -328,9 +356,15 @@ export const getInvoiceStats = query({
       });
     }
 
-    // Calculate outstanding by currency
+    // Calculate outstanding by currency (only for shipped/delivered orders)
+    const allOrders = await ctx.db.query("orders").collect();
+    const shippedOrDeliveredInvoices = invoices.filter(invoice => {
+      const order = allOrders.find(o => o._id === invoice.orderId);
+      return order && (order.status === "shipped" || order.status === "delivered");
+    });
+
     const outstandingByCurrency: Record<string, number> = {};
-    invoices.forEach(invoice => {
+    shippedOrDeliveredInvoices.forEach(invoice => {
       const currency = invoice.currency;
       if (invoice.outstandingBalance > 0) {
         outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + invoice.outstandingBalance;
@@ -356,10 +390,41 @@ export const getInvoiceStats = query({
       })
       .reduce((sum, p) => sum + p.amount, 0);
 
-    const totalOutstanding = invoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    // Calculate advance payments by currency
+    const advancePaymentsUSD = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return p.type === "advance" && client?.type === "international" && p.convertedAmountUSD;
+      })
+      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
+    
+    const advancePaymentsPKR = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return p.type === "advance" && client?.type === "local";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const advancePaymentsEUR = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return p.type === "advance" && client?.type === "international" && p.currency === "EUR";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const advancePaymentsAED = payments
+      .filter(p => {
+        const client = clients.find(c => c._id === p.clientId);
+        return p.type === "advance" && client?.type === "international" && p.currency === "AED";
+      })
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const totalOutstanding = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
     const totalPaid = totalPaidUSD + totalPaidPKR; // Use converted amounts
-    const totalOutstandingUSD = invoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
-    const totalOutstandingPKR = invoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
+    const totalOutstandingUSD = shippedOrDeliveredInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
+    const totalOutstandingPKR = shippedOrDeliveredInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
+    const totalOutstandingEUR = shippedOrDeliveredInvoices.filter(i => i.currency === "EUR").reduce((s, i) => s + i.outstandingBalance, 0);
+    const totalOutstandingAED = shippedOrDeliveredInvoices.filter(i => i.currency === "AED").reduce((s, i) => s + i.outstandingBalance, 0);
     const overdueCount = 0;
     const totalCount = invoices.length;
 
@@ -379,10 +444,18 @@ export const getInvoiceStats = query({
       totalCount,
       totalOutstandingUSD,
       totalOutstandingPKR,
+      totalOutstandingEUR,
+      totalOutstandingAED,
       totalPaidUSD,
       totalPaidPKR,
+      totalPaidEUR: totalPaidUSD, // For now, use USD as EUR equivalent
+      totalPaidAED: totalPaidUSD, // For now, use USD as AED equivalent
       outstandingByCurrency,
       paidByCurrency,
+      advancePaymentsUSD,
+      advancePaymentsPKR,
+      advancePaymentsEUR,
+      advancePaymentsAED,
     };
   },
 });

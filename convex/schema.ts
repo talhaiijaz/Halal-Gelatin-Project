@@ -25,6 +25,8 @@ export default defineSchema({
     taxId: v.optional(v.string()),
     type: v.union(v.literal("local"), v.literal("international")),
     status: v.union(v.literal("active"), v.literal("inactive")),
+    // Profile picture
+    profilePictureId: v.optional(v.id("_storage")),
     // Historical outstanding balance from previous years (used in finance and payments flows)
     outstandingBalance: v.optional(v.number()),
     approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
@@ -53,6 +55,7 @@ export default defineSchema({
       v.literal("cancelled")
     ),
     expectedDeliveryDate: v.optional(v.number()),
+    deliveryDate: v.optional(v.number()), // Actual delivery date when order is delivered
     salesRepId: v.optional(v.id("users")),
     totalAmount: v.number(), // Calculated from order items
     freightCost: v.optional(v.number()), // Freight/shipping cost

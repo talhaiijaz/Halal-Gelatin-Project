@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { X, Search, Loader2 } from "lucide-react";
+import { X, Search, Loader2, Upload, User, Camera } from "lucide-react";
 
 interface AddCustomerModalProps {
   isOpen: boolean;
@@ -13,12 +13,16 @@ interface AddCustomerModalProps {
 
 export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerModalProps) {
   const createClient = useMutation(api.clients.create);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const getCitiesByCountry = useAction(api.cities.getCitiesByCountry);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [cities, setCities] = useState<string[]>([]);
   const [citySearchTerm, setCitySearchTerm] = useState("");
   const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: "",
     contactPerson: "",
@@ -58,14 +62,63 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
     "Zambia", "Zimbabwe"
   ];
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+      
+      setProfilePicture(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfilePicturePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeProfilePicture = () => {
+    setProfilePicture(null);
+    setProfilePicturePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      let profilePictureId = undefined;
+      
+      // Upload profile picture if provided
+      if (profilePicture) {
+        const uploadUrl = await generateUploadUrl();
+        const result = await fetch(uploadUrl, {
+          method: "POST",
+          headers: { "Content-Type": profilePicture.type },
+          body: profilePicture,
+        });
+        const { storageId } = await result.json();
+        profilePictureId = storageId;
+      }
+
       await createClient({
         ...formData,
         type,
         status: "active",
+        profilePictureId,
       });
       onClose();
       // Reset form
@@ -81,6 +134,11 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
       });
       setCitySearchTerm("");
       setShowCityDropdown(false);
+      setProfilePicture(null);
+      setProfilePicturePreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
 
     } catch (error) {
       console.error("Failed to create client:", error);
@@ -212,6 +270,60 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
                   placeholder="Enter company name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 />
+              </div>
+
+              {/* Profile Picture Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Profile Picture
+                </label>
+                <div className="flex items-center space-x-4">
+                  {/* Profile Picture Preview */}
+                  <div className="relative">
+                    {profilePicturePreview ? (
+                      <div className="relative">
+                        <img
+                          src={profilePicturePreview}
+                          alt="Profile preview"
+                          className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeProfilePicture}
+                          className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 rounded-full bg-gray-100 border-2 border-gray-200 flex items-center justify-center">
+                        <User className="h-8 w-8 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload Button */}
+                  <div className="flex-1">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="profile-picture-upload"
+                    />
+                    <label
+                      htmlFor="profile-picture-upload"
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      {profilePicture ? 'Change Picture' : 'Upload Picture'}
+                    </label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      JPG, PNG or GIF (max 5MB)
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div>

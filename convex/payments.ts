@@ -132,6 +132,12 @@ export const recordPayment = mutation({
         // No conversion needed for same currency or USD payments
         convertedAmountUSD = args.amount;
       }
+      
+      // Ensure conversion rate is always set for international clients
+      if (clientOfInvoice?.type === "international" && !conversionRateToUSD) {
+        conversionRateToUSD = 1.0; // Default to 1:1 if not provided
+        convertedAmountUSD = args.amount;
+      }
 
       // Create payment record (respect requested type; default to 'invoice')
       const paymentId = await ctx.db.insert("payments", {

@@ -16,6 +16,22 @@ async function logOrderEvent(ctx: any, params: { entityId: string; action: "crea
 }
 import { v } from "convex/values";
 
+// Fiscal year validation helper functions
+const getFiscalYearRange = (fiscalYear: number) => {
+  const startDate = new Date(fiscalYear, 6, 1).getTime(); // July 1
+  const endDate = new Date(fiscalYear + 1, 5, 30, 23, 59, 59, 999).getTime(); // June 30
+  
+  return {
+    startDate,
+    endDate,
+    fiscalYear,
+  };
+};
+
+const isDateInFiscalYear = (date: number, fiscalYear: number): boolean => {
+  const range = getFiscalYearRange(fiscalYear);
+  return date >= range.startDate && date <= range.endDate;
+};
 
 // Generate order number with sequential format using fiscal year
 const generateOrderNumber = async (ctx: any, selectedFiscalYear?: number) => {
@@ -88,13 +104,27 @@ export const list = query({
       orders = orders.filter(o => o.fiscalYear === args.fiscalYear);
     }
 
-    // Sort orders: first by fiscal year (descending), then by creation date (descending)
+    // Sort orders: first by fiscal year (descending - latest year first), then by status priority, then by creation date (descending)
+    const statusPriority = {
+      pending: 1,
+      in_production: 2,
+      shipped: 3,
+      delivered: 4,
+      cancelled: 5
+    };
+    
     orders.sort((a, b) => {
       // First sort by fiscal year (descending - latest year first)
       if (a.fiscalYear !== b.fiscalYear) {
         return (b.fiscalYear || 0) - (a.fiscalYear || 0);
       }
-      // Then sort by creation date (descending - latest first)
+      // Then sort by status priority (pending first, then in_production, shipped, delivered, cancelled)
+      const statusA = statusPriority[a.status as keyof typeof statusPriority] || 6;
+      const statusB = statusPriority[b.status as keyof typeof statusPriority] || 6;
+      if (statusA !== statusB) {
+        return statusA - statusB;
+      }
+      // Finally sort by creation date (descending - latest first)
       return b.createdAt - a.createdAt;
     });
 
@@ -113,6 +143,15 @@ export const list = query({
           .withIndex("by_order", (q) => q.eq("orderId", order._id))
           .first();
 
+        // Get payments for financial calculations
+        let payments: any[] = [];
+        if (invoice) {
+          payments = await ctx.db
+            .query("payments")
+            .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
+            .collect();
+        }
+
         return {
           ...order,
           client: client ? {
@@ -127,9 +166,11 @@ export const list = query({
             _id: invoice._id,
             invoiceNumber: order.invoiceNumber, // Use the invoice number from the order
             status: invoice.status,
+            amount: invoice.amount,
             totalPaid: invoice.totalPaid,
             outstandingBalance: invoice.outstandingBalance,
           } : null,
+          payments,
         };
       })
     );
@@ -207,6 +248,7 @@ export const create = mutation({
     factoryDepartureDate: v.optional(v.number()),
     estimatedDepartureDate: v.optional(v.number()),
     estimatedArrivalDate: v.optional(v.number()),
+    deliveryDate: v.optional(v.number()), // Actual delivery date
     timelineNotes: v.optional(v.string()),
     // Shipment information
     shipmentMethod: v.optional(v.union(v.literal("air"), v.literal("sea"), v.literal("road"), v.literal("train"))),
@@ -242,6 +284,16 @@ export const create = mutation({
       throw new Error(`Invoice number ${args.invoiceNumber} already exists. Please use a unique invoice number.`);
     }
 
+    // Validate order creation date against fiscal year
+    if (args.orderCreationDate && args.fiscalYear) {
+      if (!isDateInFiscalYear(args.orderCreationDate, args.fiscalYear)) {
+        const range = getFiscalYearRange(args.fiscalYear);
+        const startDate = new Date(range.startDate).toLocaleDateString();
+        const endDate = new Date(range.endDate).toLocaleDateString();
+        throw new Error(`Order creation date must be within fiscal year ${args.fiscalYear}-${(args.fiscalYear + 1).toString().slice(-2)} (${startDate} - ${endDate})`);
+      }
+    }
+
     // Calculate total using inclusive total (with GST) plus freight cost
     const itemsTotal = args.items.reduce(
       (sum, item) => sum + (item.inclusiveTotal || (item.quantityKg * item.unitPrice)),
@@ -264,6 +316,18 @@ export const create = mutation({
 
     // Create order
     const orderNumber = await generateOrderNumber(ctx, args.fiscalYear);
+    
+    // Ensure fiscal year is properly set
+    let fiscalYearToUse = args.fiscalYear;
+    if (!fiscalYearToUse) {
+      // Calculate fiscal year from order creation date or current date
+      const orderDate = args.orderCreationDate || Date.now();
+      const date = new Date(orderDate);
+      const year = date.getFullYear();
+      const month = date.getMonth(); // 0-11
+      fiscalYearToUse = month >= 6 ? year : year - 1; // July = 6
+    }
+    
     const orderId = await ctx.db.insert("orders", {
       orderNumber,
       invoiceNumber: args.invoiceNumber,
@@ -274,6 +338,7 @@ export const create = mutation({
       factoryDepartureDate: args.factoryDepartureDate,
       estimatedDepartureDate: args.estimatedDepartureDate,
       estimatedArrivalDate: args.estimatedArrivalDate,
+      deliveryDate: args.deliveryDate,
       timelineNotes: args.timelineNotes,
       // Shipment information
       shipmentMethod: args.shipmentMethod,
@@ -284,7 +349,7 @@ export const create = mutation({
       freightCost: args.freightCost,
       currency: currencyToUse,
       notes: args.notes,
-      fiscalYear: args.fiscalYear, // Store the selected fiscal year
+      fiscalYear: fiscalYearToUse, // Store the calculated fiscal year
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -334,14 +399,8 @@ export const create = mutation({
     const issueDate = Date.now();
     const dueDate = issueDate + (30 * 24 * 60 * 60 * 1000); // 30 days from issue
 
-    // Generate invoice number if not provided
-    let invoiceNumber = args.invoiceNumber;
-    if (!invoiceNumber) {
-      // Simple sequential numbering for auto-generated invoice numbers
-      const allInvoices = await ctx.db.query("invoices").collect();
-      const nextNumber = allInvoices.length + 1;
-      invoiceNumber = `INV-${nextNumber.toString().padStart(3, '0')}`;
-    }
+    // Use the provided invoice number (required field)
+    const invoiceNumber = args.invoiceNumber;
 
     const invoiceId = await ctx.db.insert("invoices", {
       invoiceNumber: invoiceNumber,
@@ -353,7 +412,7 @@ export const create = mutation({
       amount: totalAmount,
       currency: currencyToUse,
       totalPaid: 0,
-      outstandingBalance: totalAmount,
+      outstandingBalance: 0, // New orders don't have outstanding amounts until shipped
       notes: `Invoice for Order ${orderNumber}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -435,15 +494,33 @@ export const updateStatus = mutation({
       v.literal("delivered"),
       v.literal("cancelled")
     ),
+    deliveryDate: v.optional(v.number()), // Optional delivery date when changing to delivered
   },
   handler: async (ctx, args) => {
+    // Validate delivery date when changing status to delivered
+    if (args.status === "delivered") {
+      const order = await ctx.db.get(args.orderId);
+      if (!order) throw new Error("Order not found");
+      
+      // Check if delivery date is provided or already exists
+      if (!args.deliveryDate && !order.deliveryDate) {
+        throw new Error("Delivery date is required when changing order status to delivered. Please provide a delivery date.");
+      }
+    }
     
     
 
-    await ctx.db.patch(args.orderId, {
+    const updateData: any = {
       status: args.status,
       updatedAt: Date.now(),
-    });
+    };
+    
+    // Set delivery date if provided
+    if (args.deliveryDate) {
+      updateData.deliveryDate = args.deliveryDate;
+    }
+    
+    await ctx.db.patch(args.orderId, updateData);
     await logOrderEvent(ctx, { entityId: String(args.orderId), action: "update", message: `Order status updated to ${args.status}` });
 
     // If order moves to in_production, create invoice
@@ -458,15 +535,8 @@ export const updateStatus = mutation({
         .first();
 
       if (!existingInvoice) {
-        // Generate invoice number
-        const year = new Date().getFullYear();
-        const invoices = await ctx.db
-          .query("invoices")
-          .filter(q => q.gte(q.field("issueDate"), new Date(year, 0, 1).getTime()))
-          .collect();
-        
-        const nextNumber = invoices.length + 1;
-        const invoiceNumber = `INV-${year}-${nextNumber.toString().padStart(4, '0')}`;
+        // Use the order's invoice number for consistency
+        const invoiceNumber = order.invoiceNumber;
 
         // Create invoice
         await ctx.db.insert("invoices", {
@@ -479,14 +549,14 @@ export const updateStatus = mutation({
           amount: order.totalAmount,
           currency: order.currency,
           totalPaid: 0,
-          outstandingBalance: order.totalAmount,
+          outstandingBalance: 0, // New invoices don't have outstanding amounts until shipped
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
       }
     }
 
-    // If order is shipped, create/update delivery
+    // If order is shipped, create/update delivery and update outstanding balance
     if (args.status === "shipped") {
       const delivery = await ctx.db
         .query("deliveries")
@@ -500,9 +570,29 @@ export const updateStatus = mutation({
           updatedAt: Date.now(),
         });
       }
+
+      // Update invoice outstanding balance when order is shipped
+      const invoice = await ctx.db
+        .query("invoices")
+        .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
+        .first();
+
+      if (invoice) {
+        const newOutstandingBalance = invoice.amount - invoice.totalPaid;
+        let newStatus: "unpaid" | "partially_paid" | "paid";
+        if (newOutstandingBalance === 0) newStatus = "paid";
+        else if (invoice.totalPaid > 0) newStatus = "partially_paid";
+        else newStatus = "unpaid";
+        
+        await ctx.db.patch(invoice._id, {
+          outstandingBalance: newOutstandingBalance,
+          status: newStatus,
+          updatedAt: Date.now(),
+        });
+      }
     }
 
-    // If order is delivered, update delivery
+    // If order is delivered, update delivery and recalculate outstanding balance
     if (args.status === "delivered") {
       const delivery = await ctx.db
         .query("deliveries")
@@ -513,6 +603,26 @@ export const updateStatus = mutation({
         await ctx.db.patch(delivery._id, {
           status: "delivered",
           deliveredDate: Date.now(),
+          updatedAt: Date.now(),
+        });
+      }
+
+      // Update invoice outstanding balance when order is delivered
+      const invoice = await ctx.db
+        .query("invoices")
+        .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
+        .first();
+
+      if (invoice) {
+        const newOutstandingBalance = invoice.amount - invoice.totalPaid;
+        let newStatus: "unpaid" | "partially_paid" | "paid";
+        if (newOutstandingBalance === 0) newStatus = "paid";
+        else if (invoice.totalPaid > 0) newStatus = "partially_paid";
+        else newStatus = "unpaid";
+        
+        await ctx.db.patch(invoice._id, {
+          outstandingBalance: newOutstandingBalance,
+          status: newStatus,
           updatedAt: Date.now(),
         });
       }
@@ -582,21 +692,21 @@ export const addItems = mutation({
 
     if (invoice) {
       const newAmount = invoice.amount + additionalAmount;
+      const newOutstandingBalance = newAmount - invoice.totalPaid;
+      let newStatus: "unpaid" | "partially_paid" | "paid";
+      if (newOutstandingBalance === 0) newStatus = "paid";
+      else if (invoice.totalPaid > 0) newStatus = "partially_paid";
+      else newStatus = "unpaid";
+      
       await ctx.db.patch(invoice._id, {
         amount: newAmount,
-        outstandingBalance: newAmount - invoice.totalPaid,
+        outstandingBalance: newOutstandingBalance,
+        status: newStatus,
         updatedAt: Date.now(),
       });
     } else {
-      // Create invoice if it doesn't exist
-      const year = new Date().getFullYear();
-      const invoices = await ctx.db
-        .query("invoices")
-        .filter(q => q.gte(q.field("issueDate"), new Date(year, 0, 1).getTime()))
-        .collect();
-      
-      const nextNumber = invoices.length + 1;
-      const invoiceNumber = `INV-${year}-${nextNumber.toString().padStart(4, '0')}`;
+      // Create invoice if it doesn't exist using the order's invoice number
+      const invoiceNumber = order.invoiceNumber;
 
       await ctx.db.insert("invoices", {
         invoiceNumber: invoiceNumber,
@@ -608,7 +718,7 @@ export const addItems = mutation({
         amount: order.totalAmount + additionalAmount,
         currency: order.currency,
         totalPaid: 0,
-        outstandingBalance: order.totalAmount + additionalAmount,
+        outstandingBalance: 0, // New invoices don't have outstanding amounts until shipped
         notes: "",
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -879,6 +989,7 @@ export const updateTimeline = mutation({
     factoryDepartureDate: v.optional(v.number()),
     estimatedDepartureDate: v.optional(v.number()),
     estimatedArrivalDate: v.optional(v.number()),
+    deliveryDate: v.optional(v.number()), // Actual delivery date
     timelineNotes: v.optional(v.string()),
     // Shipment information
     shipmentMethod: v.optional(v.union(v.literal("air"), v.literal("sea"), v.literal("road"), v.literal("train"))),
@@ -910,6 +1021,7 @@ export const updateTimeline = mutation({
 export const getStats = query({
   args: {
     clientType: v.optional(v.union(v.literal("local"), v.literal("international"))),
+    fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     
@@ -925,6 +1037,11 @@ export const getStats = query({
         .collect();
       const clientIds = clients.map(c => c._id);
       orders = orders.filter(o => clientIds.includes(o.clientId));
+    }
+
+    // Filter by fiscal year if specified
+    if (args.fiscalYear) {
+      orders = orders.filter(order => order.fiscalYear === args.fiscalYear);
     }
 
     // Calculate statistics
@@ -964,7 +1081,6 @@ export const getStats = query({
       statusCounts,
       totalRevenue,
       totalQuantity,
-      averageOrderValue: orders.length > 0 ? totalRevenue / orders.length : 0,
     };
   },
 });
@@ -982,6 +1098,7 @@ export const update = mutation({
     factoryDepartureDate: v.optional(v.number()),
     estimatedDepartureDate: v.optional(v.number()),
     estimatedArrivalDate: v.optional(v.number()),
+    deliveryDate: v.optional(v.number()), // Actual delivery date
     timelineNotes: v.optional(v.string()),
     // Shipment information
     shipmentMethod: v.optional(v.union(v.literal("air"), v.literal("sea"), v.literal("road"), v.literal("train"))),
@@ -1090,9 +1207,20 @@ export const update = mutation({
         .first();
 
       if (invoice) {
+        const order = await ctx.db.get(orderId);
+        const newOutstandingBalance = order && (order.status === "shipped" || order.status === "delivered") 
+          ? (cleanUpdateData as any).totalAmount - invoice.totalPaid
+          : 0; // Only outstanding if order is shipped or delivered
+        
+        let newStatus: "unpaid" | "partially_paid" | "paid";
+        if (newOutstandingBalance === 0) newStatus = "paid";
+        else if (invoice.totalPaid > 0) newStatus = "partially_paid";
+        else newStatus = "unpaid";
+        
         await ctx.db.patch(invoice._id, {
           amount: (cleanUpdateData as any).totalAmount,
-          outstandingBalance: (cleanUpdateData as any).totalAmount - invoice.totalPaid,
+          outstandingBalance: newOutstandingBalance,
+          status: newStatus,
           updatedAt: Date.now(),
         });
       }

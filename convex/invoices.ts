@@ -71,7 +71,7 @@ export const createForOrder = mutation({
       amount: order.totalAmount,
       currency: order.currency,
       totalPaid: 0,
-      outstandingBalance: order.totalAmount,
+      outstandingBalance: 0, // New invoices don't have outstanding amounts until shipped
       notes: "",
       createdAt: Date.now(),
       updatedAt: Date.now(),

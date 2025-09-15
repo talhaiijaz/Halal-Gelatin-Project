@@ -42,9 +42,18 @@ export default function ClientDetailPage() {
   const updateClient = useMutation(api.clients.update);
 
   const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // Use appropriate locale based on currency
+    // For EUR, use custom formatting to ensure symbol appears before number
+    if (currency === 'EUR') {
+      return `€${new Intl.NumberFormat('en-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount)}`;
+    }
+    
+    // Use appropriate locale based on currency for other currencies
     const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 'en-US';
+                   currency === 'PKR' ? 'en-PK' : 
+                   currency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
@@ -304,7 +313,7 @@ export default function ClientDetailPage() {
                   </div>
                 ) : (
                   <div className="text-lg font-semibold text-gray-900 mt-1">
-                    {formatCurrency(client.outstandingAmount || 0, 'PKR')}
+                    {formatCurrency(client.outstandingAmount || 0, client.type === 'local' ? 'PKR' : 'USD')}
                   </div>
                 )}
               </div>

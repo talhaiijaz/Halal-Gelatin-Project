@@ -20,7 +20,7 @@ import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-import { getCurrentFiscalYear, getFiscalYearForDate } from "@/app/utils/fiscalYear";
+import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/app/utils/fiscalYear";
 
 export default function DashboardPage() {
   console.log("DashboardPage rendering...");
@@ -30,11 +30,52 @@ export default function DashboardPage() {
   const [clientType, setClientType] = useState<"local" | "international">("local");
   const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
 
+  // Get dashboard order limit from localStorage
+  const [dashboardOrderLimit, setDashboardOrderLimit] = useState<number>(5);
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState<number>(Math.max(2025, getCurrentFiscalYear()));
+  
   // Fetch real data from Convex
-  const dashboardStats = useQuery(api.dashboard.getStats);
-  const orders = useQuery(api.orders.list, {});
+  const dashboardStats = useQuery(api.dashboard.getStats, { fiscalYear: selectedFiscalYear });
+  const orders = useQuery(api.orders.list, { fiscalYear: selectedFiscalYear });
   const orderItems = useQuery(api.orders.listItems, {});
   const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
+  
+  // Fetch client-specific stats for accurate local/international breakdown
+  const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: selectedFiscalYear });
+  const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: selectedFiscalYear });
+  
+  useEffect(() => {
+    const saved = localStorage.getItem('dashboardOrderLimit');
+    if (saved) {
+      setDashboardOrderLimit(parseInt(saved));
+    }
+    
+    // Load fiscal year setting from localStorage
+    const savedFiscalYear = localStorage.getItem('selectedFiscalYear');
+    if (savedFiscalYear) {
+      setSelectedFiscalYear(parseInt(savedFiscalYear));
+    } else {
+      // Smart default: Use current fiscal year, but ensure it's at least 2025
+      const defaultYear = Math.max(2025, getCurrentFiscalYear());
+      setSelectedFiscalYear(defaultYear);
+    }
+
+    // Listen for fiscal year changes from settings
+    const handleStorageChange = (event: CustomEvent) => {
+      if (event.detail.key === 'selectedFiscalYear') {
+        setSelectedFiscalYear(event.detail.value);
+      }
+    };
+
+    window.addEventListener('localStorageChange', handleStorageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('localStorageChange', handleStorageChange as EventListener);
+    };
+  }, []);
+
+  // Fetch orders by status
+  const ordersData = useQuery(api.dashboard.getOrdersByStatus, { limit: dashboardOrderLimit, fiscalYear: selectedFiscalYear });
 
   // Load monthly limit from database or localStorage
   useEffect(() => {
@@ -76,19 +117,40 @@ export default function DashboardPage() {
       let totalQuantity = 0;
       
       orders.forEach(order => {
-        if (order.orderCreationDate) {
+        // Use stored fiscalYear field if available, otherwise calculate from orderCreationDate
+        let orderFiscalYear: number;
+        let orderFiscalMonth: string;
+        
+        if (order.fiscalYear !== undefined && order.fiscalYear !== null) {
+          orderFiscalYear = order.fiscalYear;
+          
+          // Calculate fiscal month from orderCreationDate
+          if (order.orderCreationDate) {
+            const orderDate = new Date(order.orderCreationDate);
+            const orderMonth = orderDate.getMonth();
+            const orderFiscalMonthIndex = orderMonth >= 6 ? orderMonth - 6 : orderMonth + 6;
+            orderFiscalMonth = fiscalMonths[orderFiscalMonthIndex];
+          } else {
+            // Skip this order if no orderCreationDate available
+            return;
+          }
+        } else if (order.orderCreationDate) {
+          // Fallback: calculate fiscal year from orderCreationDate if fiscalYear not stored
           const orderDate = new Date(order.orderCreationDate);
-          const orderFiscalYear = getFiscalYearForDate(orderDate);
+          orderFiscalYear = getFiscalYearForDate(orderDate);
           const orderMonth = orderDate.getMonth();
           const orderFiscalMonthIndex = orderMonth >= 6 ? orderMonth - 6 : orderMonth + 6;
-          const orderFiscalMonth = fiscalMonths[orderFiscalMonthIndex];
-          
-          if (orderFiscalYear === fiscalYear && orderFiscalMonth === fiscalMonth) {
-            const items = orderItems.filter(item => item.orderId === order._id);
-            items.forEach(item => {
-              totalQuantity += item.quantityKg;
-            });
-          }
+          orderFiscalMonth = fiscalMonths[orderFiscalMonthIndex];
+        } else {
+          // Skip this order if no fiscal year or creation date available
+          return;
+        }
+        
+        if (orderFiscalYear === fiscalYear && orderFiscalMonth === fiscalMonth) {
+          const items = orderItems.filter(item => item.orderId === order._id);
+          items.forEach(item => {
+            totalQuantity += item.quantityKg;
+          });
         }
       });
       
@@ -109,9 +171,18 @@ export default function DashboardPage() {
 
   // Format currency
   const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // Use appropriate locale based on currency
+    // For EUR, use custom formatting to ensure symbol appears before number
+    if (currency === 'EUR') {
+      return `€${new Intl.NumberFormat('en-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount)}`;
+    }
+    
+    // Use appropriate locale based on currency for other currencies
     const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 'en-US';
+                   currency === 'PKR' ? 'en-PK' : 
+                   currency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency,
@@ -120,8 +191,8 @@ export default function DashboardPage() {
     }).format(amount);
   };
 
-  // Create stats array with real data and improved financial metrics
-  const stats = dashboardStats ? [
+  // Create stats array with real data - simplified since we now have separate financial sections
+  const stats = dashboardStats && localStats && internationalStats ? [
     {
       name: "Total Clients",
       value: dashboardStats.totalClients.value.toString(),
@@ -135,71 +206,23 @@ export default function DashboardPage() {
       icon: Package,
       color: "text-green-600",
       bgColor: "bg-green-100",
-      subtitle: `Total Orders: ${dashboardStats.totalOrders?.value?.toString() || "0"}`,
+      subtitle: `Total Orders: ${(localStats.totalOrders + internationalStats.totalOrders).toString()}`,
     },
     {
-      name: "Order Value (USD)",
-      value: formatCurrency((dashboardStats as any).totalOrderValueUSD ?? 0, 'USD'),
-      icon: Package,
-      color: "text-gray-600",
-      bgColor: "bg-gray-100",
-      subtitle: "Total value of all orders",
-    },
-    {
-      name: "Order Value (PKR)",
-      value: formatCurrency((dashboardStats as any).totalOrderValuePKR ?? 0, 'PKR'),
-      icon: Package,
-      color: "text-gray-600",
-      bgColor: "bg-gray-100",
-      subtitle: "Total value of all orders",
-    },
-    {
-      name: "Revenue (USD)",
-      value: formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD'),
-      icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-      subtitle: "Total payments received",
-    },
-    {
-      name: "Revenue (PKR)",
-      value: formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR'),
-      icon: DollarSign,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-      subtitle: "Total payments received",
-    },
-    {
-      name: "Advance Payments (USD)",
-      value: formatCurrency((dashboardStats as any).advancePaymentsUSD ?? 0, 'USD'),
-      icon: TrendingUp,
+      name: "Local Clients",
+      value: dashboardStats.localClients.toString(),
+      icon: Users,
       color: "text-blue-600",
       bgColor: "bg-blue-100",
-      subtitle: "Pre-shipment payments",
+      subtitle: `Active Orders: ${localStats.activeOrders}`,
     },
     {
-      name: "Advance Payments (PKR)",
-      value: formatCurrency((dashboardStats as any).advancePaymentsPKR ?? 0, 'PKR'),
-      icon: TrendingUp,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-      subtitle: "Pre-shipment payments",
-    },
-    {
-      name: "Outstanding (USD)",
-      value: formatCurrency((dashboardStats as any).outstandingUSD ?? 0, 'USD'),
-      icon: AlertCircle,
-      color: "text-red-600",
-      bgColor: "bg-red-100",
-      subtitle: "Shipped orders awaiting payment",
-    },
-    {
-      name: "Outstanding (PKR)",
-      value: formatCurrency((dashboardStats as any).outstandingPKR ?? 0, 'PKR'),
-      icon: AlertCircle,
-      color: "text-red-600",
-      bgColor: "bg-red-100",
-      subtitle: "Shipped orders awaiting payment",
+      name: "International Clients",
+      value: dashboardStats.internationalClients.toString(),
+      icon: Users,
+      color: "text-green-600",
+      bgColor: "bg-green-100",
+      subtitle: `Active Orders: ${internationalStats.activeOrders}`,
     },
   ] : [];
 
@@ -245,92 +268,14 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* International & Local Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        {/* International */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">International</h3>
-          {!dashboardStats ? (
-            <Skeleton height={120} />
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Clients</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalClients}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Active Orders</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.internationalOrders}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Revenue (USD)</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenueUSD ?? 0, 'USD')}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Outstanding</p>
-                <div className="text-2xl font-bold text-gray-900 mt-1">
-                  {(dashboardStats as any).outstandingByCurrency ? 
-                    Object.entries((dashboardStats as any).outstandingByCurrency)
-                      .filter(([currency, amount]) => (amount as number) > 0 && currency !== 'PKR')
-                      .map(([currency, amount]) => (
-                        <div key={currency} className="text-lg">
-                          {formatCurrency(amount as number, currency)}
-                        </div>
-                      ))
-                    : formatCurrency((dashboardStats as any).outstandingUSD ?? 0, 'USD')
-                  }
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Local */}
-        <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Local</h3>
-          {!dashboardStats ? (
-            <Skeleton height={120} />
-          ) : (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <p className="text-sm text-gray-500">Clients</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localClients}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Active Orders</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{dashboardStats.localOrders}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Revenue (PKR)</p>
-                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1">{formatCurrency((dashboardStats as any).revenuePKR ?? 0, 'PKR')}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Outstanding</p>
-                <div className="text-2xl font-bold text-gray-900 mt-1">
-                  {(dashboardStats as any).outstandingByCurrency ? 
-                    Object.entries((dashboardStats as any).outstandingByCurrency)
-                      .filter(([currency, amount]) => (amount as number) > 0 && currency === 'PKR')
-                      .map(([currency, amount]) => (
-                        <div key={currency} className="text-lg">
-                          {formatCurrency(amount as number, currency)}
-                        </div>
-                      ))
-                    : formatCurrency((dashboardStats as any).outstandingPKR ?? 0, 'PKR')
-                  }
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Modern Financial Overview */}
       <div className="space-y-8">
-        {/* Financial Performance Summary */}
+        {/* Financial Performance Summary - Local Clients */}
         <div className="card p-8">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-gray-900">Financial Performance</h2>
-            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">Current Fiscal Year</div>
+            <h2 className="text-2xl font-bold text-gray-900">Financial Performance - Local Clients</h2>
+            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(selectedFiscalYear)} Fiscal Year{selectedFiscalYear !== getCurrentFiscalYear() ? ' (Custom)' : ''}</div>
           </div>
           
           {/* Key Metrics Row */}
@@ -348,9 +293,9 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-blue-700 mb-1">Total Order Value</p>
                 <p className="text-2xl font-bold text-blue-900">
-                  {dashboardStats ? formatCurrency(((dashboardStats as any).totalOrderValueUSD || 0) + ((dashboardStats as any).totalOrderValuePKR || 0), 'USD') : <Skeleton width={100} height={32} />}
+                  {localStats ? formatCurrency(localStats.totalOrderValue || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
-                <p className="text-xs text-blue-600 mt-1">All orders in pipeline</p>
+                <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
               </div>
             </div>
 
@@ -367,9 +312,9 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
                 <p className="text-2xl font-bold text-green-900">
-                  {dashboardStats ? formatCurrency(((dashboardStats as any).revenueUSD || 0) + ((dashboardStats as any).revenuePKR || 0), 'USD') : <Skeleton width={100} height={32} />}
+                  {localStats ? formatCurrency(localStats.totalRevenue || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
-                <p className="text-xs text-green-600 mt-1">All payments received</p>
+                <p className="text-xs text-green-600 mt-1">Local payments received</p>
               </div>
             </div>
 
@@ -386,7 +331,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-purple-700 mb-1">Advance Payments</p>
                 <p className="text-2xl font-bold text-purple-900">
-                  {dashboardStats ? formatCurrency(((dashboardStats as any).advancePaymentsUSD || 0) + ((dashboardStats as any).advancePaymentsPKR || 0), 'USD') : <Skeleton width={100} height={32} />}
+                  {localStats ? formatCurrency(localStats.advancePayments || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
                 <p className="text-xs text-purple-600 mt-1">Pre-shipment payments</p>
               </div>
@@ -405,7 +350,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
                 <p className="text-2xl font-bold text-red-900">
-                  {dashboardStats ? formatCurrency(((dashboardStats as any).outstandingUSD || 0) + ((dashboardStats as any).outstandingPKR || 0), 'USD') : <Skeleton width={100} height={32} />}
+                  {localStats ? formatCurrency(localStats.outstandingAmount || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
                 <p className="text-xs text-red-600 mt-1">Shipped awaiting payment</p>
               </div>
@@ -413,91 +358,298 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Business Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Order Status Distribution */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Order Status</h3>
-              <Package className="h-5 w-5 text-gray-400" />
-            </div>
-            <div className="space-y-4">
-              {dashboardStats ? (
-                <>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium text-gray-700">Active Orders</span>
-                    <span className="text-lg font-bold text-blue-600">{(dashboardStats as any).activeOrders?.value || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium text-gray-700">Total Orders</span>
-                    <span className="text-lg font-bold text-gray-900">{(dashboardStats as any).totalOrders?.value || 0}</span>
-                  </div>
-                </>
-              ) : (
-                <Skeleton count={2} height={48} />
-              )}
-            </div>
+        {/* Financial Performance Summary - International Clients */}
+        <div className="card p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-bold text-gray-900">Financial Performance - International Clients</h2>
+            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(selectedFiscalYear)} Fiscal Year{selectedFiscalYear !== getCurrentFiscalYear() ? ' (Custom)' : ''}</div>
           </div>
+          
+          {/* Key Metrics Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Order Value */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-blue-200 rounded-lg">
+                  <Package className="h-6 w-6 text-blue-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Pipeline</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-700 mb-1">Total Order Value</p>
+                <div className="text-2xl font-bold text-blue-900 space-y-1">
+                  {internationalStats ? (
+                    <>
+                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.PKR || 0, 'PKR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
+                    </>
+                  ) : <Skeleton width={100} height={32} />}
+                </div>
+                <p className="text-xs text-blue-600 mt-1">International orders in pipeline</p>
+              </div>
+            </div>
 
-          {/* Client Overview */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Client Base</h3>
-              <Users className="h-5 w-5 text-gray-400" />
+            {/* Revenue */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-green-200 rounded-lg">
+                  <DollarSign className="h-6 w-6 text-green-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Received</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
+                <div className="text-2xl font-bold text-green-900 space-y-1">
+                  {internationalStats ? (
+                    <>
+                      <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.USD || 0, 'USD')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.PKR || 0, 'PKR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.EUR || 0, 'EUR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.AED || 0, 'AED')}</div>
+                    </>
+                  ) : <Skeleton width={100} height={32} />}
+                </div>
+                <p className="text-xs text-green-600 mt-1">International payments received</p>
+              </div>
             </div>
-            <div className="space-y-4">
-              {dashboardStats ? (
-                <>
-                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                    <span className="text-sm font-medium text-blue-700">Local Clients</span>
-                    <span className="text-lg font-bold text-blue-600">{(dashboardStats as any).localClients || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <span className="text-sm font-medium text-green-700">International</span>
-                    <span className="text-lg font-bold text-green-600">{(dashboardStats as any).internationalClients || 0}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-sm font-medium text-gray-700">Active Total</span>
-                    <span className="text-lg font-bold text-gray-900">{(dashboardStats as any).activeClients || 0}</span>
-                  </div>
-                </>
-              ) : (
-                <Skeleton count={3} height={48} />
-              )}
-            </div>
-          </div>
 
-          {/* Payment Health */}
-          <div className="card p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Payment Health</h3>
-              <CheckCircle className="h-5 w-5 text-gray-400" />
+            {/* Advance Payments */}
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-purple-200 rounded-lg">
+                  <TrendingUp className="h-6 w-6 text-purple-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-purple-600 font-medium uppercase tracking-wide">Advance</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-purple-700 mb-1">Advance Payments</p>
+                <div className="text-2xl font-bold text-purple-900 space-y-1">
+                  {internationalStats ? (
+                    <>
+                      <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.USD || 0, 'USD')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.PKR || 0, 'PKR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.EUR || 0, 'EUR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.AED || 0, 'AED')}</div>
+                    </>
+                  ) : <Skeleton width={100} height={32} />}
+                </div>
+                <p className="text-xs text-purple-600 mt-1">Pre-shipment payments</p>
+              </div>
             </div>
-            <div className="space-y-4">
-              {dashboardStats ? (
-                <>
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                    <span className="text-sm font-medium text-green-700">Collection Rate</span>
-                    <span className="text-lg font-bold text-green-600">
-                      {((dashboardStats as any).totalPaid / Math.max((dashboardStats as any).totalRevenue, 1) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                    <span className="text-sm font-medium text-red-700">Outstanding Ratio</span>
-                    <span className="text-lg font-bold text-red-600">
-                      {(((dashboardStats as any).outstandingUSD + (dashboardStats as any).outstandingPKR) / Math.max((dashboardStats as any).totalRevenue, 1) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <Skeleton count={2} height={48} />
-              )}
+
+            {/* Outstanding */}
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-red-200 rounded-lg">
+                  <AlertCircle className="h-6 w-6 text-red-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-red-600 font-medium uppercase tracking-wide">Pending</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
+                <div className="text-2xl font-bold text-red-900 space-y-1">
+                  {internationalStats ? (
+                    <>
+                      <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.USD || 0, 'USD')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.PKR || 0, 'PKR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.EUR || 0, 'EUR')}</div>
+                      <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.AED || 0, 'AED')}</div>
+                    </>
+                  ) : <Skeleton width={100} height={32} />}
+                </div>
+                <p className="text-xs text-red-600 mt-1">Shipped awaiting payment</p>
+              </div>
             </div>
           </div>
         </div>
+
       </div>
 
+      {/* Orders by Status */}
+      <div className="mt-12">
+        <div className="space-y-6">
+        {/* Pending Orders */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Pending Orders</h3>
+            <Clock className="h-5 w-5 text-orange-500" />
+          </div>
+          <div>
+            {!ordersData ? (
+              <div className="space-y-4">
+                <Skeleton count={5} height={120} />
+              </div>
+            ) : ordersData.pendingOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No pending orders</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {ordersData.pendingOrders.map((order) => (
+                  <div key={order._id} className="p-4 bg-orange-50 rounded-lg border border-orange-200">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-orange-600 font-medium mb-1">Invoice Number</p>
+                        <p className="text-orange-800 font-semibold">{order.invoiceNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-orange-600 font-medium mb-1">Quantity</p>
+                        <p className="text-orange-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
+                      </div>
+                      <div>
+                        <p className="text-orange-600 font-medium mb-1">Customer Name</p>
+                        <p className="text-orange-800 font-semibold">{order.clientName}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
+        {/* In Production Orders */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">In Production</h3>
+            <Package className="h-5 w-5 text-blue-500" />
+          </div>
+          <div>
+            {!ordersData ? (
+              <div className="space-y-4">
+                <Skeleton count={5} height={120} />
+              </div>
+            ) : ordersData.inProductionOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No orders in production</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {ordersData.inProductionOrders.map((order) => (
+                  <div key={order._id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-blue-600 font-medium mb-1">Invoice Number</p>
+                        <p className="text-blue-800 font-semibold">{order.invoiceNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-blue-600 font-medium mb-1">Quantity</p>
+                        <p className="text-blue-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
+                      </div>
+                      <div>
+                        <p className="text-blue-600 font-medium mb-1">Customer Name</p>
+                        <p className="text-blue-800 font-semibold">{order.clientName}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Shipped Orders */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Shipped Orders</h3>
+            <TrendingUp className="h-5 w-5 text-purple-500" />
+          </div>
+          <div>
+            {!ordersData ? (
+              <div className="space-y-4">
+                <Skeleton count={5} height={120} />
+              </div>
+            ) : ordersData.shippedOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No shipped orders</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {ordersData.shippedOrders.map((order) => (
+                  <div key={order._id} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-purple-600 font-medium mb-1">Invoice Number</p>
+                        <p className="text-purple-800 font-semibold">{order.invoiceNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-purple-600 font-medium mb-1">Quantity</p>
+                        <p className="text-purple-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
+                      </div>
+                      <div>
+                        <p className="text-purple-600 font-medium mb-1">Customer Name</p>
+                        <p className="text-purple-800 font-semibold">{order.clientName}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Delivered Orders */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Delivered Orders</h3>
+            <CheckCircle className="h-5 w-5 text-green-500" />
+          </div>
+          <div>
+            {!ordersData ? (
+              <div className="space-y-4">
+                <Skeleton count={5} height={120} />
+              </div>
+            ) : ordersData.deliveredOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <p>No delivered orders</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {ordersData.deliveredOrders.map((order) => (
+                  <div key={order._id} className="p-4 bg-green-50 rounded-lg border border-green-200">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-green-600 font-medium mb-1">Invoice Number</p>
+                        <p className="text-green-800 font-semibold">{order.invoiceNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-green-600 font-medium mb-1">Quantity</p>
+                        <p className="text-green-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
+                      </div>
+                      <div>
+                        <p className="text-green-600 font-medium mb-1">Customer Name</p>
+                        <p className="text-green-800 font-semibold">{order.clientName}</p>
+                      </div>
+                    </div>
+                    {order.deliveryDate && (
+                      <div className="mt-3 pt-3 border-t border-green-200">
+                        <p className="text-xs text-green-600">
+                          <strong>Delivered:</strong> {new Date(order.deliveryDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        </div>
+      </div>
 
       {/* Add Client Modal */}
       <AddCustomerModal

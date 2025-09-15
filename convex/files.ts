@@ -1,4 +1,5 @@
 import { mutation } from "./_generated/server";
+import { v } from "convex/values";
 
 // Generate upload URL for file uploads
 export const generateUploadUrl = mutation(async (ctx) => {
@@ -7,7 +8,8 @@ export const generateUploadUrl = mutation(async (ctx) => {
 
 // Get file URL for downloads
 export const getFileUrl = mutation({
-  handler: async (ctx, { storageId }: { storageId: string }) => {
+  args: { storageId: v.string() },
+  handler: async (ctx, { storageId }) => {
     return await ctx.storage.getUrl(storageId);
   },
 });

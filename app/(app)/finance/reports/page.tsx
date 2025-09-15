@@ -72,7 +72,6 @@ export default function ReportsPage() {
 
     const totalRevenue = paymentStats.totalAmount;
     const totalOrders = filteredOrders.length;
-    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const totalClients = clients.length;
     const activeClients = clients.filter(c => c.status === "active").length;
 
@@ -83,7 +82,6 @@ export default function ReportsPage() {
     return {
       totalRevenue,
       totalOrders,
-      averageOrderValue,
       totalClients,
       activeClients,
       revenueGrowth,
@@ -111,7 +109,6 @@ export default function ReportsPage() {
           ["Total Revenue", "$" + metrics.totalRevenue.toFixed(2)],
           ["Revenue Growth", metrics.revenueGrowth.toFixed(1) + "%"],
           ["Total Orders", metrics.totalOrders],
-          ["Average Order Value", "$" + metrics.averageOrderValue.toFixed(2)],
           ["Outstanding Amount", "$" + metrics.outstandingAmount.toFixed(2)],
           [""],
           ["Payment Methods", "Amount"],
@@ -140,7 +137,6 @@ export default function ReportsPage() {
           [""],
           ["Metric", "Value"],
           ["Total Orders", metrics.totalOrders],
-          ["Average Order Value", "$" + metrics.averageOrderValue.toFixed(2)],
           ["Total Revenue", "$" + metrics.totalRevenue.toFixed(2)],
         ].map(row => row.join(",")).join("\n");
         break;
@@ -266,19 +262,6 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Average Order Value</p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900">
-                    {metrics ? `$${metrics.averageOrderValue.toFixed(2)}` : <Skeleton width={120} />}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-full">
-                  <BarChart3 className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </div>
 
             <div className="card">
               <div className="flex items-center justify-between">
@@ -393,16 +376,6 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Average Value</p>
-                  <p className="mt-2 text-3xl font-bold text-gray-900">
-                    {metrics ? `$${metrics.averageOrderValue.toFixed(2)}` : <Skeleton width={120} />}
-                  </p>
-                </div>
-              </div>
-            </div>
 
             <div className="card">
               <div className="flex items-center justify-between">

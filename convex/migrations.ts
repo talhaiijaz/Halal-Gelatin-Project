@@ -25,6 +25,28 @@ export const backfillFiscalYear = mutation({
   },
 });
 
+// Debug query to check fiscal years in orders
+export const debugFiscalYears = query({
+  args: {},
+  returns: v.array(v.object({
+    _id: v.id("orders"),
+    invoiceNumber: v.string(),
+    fiscalYear: v.optional(v.number()),
+    createdAt: v.number(),
+    orderCreationDate: v.optional(v.number()),
+  })),
+  handler: async (ctx) => {
+    const orders = await ctx.db.query("orders").collect();
+    return orders.map(order => ({
+      _id: order._id,
+      invoiceNumber: order.invoiceNumber,
+      fiscalYear: order.fiscalYear,
+      createdAt: order.createdAt,
+      orderCreationDate: order.orderCreationDate,
+    }));
+  },
+});
+
 // Seed deliveries for orders that are shipped/in_transit/delivered but lack a delivery record
 export const seedDeliveriesFromOrders = mutation({
   args: {},

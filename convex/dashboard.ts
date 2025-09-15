@@ -62,7 +62,9 @@ export const getEntityActivityLogs = query({
 
 // Get dashboard statistics
 export const getStats = query({
-  args: {},
+  args: {
+    fiscalYear: v.optional(v.number()),
+  },
   returns: v.object({
     totalClients: v.object({
       value: v.number(),
@@ -95,12 +97,17 @@ export const getStats = query({
     advancePaymentsUSD: v.number(),
     advancePaymentsPKR: v.number(),
   }),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     // Get all data
     const clients = await ctx.db.query("clients").collect();
-    const orders = await ctx.db.query("orders").collect();
+    let orders = await ctx.db.query("orders").collect();
     const invoices = await ctx.db.query("invoices").collect();
     const payments = await ctx.db.query("payments").collect();
+
+    // Filter orders by fiscal year if specified
+    if (args.fiscalYear) {
+      orders = orders.filter(order => order.fiscalYear === args.fiscalYear);
+    }
 
     // Calculate client stats
     const totalClients = clients.length;
@@ -124,26 +131,42 @@ export const getStats = query({
       return client?.type === "international";
     }).length;
 
+    // Filter invoices and payments by fiscal year if specified
+    let filteredInvoices = invoices;
+    let filteredPayments = payments;
+    
+    if (args.fiscalYear) {
+      filteredInvoices = invoices.filter(inv => {
+        const order = orders.find(o => o._id === inv.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+      
+      filteredPayments = payments.filter(payment => {
+        const invoice = filteredInvoices.find(inv => inv._id === payment.invoiceId);
+        return invoice !== undefined;
+      });
+    }
+
     // Calculate financial stats using payments with converted amounts
-    const totalRevenue = invoices.reduce((sum, inv) => sum + inv.amount, 0);
-    const totalPaid = invoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const totalPaid = filteredInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     
     // Calculate outstanding only for shipped/delivered orders
-    const shippedOrDeliveredInvoices = invoices.filter(inv => {
+    const shippedOrDeliveredInvoices = filteredInvoices.filter(inv => {
       const order = orders.find(o => o._id === inv.orderId);
       return order && (order.status === "shipped" || order.status === "delivered");
     });
     const outstandingAmount = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
     
     // Calculate revenue by currency using payments (with conversion for international)
-    const revenueUSD = payments
+    const revenueUSD = filteredPayments
       .filter(p => {
         const client = clients.find(c => c._id === p.clientId);
         return client?.type === "international" && p.convertedAmountUSD;
       })
       .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
     
-    const revenuePKR = payments
+    const revenuePKR = filteredPayments
       .filter(p => {
         const client = clients.find(c => c._id === p.clientId);
         return client?.type === "local";
@@ -228,7 +251,7 @@ export const getStats = query({
       .reduce((sum, order) => sum + order.totalAmount, 0);
 
     // 2. Advance Payments - payments for orders not yet shipped (pending/in_production)
-    const advancePaymentInvoices = invoices.filter(inv => {
+    const advancePaymentInvoices = filteredInvoices.filter(inv => {
       const order = orders.find(o => o._id === inv.orderId);
       return order && ["pending", "in_production"].includes(order.status);
     });
@@ -444,5 +467,123 @@ export const getRecentActivity = query({
     return activities
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
+  },
+});
+
+// Get orders by status for homepage
+export const getOrdersByStatus = query({
+  args: {
+    limit: v.optional(v.number()),
+    fiscalYear: v.optional(v.number())
+  },
+  returns: v.object({
+    pendingOrders: v.array(v.object({
+      _id: v.id("orders"),
+      invoiceNumber: v.string(),
+      clientName: v.union(v.string(), v.null()),
+      totalQuantity: v.number(),
+      currency: v.string(),
+      totalAmount: v.number(),
+      createdAt: v.number(),
+      deliveryDate: v.optional(v.number()),
+    })),
+    inProductionOrders: v.array(v.object({
+      _id: v.id("orders"),
+      invoiceNumber: v.string(),
+      clientName: v.union(v.string(), v.null()),
+      totalQuantity: v.number(),
+      currency: v.string(),
+      totalAmount: v.number(),
+      createdAt: v.number(),
+      deliveryDate: v.optional(v.number()),
+    })),
+    shippedOrders: v.array(v.object({
+      _id: v.id("orders"),
+      invoiceNumber: v.string(),
+      clientName: v.union(v.string(), v.null()),
+      totalQuantity: v.number(),
+      currency: v.string(),
+      totalAmount: v.number(),
+      createdAt: v.number(),
+      deliveryDate: v.optional(v.number()),
+    })),
+    deliveredOrders: v.array(v.object({
+      _id: v.id("orders"),
+      invoiceNumber: v.string(),
+      clientName: v.union(v.string(), v.null()),
+      totalQuantity: v.number(),
+      currency: v.string(),
+      totalAmount: v.number(),
+      createdAt: v.number(),
+      deliveryDate: v.optional(v.number()),
+    })),
+  }),
+  handler: async (ctx, args) => {
+    const limit = args.limit || 5;
+    
+    // Helper function to process orders
+    const processOrders = async (orders: any[]) => {
+      return Promise.all(
+        orders.map(async (order) => {
+          const client = await ctx.db.get(order.clientId);
+          const orderItems = await ctx.db
+            .query("orderItems")
+            .withIndex("by_order", q => q.eq("orderId", order._id))
+            .collect();
+          
+          const totalQuantity = orderItems.reduce((sum, item) => sum + item.quantityKg, 0);
+          
+          return {
+            _id: order._id,
+            invoiceNumber: order.invoiceNumber,
+            clientName: (client as any)?.name || "Unknown Client",
+            totalQuantity,
+            currency: order.currency,
+            totalAmount: order.totalAmount,
+            createdAt: order.createdAt,
+            ...(order.deliveryDate && { deliveryDate: order.deliveryDate }),
+          };
+        })
+      );
+    };
+
+    // Helper function to filter orders by fiscal year
+    const filterByFiscalYear = (orders: any[]) => {
+      if (args.fiscalYear) {
+        return orders.filter(order => order.fiscalYear === args.fiscalYear);
+      }
+      return orders;
+    };
+
+    // Get orders by status, sorted by createdAt (latest first)
+    const [pendingOrders, inProductionOrders, shippedOrders, deliveredOrders] = await Promise.all([
+      ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "pending")).collect().then(orders => 
+        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+      ),
+      ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "in_production")).collect().then(orders => 
+        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+      ),
+      ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "shipped")).collect().then(orders => 
+        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+      ),
+      ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "delivered")).collect().then(orders => 
+        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+      ),
+    ]);
+
+    // Process all orders
+    const [pendingOrdersWithDetails, inProductionOrdersWithDetails, shippedOrdersWithDetails, deliveredOrdersWithDetails] = await Promise.all([
+      processOrders(pendingOrders),
+      processOrders(inProductionOrders),
+      processOrders(shippedOrders),
+      processOrders(deliveredOrders),
+    ]);
+
+    return {
+      pendingOrders: pendingOrdersWithDetails,
+      inProductionOrders: inProductionOrdersWithDetails,
+      shippedOrders: shippedOrdersWithDetails,
+      deliveredOrders: deliveredOrdersWithDetails,
+    };
   },
 });

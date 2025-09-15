@@ -111,14 +111,27 @@ export function isDateInFiscalYear(date: Date | number, fiscalYear: number): boo
 }
 
 /**
- * Get fiscal year options for dropdowns (current year and previous 5 years)
+ * Get fiscal year options for dropdowns (current year, previous 5 years, and next year)
  * @returns Array of fiscal year options
  */
 export function getFiscalYearOptions(): Array<{ value: number; label: string }> {
   const currentFY = getCurrentFiscalYear();
   const options = [];
   
-  for (let i = 0; i < 6; i++) {
+  // Add next year (future fiscal year)
+  options.push({
+    value: currentFY + 1,
+    label: getFiscalYearLabel(currentFY + 1),
+  });
+  
+  // Add current year
+  options.push({
+    value: currentFY,
+    label: getFiscalYearLabel(currentFY),
+  });
+  
+  // Add previous 5 years
+  for (let i = 1; i <= 5; i++) {
     const fy = currentFY - i;
     options.push({
       value: fy,

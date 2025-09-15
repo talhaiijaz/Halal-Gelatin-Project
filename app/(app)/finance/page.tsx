@@ -106,10 +106,17 @@ export default function FinancePage() {
   const deletePayment = useMutation(api.payments.deletePayment);
 
   const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // Use appropriate locale based on currency
+    // For EUR, use custom formatting to ensure symbol appears before number
+    if (currency === 'EUR') {
+      return `€${new Intl.NumberFormat('en-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount)}`;
+    }
+    
+    // Use appropriate locale based on currency for other currencies
     const locale = currency === 'USD' ? 'en-US' : 
                    currency === 'PKR' ? 'en-PK' : 
-                   currency === 'EUR' ? 'en-DE' :
                    currency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
@@ -295,52 +302,54 @@ export default function FinancePage() {
           </div>
 
           {/* Financial Summary (split by currency) */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Revenue</p>
+              <p className="text-sm text-gray-500">Total Order Value</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
-                {(dashboardStats?.totalRevenueEUR || 0) > 0 && (
-                  <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')} <span className="text-xs text-gray-500">EUR</span></p>
-                )}
-                {(dashboardStats?.totalRevenueAED || 0) > 0 && (
-                  <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')} <span className="text-xs text-gray-500">AED</span></p>
-                )}
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')}</p>
               </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Based on order amounts (excluding cancelled orders)
+              </p>
             </div>
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Paid</p>
+              <p className="text-sm text-gray-500">Total Received</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
-                {(dashboardStats?.totalPaidEUR || 0) > 0 && (
-                  <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidEUR || 0, 'EUR')} <span className="text-xs text-gray-500">EUR</span></p>
-                )}
-                {(dashboardStats?.totalPaidAED || 0) > 0 && (
-                  <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidAED || 0, 'AED')} <span className="text-xs text-gray-500">AED</span></p>
-                )}
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidAED || 0, 'AED')}</p>
               </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Includes converted amounts from international payments
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Advance Payments</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsAED || 0, 'AED')}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Payments received before invoicing
+              </p>
             </div>
             <div className="card p-4">
               <p className="text-sm text-gray-500">Outstanding</p>
               <div className="mt-1 space-y-1">
-                {(dashboardStats as any)?.outstandingByCurrency ? 
-                  Object.entries((dashboardStats as any).outstandingByCurrency)
-                    .filter(([currency, amount]) => (amount as number) > 0)
-                    .map(([currency, amount]) => (
-                      <p key={currency} className="text-xl font-bold text-orange-600">
-                        {formatCurrency(amount as number, currency)} <span className="text-xs text-gray-500">{currency}</span>
-                      </p>
-                    ))
-                  : (
-                    <>
-                      <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                      <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
-                    </>
-                  )
-                }
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingAED || 0, 'AED')}</p>
               </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Only for shipped/delivered orders
+              </p>
             </div>
           </div>
 
@@ -440,63 +449,59 @@ export default function FinancePage() {
       {/* Invoices Tab */}
       {activeTab === "invoices" && (
         <div className="space-y-6">
-          {/* Invoice Statistics */}
-          {invoiceStats && (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-              <div className="rounded-lg border border-gray-200 bg-white p-3">
-                <p className="text-xs text-gray-500">Total Outstanding</p>
-                <div className="mt-1 space-y-1">
-                  {(invoiceStats as any).outstandingByCurrency ? 
-                    Object.entries((invoiceStats as any).outstandingByCurrency)
-                      .filter(([currency, amount]) => (amount as number) > 0)
-                      .map(([currency, amount]) => (
-                        <p key={currency} className="text-lg font-semibold text-gray-900">
-                          {formatCurrency(amount as number, currency)} <span className="text-xs text-gray-500">{currency}</span>
-                        </p>
-                      ))
-                    : (
-                      <>
-                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalOutstandingPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
-                      </>
-                    )
-                  }
-                </div>
+          {/* Financial Summary Cards - Same as Dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Total Order Value</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')}</p>
               </div>
-              <div className="rounded-lg border border-gray-200 bg-white p-3">
-                <p className="text-xs text-gray-500">Total Paid</p>
-                <div className="mt-1 space-y-1">
-                  {(invoiceStats as any)?.paidByCurrency ? 
-                    Object.entries((invoiceStats as any).paidByCurrency)
-                      .filter(([currency, amount]) => (amount as number) > 0)
-                      .map(([currency, amount]) => (
-                        <p key={currency} className="text-lg font-semibold text-gray-900">
-                          {formatCurrency(amount as number, currency)} <span className="text-xs text-gray-500">{currency}</span>
-                        </p>
-                      ))
-                    : (
-                      <>
-                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidUSD || 0, 'USD')} <span className="text-xs text-gray-500">USD</span></p>
-                        <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoiceStats.totalPaidPKR || 0, 'PKR')} <span className="text-xs text-gray-500">PKR</span></p>
-                      </>
-                    )
-                  }
-                </div>
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-white p-3">
-                <p className="text-xs text-gray-500">Overdue</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {invoiceStats.overdueCount}
-                </p>
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-white p-3">
-                <p className="text-xs text-gray-500">Total Invoices</p>
-                <p className="mt-1 text-lg font-semibold text-gray-900">
-                  {invoiceStats.totalCount}
-                </p>
-              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Based on order amounts (excluding cancelled orders)
+              </p>
             </div>
-          )}
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Total Received</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidAED || 0, 'AED')}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Includes converted amounts from international payments
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Advance Payments</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsAED || 0, 'AED')}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Payments received before invoicing
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Outstanding</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingAED || 0, 'AED')}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Only for shipped/delivered orders
+              </p>
+            </div>
+          </div>
+
+          
 
           {/* Search and Filters */}
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
@@ -661,47 +666,59 @@ export default function FinancePage() {
       {/* Payments Tab */}
       {activeTab === "payments" && (
         <div className="space-y-6">
-          {/* Payment Statistics */}
-          {paymentStats && (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="card p-4">
-                <p className="text-sm text-gray-500">Total Payments</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {paymentStats.totalCount}
-                </p>
+          {/* Financial Summary Cards - Same as Dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Total Order Value</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')}</p>
               </div>
-              <div className="card p-4">
-                <p className="text-sm text-gray-500">Total Amount (USD)</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {formatCurrency(paymentStats.totalAmountUSD || 0, 'USD')}
-                </p>
-              </div>
-              <div className="card p-4">
-                <p className="text-sm text-gray-500">Total Amount (PKR)</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">
-                  {formatCurrency(paymentStats.totalAmountPKR || 0, 'PKR')}
-                </p>
-              </div>
-              {/* Show EUR and AED only if there are amounts */}
-              {((paymentStats.totalAmountEUR || 0) > 0 || (paymentStats.totalAmountAED || 0) > 0) && (
-                <div className="card p-4">
-                  <p className="text-sm text-gray-500">Other Currencies</p>
-                  <div className="mt-1 space-y-1">
-                    {(paymentStats.totalAmountEUR || 0) > 0 && (
-                      <p className="text-lg font-bold text-green-600">
-                        {formatCurrency(paymentStats.totalAmountEUR || 0, 'EUR')}
-                      </p>
-                    )}
-                    {(paymentStats.totalAmountAED || 0) > 0 && (
-                      <p className="text-lg font-bold text-green-600">
-                        {formatCurrency(paymentStats.totalAmountAED || 0, 'AED')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
+              <p className="text-xs text-gray-500 mt-2">
+                Based on order amounts (excluding cancelled orders)
+              </p>
             </div>
-          )}
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Total Received</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(dashboardStats?.totalPaidAED || 0, 'AED')}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Includes converted amounts from international payments
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Advance Payments</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsAED || 0, 'AED')}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Payments received before invoicing
+              </p>
+            </div>
+            <div className="card p-4">
+              <p className="text-sm text-gray-500">Outstanding</p>
+              <div className="mt-1 space-y-1">
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingAED || 0, 'AED')}</p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Only for shipped/delivered orders
+              </p>
+            </div>
+          </div>
+
+          
 
           {/* Payments History */}
           <div className="card overflow-hidden">
@@ -714,14 +731,14 @@ export default function FinancePage() {
               <table className="min-w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[22%]">Customer</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">Invoice</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">Customer</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Invoice</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8%]">Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">Amount</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">Reference</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">Bank Account</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8%]">View</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Reference</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Bank Account</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[6%]">View</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -737,12 +754,19 @@ export default function FinancePage() {
                     >
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(payment.paymentDate)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="truncate inline-block max-w-[220px] align-middle" title={payment.client?.name || "-"}>
-                          {payment.client?.name || "-"}
-                        </span>
+                        <div>
+                          <span className="truncate inline-block max-w-[180px] align-middle" title={payment.client?.name || "-"}>
+                            {payment.client?.name || "-"}
+                          </span>
+                          {payment.client?.type && (
+                            <div className="text-xs text-gray-500">
+                              {payment.client.type === "local" ? "Local" : "International"}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        <span className="truncate inline-block max-w-[180px]" title={payment.invoice?.invoiceNumber || "-"}>
+                        <span className="truncate inline-block max-w-[140px]" title={payment.invoice?.invoiceNumber || "-"}>
                           {payment.invoice?.invoiceNumber || "-"}
                         </span>
                       </td>
@@ -751,7 +775,21 @@ export default function FinancePage() {
                           {payment.type === "advance" ? "Advance" : "Invoice"}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(payment.amount, payment.currency)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="font-medium text-green-600">{formatCurrency(payment.amount, payment.currency)}</div>
+                        {/* Show conversion info for international payments */}
+                        {payment.convertedAmountUSD && payment.convertedAmountUSD !== payment.amount && (
+                          <div className="text-xs text-gray-500">
+                            ≈ {formatCurrency(payment.convertedAmountUSD, 'USD')}
+                          </div>
+                        )}
+                        {/* Show withholding info for local payments */}
+                        {(payment as any).withheldTaxAmount && (payment as any).withheldTaxAmount > 0 && (
+                          <div className="text-xs text-orange-600">
+                            -{formatCurrency((payment as any).withheldTaxAmount, payment.currency)} withheld
+                          </div>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.reference}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {payment.bankAccount ? (
@@ -782,26 +820,7 @@ export default function FinancePage() {
       {activeTab === "banks" && (
         <div className="space-y-6">
           {/* Bank Statistics */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Accounts</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {bankStats?.totalAccounts || 0}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Active Accounts</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {bankStats?.activeAccounts || 0}
-              </p>
-            </div>
-            <div className="card p-4">
-              <p className="text-sm text-gray-500">Currencies</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">
-                {Object.keys(bankStats?.accountsByCurrency || {}).length}
-              </p>
-            </div>
-          </div>
+          
 
           {/* Bank Accounts Table */}
           <div className="card overflow-hidden">

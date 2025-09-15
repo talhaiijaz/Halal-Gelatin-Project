@@ -58,13 +58,26 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
 
   if (!isOpen || !payment) return null;
 
-  const formatCurrency = (amount?: number, currency?: string) =>
-    new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', { 
+  const formatCurrency = (amount?: number, currency?: string) => {
+    // For EUR, use custom formatting to ensure symbol appears before number
+    if (currency === 'EUR') {
+      return `€${new Intl.NumberFormat('en-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount || 0)}`;
+    }
+    
+    // Use appropriate locale based on currency for other currencies
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 
+                   currency === 'AED' ? 'en-AE' : 'en-US';
+    return new Intl.NumberFormat(locale, { 
       style: "currency", 
       currency: currency || "USD", 
       minimumFractionDigits: 0, 
       maximumFractionDigits: 0 
     }).format(amount || 0);
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">

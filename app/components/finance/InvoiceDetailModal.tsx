@@ -31,9 +31,17 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
   if (!isOpen || !invoiceId) return null;
 
   const formatCurrency = (amount: number, currency?: string) => {
+    // For EUR, use custom formatting to ensure symbol appears before number
+    if (currency === 'EUR') {
+      return `€${new Intl.NumberFormat('en-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount || 0)}`;
+    }
+    
+    // Use appropriate locale based on currency for other currencies
     const locale = currency === 'USD' ? 'en-US' : 
                    currency === 'PKR' ? 'en-PK' : 
-                   currency === 'EUR' ? 'en-DE' :
                    currency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, { 
       style: "currency", 

@@ -24,6 +24,7 @@ import EditOrderModal from "./EditOrderModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import RecordPaymentModal from "@/app/components/finance/RecordPaymentModal";
 import ActivityLog from "../ActivityLog";
+import DatePickerModal from "../DatePickerModal";
 import { useQuery as useConvexQuery } from "convex/react";
 import { api as convexApi } from "@/convex/_generated/api";
 
@@ -44,6 +45,8 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   const [isEditingInvoiceNumber, setIsEditingInvoiceNumber] = useState(false);
   const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [pendingStatusUpdate, setPendingStatusUpdate] = useState<"pending" | "in_production" | "shipped" | "delivered" | "cancelled" | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,14 +62,48 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   if (!isOpen || !orderId) return null;
 
   const handleStatusUpdate = async (newStatus: any) => {
+    // Check if changing to delivered without delivery date
+    if (newStatus === "delivered" && !order?.deliveryDate) {
+      setPendingStatusUpdate(newStatus);
+      setShowDatePicker(true);
+      return;
+    }
+    
     setIsUpdating(true);
     try {
       await updateStatus({ orderId, status: newStatus });
     } catch (error) {
       console.error("Failed to update status:", error);
+      alert("Failed to update order status. Please try again.");
     } finally {
       setIsUpdating(false);
     }
+  };
+
+  const handleDatePickerConfirm = async (date: Date) => {
+    setShowDatePicker(false);
+    
+    if (!pendingStatusUpdate) return;
+    
+    setIsUpdating(true);
+    try {
+      await updateStatus({ 
+        orderId, 
+        status: pendingStatusUpdate,
+        deliveryDate: date.getTime()
+      });
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      alert("Failed to update order status. Please try again.");
+    } finally {
+      setIsUpdating(false);
+      setPendingStatusUpdate(null);
+    }
+  };
+
+  const handleDatePickerClose = () => {
+    setShowDatePicker(false);
+    setPendingStatusUpdate(null);
   };
 
 
@@ -103,7 +140,19 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   };
 
   const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
+    // For EUR, use custom formatting to ensure symbol appears before number
+    if (currency === 'EUR') {
+      return `€${new Intl.NumberFormat('en-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount)}`;
+    }
+    
+    // Use appropriate locale based on currency for other currencies
+    const locale = currency === 'USD' ? 'en-US' : 
+                   currency === 'PKR' ? 'en-PK' : 
+                   currency === 'AED' ? 'en-AE' : 'en-US';
+    return new Intl.NumberFormat(locale, {
       style: "currency",
       currency: currency || "USD",
       minimumFractionDigits: 0,
@@ -181,9 +230,9 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Expected Delivery</p>
+                      <p className="text-sm text-gray-500">Delivery Date</p>
                       <p className="font-medium text-gray-900">
-                        {order.expectedDeliveryDate ? formatDate(order.expectedDeliveryDate) : 'Not set'}
+                        {order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}
                       </p>
                     </div>
                     <div>
@@ -403,7 +452,15 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                         </p>
                       </div>
                     )}
-                    {!order.orderCreationDate && !order.factoryDepartureDate && !order.estimatedDepartureDate && !order.estimatedArrivalDate && (
+                    {order.deliveryDate && (
+                      <div>
+                        <p className="text-sm text-gray-500">Delivery Date</p>
+                        <p className="font-medium text-gray-900">
+                          {formatDate(order.deliveryDate)}
+                        </p>
+                      </div>
+                    )}
+                    {!order.orderCreationDate && !order.factoryDepartureDate && !order.estimatedDepartureDate && !order.estimatedArrivalDate && !order.deliveryDate && (
                       <p className="text-sm text-gray-500">No timeline dates set</p>
                     )}
                     {order.timelineNotes && (
@@ -554,24 +611,67 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                         const invoicePaid = payments
                           .filter((p: any) => p.type !== "advance")
                           .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+                        const totalPaid = advancePaid + invoicePaid;
+                        
+                        // Outstanding balance should only be calculated for shipped/delivered orders
+                        // For in_production orders, outstanding should be 0 until they are shipped
+                        const outstanding = (order.status === "shipped" || order.status === "delivered") 
+                          ? Math.max(0, order.invoice.amount - totalPaid)
+                          : 0;
+                        
                         return (
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
-                              <p className="text-xs text-gray-500">Total Paid</p>
-                              <p className="mt-1 text-lg font-semibold text-green-600">{formatCurrency(order.invoice.totalPaid, order.currency)}</p>
+                          <div className="space-y-4">
+                            {/* Main financial summary */}
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                <p className="text-xs text-gray-500">Total Order Value</p>
+                                <p className="mt-1 text-lg font-semibold text-gray-900">{formatCurrency(order.invoice.amount, order.currency)}</p>
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                <p className="text-xs text-gray-500">Total Paid</p>
+                                <p className="mt-1 text-lg font-semibold text-green-600">{formatCurrency(totalPaid, order.currency)}</p>
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                <p className="text-xs text-gray-500">Advance Payments</p>
+                                <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(advancePaid, order.currency)}</p>
+                              </div>
+                              <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                <p className="text-xs text-gray-500">Outstanding</p>
+                                <p className="mt-1 text-lg font-semibold text-orange-600">
+                                  {outstanding > 0 ? formatCurrency(outstanding, order.currency) : 
+                                   order.status === "shipped" || order.status === "delivered" ? "$0" : 
+                                   "Not yet due"}
+                                </p>
+                                {(order.status !== "shipped" && order.status !== "delivered") && (
+                                  <p className="text-xs text-gray-400 mt-1">Outstanding balance applies after shipment</p>
+                                )}
+                              </div>
                             </div>
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
-                              <p className="text-xs text-gray-500">Outstanding</p>
-                              <p className="mt-1 text-lg font-semibold text-orange-600">{formatCurrency(order.invoice.outstandingBalance, order.currency)}</p>
-                            </div>
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
-                              <p className="text-xs text-gray-500">Advance Paid</p>
-                              <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(advancePaid, order.currency)}</p>
-                            </div>
-                            <div className="rounded-lg border border-gray-200 bg-white p-3">
-                              <p className="text-xs text-gray-500">Invoice Payments</p>
-                              <p className="mt-1 text-lg font-semibold text-green-700">{formatCurrency(invoicePaid, order.currency)}</p>
-                            </div>
+                            
+                            {/* Payment breakdown */}
+                            {(advancePaid > 0 || invoicePaid > 0) && (
+                              <div className="bg-gray-50 rounded-lg p-3">
+                                <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Breakdown</h4>
+                                <div className="space-y-1 text-sm">
+                                  {advancePaid > 0 && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Advance Payments:</span>
+                                      <span className="font-medium text-blue-600">{formatCurrency(advancePaid, order.currency)}</span>
+                                    </div>
+                                  )}
+                                  {invoicePaid > 0 && (
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">Invoice Payments:</span>
+                                      <span className="font-medium text-green-600">{formatCurrency(invoicePaid, order.currency)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between pt-1 border-t border-gray-200">
+                                    <span className="font-medium text-gray-700">Total Paid:</span>
+                                    <span className="font-medium text-green-600">{formatCurrency(totalPaid, order.currency)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -735,6 +835,13 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
         />
       )}
 
+      {/* Date Picker Modal for Delivery Date */}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={handleDatePickerClose}
+        onConfirm={handleDatePickerConfirm}
+        title="Select Delivery Date"
+      />
 
     </div>
   );

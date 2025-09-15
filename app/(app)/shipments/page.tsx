@@ -95,11 +95,31 @@ export default function ShipmentsPage() {
       const client = clientMap[order.clientId];
       const clientName = client?.name || 'Unknown Client';
       
-      // Get order creation date and convert to fiscal year and month
+      // Debug: Log order details
+      console.log(`Processing order: ${order.invoiceNumber} (${order.orderNumber})`);
+      console.log(`  Stored fiscalYear: ${order.fiscalYear}`);
+      console.log(`  Order creation date: ${order.orderCreationDate ? new Date(order.orderCreationDate).toISOString().split('T')[0] : 'Not set'}`);
+      
+      // Get fiscal year and month from order data
       let fiscalYear: number;
       let fiscalMonth: string;
       
-      if (order.orderCreationDate) {
+      // Use stored fiscalYear field if available, otherwise calculate from orderCreationDate
+      if (order.fiscalYear !== undefined && order.fiscalYear !== null) {
+        fiscalYear = order.fiscalYear;
+        
+        // Calculate fiscal month from orderCreationDate
+        if (order.orderCreationDate) {
+          const date = new Date(order.orderCreationDate);
+          const month = date.getMonth(); // 0-11
+          const fiscalMonthIndex = month >= 6 ? month - 6 : month + 6;
+          fiscalMonth = fiscalMonths[fiscalMonthIndex];
+        } else {
+          // Fallback to current fiscal month if no orderCreationDate
+          fiscalMonth = getCurrentFiscalMonth();
+        }
+      } else if (order.orderCreationDate) {
+        // Fallback: calculate fiscal year from orderCreationDate if fiscalYear not stored
         const date = new Date(order.orderCreationDate);
         fiscalYear = getFiscalYearForDate(date);
         
@@ -108,10 +128,12 @@ export default function ShipmentsPage() {
         const fiscalMonthIndex = month >= 6 ? month - 6 : month + 6;
         fiscalMonth = fiscalMonths[fiscalMonthIndex];
       } else {
-        // Fallback to current fiscal year and month
+        // Final fallback to current fiscal year and month
         fiscalYear = getCurrentFiscalYear();
         fiscalMonth = getCurrentFiscalMonth();
       }
+      
+      console.log(`  Calculated fiscalYear: ${fiscalYear}, fiscalMonth: ${fiscalMonth}`);
 
       // Get items for this order
       const items = itemsByOrderId[order._id] || [];
@@ -141,11 +163,18 @@ export default function ShipmentsPage() {
   // Generate shipment data from orders
   const shipmentData = generateShipmentData();
 
+  // Debug: Log shipment data for troubleshooting
+  console.log('All shipment data:', shipmentData);
+  console.log('Selected fiscal year:', selectedFiscalYear);
+  console.log('Selected fiscal month:', selectedFiscalMonth);
+
   // Get data for selected fiscal year and month
   const getFiscalMonthData = (fiscalYear: number, fiscalMonth: string) => {
-    return shipmentData.filter(item => 
+    const filtered = shipmentData.filter(item => 
       item.fiscalYear === fiscalYear && item.fiscalMonth === fiscalMonth
     );
+    console.log(`Filtered data for FY ${fiscalYear} ${fiscalMonth}:`, filtered);
+    return filtered;
   };
 
   // Get unique companies that have data for the selected fiscal month
@@ -154,10 +183,36 @@ export default function ShipmentsPage() {
     return Array.from(new Set(monthData.map(item => item.companyName)));
   };
 
+  // Custom sorting function for bloom ranges
+  const sortBloomRanges = (bloomRanges: string[]): string[] => {
+    return bloomRanges.sort((a, b) => {
+      // "No Bloom" should always be at the end
+      if (a === "No Bloom") return 1;
+      if (b === "No Bloom") return -1;
+      
+      // Extract numeric values for comparison
+      const getNumericValue = (bloom: string): number => {
+        if (bloom.includes('-')) {
+          // For ranges like "160-180", use the lower bound
+          return parseInt(bloom.split('-')[0]);
+        } else {
+          // For individual values like "160", use the value directly
+          return parseInt(bloom);
+        }
+      };
+      
+      const aValue = getNumericValue(a);
+      const bValue = getNumericValue(b);
+      
+      return aValue - bValue;
+    });
+  };
+
   // Get unique bloom ranges that have data for the selected fiscal month
   const getActiveBloomRanges = (fiscalYear: number, fiscalMonth: string) => {
     const monthData = getFiscalMonthData(fiscalYear, fiscalMonth);
-    return Array.from(new Set(monthData.map(item => item.bloom)));
+    const uniqueBloomRanges = Array.from(new Set(monthData.map(item => item.bloom)));
+    return sortBloomRanges(uniqueBloomRanges);
   };
 
   // Get quantity for specific bloom and company in selected fiscal month
@@ -456,7 +511,7 @@ export default function ShipmentsPage() {
                   monthBloomRanges.forEach(bloom => allBloomRanges.add(bloom));
                 });
                 
-                const sortedBloomRanges = Array.from(allBloomRanges).sort();
+                const sortedBloomRanges = sortBloomRanges(Array.from(allBloomRanges));
                 
                 return sortedBloomRanges.map((bloom) => {
                   // Check if bloom is delivered across any of the 3 months

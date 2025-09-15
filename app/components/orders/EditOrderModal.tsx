@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Search, Plus } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import DocumentUpload from "./DocumentUpload";
-import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, isDateInFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 
 interface OrderItem {
@@ -42,12 +42,12 @@ export default function EditOrderModal({
 }: EditOrderModalProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedClientId, setSelectedClientId] = useState<Id<"clients"> | null>(null);
-  const [orderItem, setOrderItem] = useState<OrderItem>({
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([{
     product: "",
     quantityKg: 0,
     unitPrice: 0,
     exclusiveValue: 0,
-    gstRate: 18, // Default 18% GST
+    gstRate: 0, // Default 0% GST
     gstAmount: 0,
     inclusiveTotal: 0,
     // Discount fields
@@ -58,14 +58,17 @@ export default function EditOrderModal({
     bloom: undefined,
     mesh: undefined,
     lotNumbers: [],
-  });
-  const [gstRateInput, setGstRateInput] = useState("18"); // Track GST rate input as string
+  }]);
+  // Keep separate input strings for each item
+  const [lotNumbersInputs, setLotNumbersInputs] = useState<string[]>([""]);
+  const [gstRateInputs, setGstRateInputs] = useState<string[]>(["0"]); // Track GST rate input as string for each item
   const [selectedFiscalYear, setSelectedFiscalYear] = useState(getCurrentFiscalYear()); // Default to current fiscal year
   // Timeline fields
   const [orderCreationDate, setOrderCreationDate] = useState("");
   const [factoryDepartureDate, setFactoryDepartureDate] = useState("");
   const [estimatedDepartureDate, setEstimatedDepartureDate] = useState("");
   const [estimatedArrivalDate, setEstimatedArrivalDate] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
   const [timelineNotes, setTimelineNotes] = useState("");
   // Shipment information
   const [shipmentMethod, setShipmentMethod] = useState<"air" | "sea" | "road" | "train" | "">("");
@@ -75,19 +78,58 @@ export default function EditOrderModal({
   const [freightCost, setFreightCost] = useState(0);
   const [isUpdating, setIsUpdating] = useState(false);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
-  const [lotNumbersInput, setLotNumbersInput] = useState("");
+  const [dateValidationError, setDateValidationError] = useState("");
 
   const order = useQuery(api.orders.get, orderId ? { id: orderId } : "skip");
   const clients = useQuery(api.clients.list, {});
   const bankAccounts = useQuery(api.banks.list);
   const updateOrder = useMutation(api.orders.update);
 
+  // Date validation helper
+  const validateOrderCreationDate = (date: string, fiscalYear: number): boolean => {
+    if (!date) return true; // Empty date is valid (will use current date)
+    
+    const dateTimestamp = new Date(date).getTime();
+    return isDateInFiscalYear(dateTimestamp, fiscalYear);
+  };
+
+  // Update order creation date when fiscal year changes
+  const handleFiscalYearChange = (newFiscalYear: number) => {
+    setSelectedFiscalYear(newFiscalYear);
+    
+    // If order creation date is set and outside the new fiscal year, reset it
+    if (orderCreationDate && !validateOrderCreationDate(orderCreationDate, newFiscalYear)) {
+      const fiscalYearRange = getFiscalYearRange(newFiscalYear);
+      const startDate = new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
+      setOrderCreationDate(startDate);
+      setDateValidationError("");
+    }
+  };
+
+  // Handle order creation date change with validation
+  const handleOrderCreationDateChange = (newDate: string) => {
+    setOrderCreationDate(newDate);
+    
+    // Validate the date against the selected fiscal year
+    if (newDate && !validateOrderCreationDate(newDate, selectedFiscalYear)) {
+      const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
+      const startDate = new Date(fiscalYearRange.startDate);
+      const endDate = new Date(fiscalYearRange.endDate);
+      setDateValidationError(
+        `Order creation date must be within ${getFiscalYearLabel(selectedFiscalYear)} (${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()})`
+      );
+    } else {
+      setDateValidationError("");
+    }
+  };
+
   // Populate form with existing order data
   useEffect(() => {
     if (order && order.items && order.items.length > 0) {
-      const item = order.items[0]; // Assuming single item for now
       setSelectedClientId(order.clientId);
-      setOrderItem({
+      
+      // Populate all order items
+      const populatedItems = order.items.map((item: any) => ({
         product: item.product,
         quantityKg: item.quantityKg,
         unitPrice: item.unitPrice,
@@ -100,79 +142,132 @@ export default function EditOrderModal({
         discountValue: item.discountValue,
         discountAmount: item.discountAmount || 0,
         // New
-        bloom: (item as any).bloom,
-        mesh: (item as any).mesh,
-        lotNumbers: (item as any).lotNumbers || [],
-      });
+        bloom: item.bloom,
+        mesh: item.mesh,
+        lotNumbers: item.lotNumbers || [],
+      }));
+      
+      setOrderItems(populatedItems);
+      
+      // Set lot numbers inputs for each item
+      const lotInputs = order.items.map((item: any) => 
+        (item.lotNumbers || []).join(", ")
+      );
+      setLotNumbersInputs(lotInputs);
+      
+      // Set GST rate inputs for each item
+      const gstInputs = order.items.map((item: any) => 
+        String(item.gstRate || 18)
+      );
+      setGstRateInputs(gstInputs);
+      
       setOrderCreationDate(order.orderCreationDate ? new Date(order.orderCreationDate).toISOString().split('T')[0] : "");
       setFactoryDepartureDate(order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toISOString().split('T')[0] : "");
       setEstimatedDepartureDate(order.estimatedDepartureDate ? new Date(order.estimatedDepartureDate).toISOString().split('T')[0] : "");
       setEstimatedArrivalDate(order.estimatedArrivalDate ? new Date(order.estimatedArrivalDate).toISOString().split('T')[0] : "");
+      setDeliveryDate(order.deliveryDate ? new Date(order.deliveryDate).toISOString().split('T')[0] : "");
       setTimelineNotes(order.timelineNotes || "");
       setShipmentMethod(order.shipmentMethod || "");
       setShippingCompany(order.shippingCompany || "");
       setShippingOrderNumber(order.shippingOrderNumber || "");
       setNotes(order.notes || "");
       setFreightCost(order.freightCost || 0);
-      // Seed lot numbers input for editing
-      const ln = ((order.items[0] as any).lotNumbers || []).join(", ");
-      setLotNumbersInput(ln);
     }
   }, [order]);
 
-  // Calculate order total
-  const orderTotal = (orderItem.inclusiveTotal || 0) + freightCost;
+  // Calculate order total from all items
+  const orderTotal = orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0) + freightCost;
 
-  const handleUpdateItem = (field: keyof OrderItem, value: string | number) => {
-    const updatedItem = { ...orderItem };
+  const updateOrderItem = (index: number, field: keyof OrderItem, value: any) => {
+    const newItems = [...orderItems];
+    newItems[index] = { ...newItems[index], [field]: value };
     
-    if (field === "product") {
-      updatedItem.product = value as string;
-    } else if (field === "bloom") {
-      updatedItem.bloom = typeof value === "string" ? (value === "" ? undefined : value) : value.toString();
-      setOrderItem(updatedItem);
-      return;
-    } else if (field === "mesh") {
-      updatedItem.mesh = typeof value === "string" ? (value === "" ? undefined : parseFloat(value)) : (value as number);
-      setOrderItem(updatedItem);
-      return;
-    } else {
-      const numValue = typeof value === "string" ? parseFloat(value) || 0 : value;
-      
-      // Update the specific field
-      if (field === "quantityKg") {
-        updatedItem.quantityKg = numValue;
-      } else if (field === "unitPrice") {
-        updatedItem.unitPrice = numValue;
-      } else if (field === "gstRate") {
-        updatedItem.gstRate = numValue;
-      } else if (field === "discountType") {
-        updatedItem.discountType = value === "" ? undefined : (value as "amount" | "percentage");
-      } else if (field === "discountValue") {
-        updatedItem.discountValue = numValue;
+    // Recalculate totals for this item
+    const item = newItems[index];
+    const exclusiveValue = item.quantityKg * item.unitPrice;
+    const gstAmount = (exclusiveValue * item.gstRate) / 100;
+    
+    // Calculate discount
+    let discountAmount = 0;
+    if (item.discountType && item.discountValue) {
+      const totalBeforeDiscount = exclusiveValue + gstAmount;
+      if (item.discountType === "amount") {
+        discountAmount = item.discountValue;
+      } else if (item.discountType === "percentage") {
+        discountAmount = (totalBeforeDiscount * item.discountValue) / 100;
       }
-      
-      // Recalculate all values
-      updatedItem.exclusiveValue = updatedItem.quantityKg * updatedItem.unitPrice;
-      updatedItem.gstAmount = (updatedItem.exclusiveValue * updatedItem.gstRate) / 100;
-      const totalBeforeDiscount = updatedItem.exclusiveValue + updatedItem.gstAmount;
-      
-      // Calculate discount on total (after GST)
-      let discountAmount = 0;
-      if (updatedItem.discountType && updatedItem.discountValue) {
-        if (updatedItem.discountType === "amount") {
-          discountAmount = updatedItem.discountValue;
-        } else if (updatedItem.discountType === "percentage") {
-          discountAmount = (totalBeforeDiscount * updatedItem.discountValue) / 100;
-        }
-      }
-      updatedItem.discountAmount = discountAmount;
-      
-      // Apply discount to total
-      updatedItem.inclusiveTotal = totalBeforeDiscount - discountAmount;
     }
     
-    setOrderItem(updatedItem);
+    const inclusiveTotal = exclusiveValue + gstAmount - discountAmount;
+    
+    newItems[index] = {
+      ...newItems[index],
+      exclusiveValue,
+      gstAmount,
+      discountAmount,
+      inclusiveTotal,
+    };
+    
+    setOrderItems(newItems);
+  };
+
+  // Helper function to handle lot numbers input for a specific item
+  const handleLotNumbersChange = (index: number, value: string) => {
+    const newInputs = [...lotNumbersInputs];
+    newInputs[index] = value;
+    setLotNumbersInputs(newInputs);
+    
+    const tokens = value.split(",").map(v => v.trim()).filter(v => v.length > 0);
+    updateOrderItem(index, "lotNumbers", tokens);
+  };
+
+  // Helper function to handle GST rate input for a specific item
+  const handleGstRateChange = (index: number, value: string) => {
+    const newInputs = [...gstRateInputs];
+    newInputs[index] = value;
+    setGstRateInputs(newInputs);
+    
+    // If the value is empty or just a decimal point, set to 0
+    if (value === "" || value === ".") {
+      updateOrderItem(index, "gstRate", 0);
+    } else {
+      const numValue = parseFloat(value);
+      // Allow any valid number (including over 100) for input, but validate later
+      if (!isNaN(numValue) && numValue >= 0) {
+        updateOrderItem(index, "gstRate", numValue);
+      }
+    }
+  };
+
+  const addNewProduct = () => {
+    setOrderItems([...orderItems, {
+      product: "",
+      quantityKg: 0,
+      unitPrice: 0,
+      exclusiveValue: 0,
+      gstRate: 0,
+      gstAmount: 0,
+      inclusiveTotal: 0,
+      discountType: undefined,
+      discountValue: undefined,
+      discountAmount: 0,
+      bloom: undefined,
+      mesh: undefined,
+      lotNumbers: [],
+    }]);
+    setLotNumbersInputs([...lotNumbersInputs, ""]);
+    setGstRateInputs([...gstRateInputs, "0"]);
+  };
+
+  const removeProduct = (index: number) => {
+    if (orderItems.length > 1) {
+      const newItems = orderItems.filter((_, i) => i !== index);
+      const newLotInputs = lotNumbersInputs.filter((_, i) => i !== index);
+      const newGstInputs = gstRateInputs.filter((_, i) => i !== index);
+      setOrderItems(newItems);
+      setLotNumbersInputs(newLotInputs);
+      setGstRateInputs(newGstInputs);
+    }
   };
 
   const handleNext = async () => {
@@ -183,9 +278,23 @@ export default function EditOrderModal({
       return;
     }
     
-    if (currentStep === 2 && (!orderItem.product || orderItem.quantityKg <= 0 || orderItem.unitPrice <= 0)) {
-      alert("Please fill in all required fields");
-      return;
+    if (currentStep === 2) {
+      // Validate all order items
+      for (let i = 0; i < orderItems.length; i++) {
+        const item = orderItems[i];
+        if (!item.product || item.quantityKg <= 0 || item.unitPrice <= 0) {
+          alert(`Please fill in all details for product ${i + 1} with valid values`);
+          return;
+        }
+        if (item.gstRate < 0) {
+          alert(`GST rate cannot be negative for product ${i + 1}`);
+          return;
+        }
+        if (item.gstRate > 100) {
+          alert(`GST rate cannot be more than 100% for product ${i + 1}`);
+          return;
+        }
+      }
     }
     if (currentStep === 3) {
       // Timeline step - no validation needed
@@ -205,7 +314,7 @@ export default function EditOrderModal({
   const resetForm = () => {
     setCurrentStep(1);
     setSelectedClientId(null);
-    setOrderItem({
+    setOrderItems([{
       product: "",
       quantityKg: 0,
       unitPrice: 0,
@@ -221,11 +330,14 @@ export default function EditOrderModal({
       bloom: undefined,
       mesh: undefined,
       lotNumbers: [],
-    });
+    }]);
+    setLotNumbersInputs([""]);
+    setGstRateInputs(["18"]);
     setOrderCreationDate("");
     setFactoryDepartureDate("");
     setEstimatedDepartureDate("");
     setEstimatedArrivalDate("");
+    setDeliveryDate("");
     setTimelineNotes("");
     // Shipment information
     setShipmentMethod("");
@@ -242,7 +354,7 @@ export default function EditOrderModal({
   };
 
   const handleSubmit = async () => {
-    if (!selectedClientId || !orderId || isUpdating) return;
+    if (!selectedClientId || !orderId || isUpdating || dateValidationError) return;
 
     console.log('Updating order...', { orderId, currentStep });
     setIsUpdating(true);
@@ -257,28 +369,28 @@ export default function EditOrderModal({
         factoryDepartureDate: factoryDepartureDate ? new Date(factoryDepartureDate).getTime() : undefined,
         estimatedDepartureDate: estimatedDepartureDate ? new Date(estimatedDepartureDate).getTime() : undefined,
         estimatedArrivalDate: estimatedArrivalDate ? new Date(estimatedArrivalDate).getTime() : undefined,
+        deliveryDate: deliveryDate ? new Date(deliveryDate).getTime() : undefined,
         timelineNotes,
         // Shipment information
         shipmentMethod: shipmentMethod || undefined,
         shippingCompany: shippingCompany || undefined,
         shippingOrderNumber: shippingOrderNumber || undefined,
-        items: [{
-          product: orderItem.product,
-          quantityKg: orderItem.quantityKg,
-          unitPrice: orderItem.unitPrice,
-          exclusiveValue: orderItem.exclusiveValue,
-          gstRate: orderItem.gstRate,
-          gstAmount: orderItem.gstAmount,
-          inclusiveTotal: orderItem.inclusiveTotal,
+        items: orderItems.map(item => ({
+          product: item.product,
+          bloom: item.bloom,
+          mesh: item.mesh,
+          lotNumbers: item.lotNumbers && item.lotNumbers.length ? item.lotNumbers : undefined,
+          quantityKg: item.quantityKg,
+          unitPrice: item.unitPrice,
+          exclusiveValue: item.exclusiveValue,
+          gstRate: item.gstRate,
+          gstAmount: item.gstAmount,
+          inclusiveTotal: item.inclusiveTotal,
           // Discount fields
-          discountType: orderItem.discountType,
-          discountValue: orderItem.discountValue,
-          discountAmount: orderItem.discountAmount,
-          // New
-          bloom: orderItem.bloom,
-          mesh: orderItem.mesh,
-          lotNumbers: orderItem.lotNumbers && orderItem.lotNumbers.length ? orderItem.lotNumbers : undefined,
-        }],
+          discountType: item.discountType,
+          discountValue: item.discountValue,
+          discountAmount: item.discountAmount,
+        })),
       });
 
       console.log('Order updated successfully');
@@ -428,201 +540,230 @@ export default function EditOrderModal({
               <div className="space-y-4">
                 <h3 className="text-lg font-medium mb-4">Order Details</h3>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Product Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={orderItem.product}
-                      onChange={(e) => handleUpdateItem("product", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="Enter product name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
-                    <select
-                      value={orderItem.bloom ?? ""}
-                      onChange={(e) => handleUpdateItem("bloom", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                {/* Products Section */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-medium text-gray-900">Products</h4>
+                    <button
+                      type="button"
+                      onClick={addNewProduct}
+                      className="flex items-center px-3 py-2 bg-primary text-white rounded-md hover:bg-primary-dark text-sm"
                     >
-                      <option value="">Select Bloom Value</option>
-                      {ALL_BLOOM_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>
-                    <input
-                      type="number"
-                      value={orderItem.mesh ?? ""}
-                      onChange={(e) => handleUpdateItem("mesh", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="e.g., 80"
-                      min={0}
-                      step={1}
-                    />
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Product
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Quantity (kg) *
-                    </label>
-                    <input
-                      type="number"
-                      value={orderItem.quantityKg}
-                      onChange={(e) => handleUpdateItem("quantityKg", parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="0"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Unit Price (per kg) *
-                    </label>
-                    <input
-                      type="number"
-                      value={orderItem.unitPrice}
-                      onChange={(e) => handleUpdateItem("unitPrice", parseFloat(e.target.value) || 0)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="0"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      GST Rate (%)
-                    </label>
-                    <input
-                      type="number"
-                      value={gstRateInput}
-                      onChange={(e) => {
-                        setGstRateInput(e.target.value);
-                        const numValue = parseFloat(e.target.value) || 0;
-                        if (numValue >= 0) {
-                          handleUpdateItem("gstRate", numValue);
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      placeholder="18"
-                      min="0"
-                      step="0.01"
-                    />
-                  </div>
-
-
-                </div>
-
-                {/* Lot Numbers */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Lot Numbers (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={lotNumbersInput}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setLotNumbersInput(val);
-                      const tokens = val.split(",").map(v => v.trim()).filter(Boolean);
-                      setOrderItem({ ...orderItem, lotNumbers: tokens });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                    placeholder="e.g., 12345, 67890"
-                  />
-                </div>
-
-                {/* Discount Section */}
-                <div className="border-t pt-4 mt-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Discount Type
-                      </label>
-                      <select
-                        value={orderItem.discountType || ""}
-                        onChange={(e) => handleUpdateItem("discountType", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      >
-                        <option value="">No discount</option>
-                        <option value="amount">Fixed Amount</option>
-                        <option value="percentage">Percentage</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        {orderItem.discountType === "amount" ? "Discount Amount ($)" : 
-                         orderItem.discountType === "percentage" ? "Discount Percentage (%)" : 
-                         "Discount Value"}
-                      </label>
-                      <input
-                        type="number"
-                        value={orderItem.discountValue || ""}
-                        onChange={(e) => handleUpdateItem("discountValue", parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                        placeholder={orderItem.discountType === "amount" ? "0.00" : 
-                                    orderItem.discountType === "percentage" ? "0" : ""}
-                        min="0"
-                        step={orderItem.discountType === "amount" ? "0.01" : "0.1"}
-                        disabled={!orderItem.discountType}
-                      />
-                    </div>
-                  </div>
-
-                  {orderItem.discountType && orderItem.discountValue && (
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Total Before Discount
-                      </label>
-                      <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
-                        ${(orderItem.exclusiveValue + orderItem.gstAmount).toFixed(2)}
+                  {orderItems.map((item, index) => (
+                    <div key={index} className="border rounded-lg p-4 mb-4 bg-gray-50">
+                      <div className="flex items-center justify-between mb-4">
+                        <h5 className="font-medium text-gray-900">Product {index + 1}</h5>
+                        {orderItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeProduct(index)}
+                            className="text-red-600 hover:text-red-800 text-sm"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
-                        Calculated Discount Amount
-                      </label>
-                      <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
-                        ${orderItem.discountAmount?.toFixed(2) || "0.00"}
+
+                      {/* Product Name */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Product Name
+                        </label>
+                        <input
+                          type="text"
+                          value={item.product}
+                          onChange={(e) => updateOrderItem(index, "product", e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                          placeholder="Enter product name"
+                        />
+                      </div>
+                      {/* Product specs: Bloom, Mesh */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
+                          <select
+                            value={item.bloom ?? ""}
+                            onChange={(e) => updateOrderItem(index, "bloom", e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                          >
+                            <option value="">Select Bloom Value</option>
+                            {ALL_BLOOM_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>
+                          <input
+                            type="number"
+                            value={item.mesh ?? ""}
+                            onChange={(e) => updateOrderItem(index, "mesh", e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                            placeholder="e.g., 80"
+                            min="0"
+                            step="1"
+                          />
+                        </div>
+                      </div>
+                      {/* Lot numbers */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Lot Numbers (comma-separated)</label>
+                        <input
+                          type="text"
+                          value={lotNumbersInputs[index] || ""}
+                          onChange={(e) => handleLotNumbersChange(index, e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                          placeholder="e.g., 12345, 67890"
+                        />
+                      </div>
+
+                      {/* Quantity and Rate */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Quantity (kg)
+                          </label>
+                          <input
+                            type="number"
+                            value={item.quantityKg || ""}
+                            onChange={(e) => updateOrderItem(index, "quantityKg", parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                            placeholder="0.00"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Rate ($ per kg)
+                          </label>
+                          <input
+                            type="number"
+                            value={item.unitPrice || ""}
+                            onChange={(e) => updateOrderItem(index, "unitPrice", parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                            placeholder="0.00"
+                            min="0"
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Calculations */}
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Ex. Value (Before GST)
+                          </label>
+                          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
+                            ${item.exclusiveValue.toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            GST Rate (%)
+                          </label>
+                          <input
+                            type="number"
+                            value={gstRateInputs[index] || ""}
+                            onChange={(e) => handleGstRateChange(index, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                            placeholder="0"
+                            min="0"
+                            step="0.1"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Discount Section */}
+                      <div className="border-t pt-4 mt-4">
+                        <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
+                        
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Discount Type
+                            </label>
+                            <select
+                              value={item.discountType || ""}
+                              onChange={(e) => updateOrderItem(index, "discountType", e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                            >
+                              <option value="">No discount</option>
+                              <option value="amount">Fixed Amount</option>
+                              <option value="percentage">Percentage</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              {item.discountType === "amount" ? "Discount Amount ($)" : 
+                               item.discountType === "percentage" ? "Discount Percentage (%)" : 
+                               "Discount Value"}
+                            </label>
+                            <input
+                              type="number"
+                              value={item.discountValue || ""}
+                              onChange={(e) => updateOrderItem(index, "discountValue", parseFloat(e.target.value) || undefined)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                              placeholder={item.discountType === "amount" ? "0.00" : 
+                                          item.discountType === "percentage" ? "0" : ""}
+                              min="0"
+                              step={(item.discountType === "amount" ? "0.01" : "0.1") as any}
+                              disabled={!item.discountType}
+                            />
+                          </div>
+                        </div>
+
+                        {item.discountType && item.discountValue && (
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Total Before Discount
+                            </label>
+                            <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
+                              ${(item.exclusiveValue + item.gstAmount).toFixed(2)}
+                            </div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
+                              Calculated Discount Amount
+                            </label>
+                            <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
+                              ${item.discountAmount?.toFixed(2) || "0.00"}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* GST Amount and Total */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            GST Amount
+                          </label>
+                          <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
+                            ${item.gstAmount.toFixed(2)}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Product Total
+                          </label>
+                          <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
+                            ${item.inclusiveTotal.toFixed(2)}
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  )}
-                </div>
-
-                {/* Calculation Summary */}
-                <div className="bg-gray-50 p-4 rounded-md">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Calculation Summary</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Exclusive Value:</span>
-                      <div className="font-medium">${orderItem.exclusiveValue.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">GST Amount:</span>
-                      <div className="font-medium">${orderItem.gstAmount.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">GST Rate:</span>
-                      <div className="font-medium">{orderItem.gstRate}%</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Total:</span>
-                      <div className="font-medium text-primary">${orderItem.inclusiveTotal.toFixed(2)}</div>
-                    </div>
-                  </div>
+                  ))}
                 </div>
 
                 {/* Freight Cost */}
-                <div className="border-t pt-4 mt-4">
+                <div className="mt-4 pt-4 border-t">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Freight Cost</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -644,19 +785,17 @@ export default function EditOrderModal({
                         Product Total
                       </label>
                       <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                        ${orderItem.inclusiveTotal.toFixed(2)}
+                        ${orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0).toFixed(2)}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Order Total Summary */}
-                <div className="bg-primary/5 p-4 rounded-md border border-primary/20">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Order Total</h4>
+                <div className="mt-4 pt-4 border-t">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Product Total:</span>
-                      <span>${orderItem.inclusiveTotal.toFixed(2)}</span>
+                      <span>${orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0).toFixed(2)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Freight Cost:</span>
@@ -687,9 +826,27 @@ export default function EditOrderModal({
                     <input
                       type="date"
                       value={orderCreationDate}
-                      onChange={(e) => setOrderCreationDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      onChange={(e) => handleOrderCreationDateChange(e.target.value)}
+                      min={(() => {
+                        const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
+                        return new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
+                      })()}
+                      max={(() => {
+                        const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
+                        return new Date(fiscalYearRange.endDate).toISOString().split('T')[0];
+                      })()}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
+                        dateValidationError ? 'border-red-500' : 'border-gray-300'
+                      }`}
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Must be within {getFiscalYearLabel(selectedFiscalYear)} ({new Date(getFiscalYearRange(selectedFiscalYear).startDate).toLocaleDateString()} - {new Date(getFiscalYearRange(selectedFiscalYear).endDate).toLocaleDateString()})
+                    </p>
+                    {dateValidationError && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {dateValidationError}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -724,6 +881,18 @@ export default function EditOrderModal({
                       type="date"
                       value={estimatedArrivalDate}
                       onChange={(e) => setEstimatedArrivalDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Delivery Date
+                    </label>
+                    <input
+                      type="date"
+                      value={deliveryDate}
+                      onChange={(e) => setDeliveryDate(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                     />
                   </div>
@@ -843,15 +1012,17 @@ export default function EditOrderModal({
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          <tr>
-                            <td className="px-2 py-2 text-xs">{orderItem.product}</td>
-                            <td className="px-2 py-2 text-xs text-right">{orderItem.quantityKg} kg</td>
-                            <td className="px-2 py-2 text-xs text-right">${orderItem.unitPrice.toFixed(2)}</td>
-                            <td className="px-2 py-2 text-xs text-right">${orderItem.exclusiveValue.toFixed(2)}</td>
-                            <td className="px-2 py-2 text-xs text-right">{orderItem.gstRate}%</td>
-                            <td className="px-2 py-2 text-xs text-right">${orderItem.gstAmount.toFixed(2)}</td>
-                            <td className="px-2 py-2 text-xs text-right font-medium">${orderItem.inclusiveTotal.toFixed(2)}</td>
-                          </tr>
+                          {orderItems.map((item, index) => (
+                            <tr key={index}>
+                              <td className="px-2 py-2 text-xs">{item.product}</td>
+                              <td className="px-2 py-2 text-xs text-right">{item.quantityKg} kg</td>
+                              <td className="px-2 py-2 text-xs text-right">${item.unitPrice.toFixed(2)}</td>
+                              <td className="px-2 py-2 text-xs text-right">${item.exclusiveValue.toFixed(2)}</td>
+                              <td className="px-2 py-2 text-xs text-right">{item.gstRate}%</td>
+                              <td className="px-2 py-2 text-xs text-right">${item.gstAmount.toFixed(2)}</td>
+                              <td className="px-2 py-2 text-xs text-right font-medium">${item.inclusiveTotal.toFixed(2)}</td>
+                            </tr>
+                          ))}
                           <tr className="bg-gray-100 font-medium">
                             <td colSpan={6} className="px-2 py-2 text-xs text-right">Grand Total:</td>
                             <td className="px-2 py-2 text-xs text-right text-primary font-bold">${orderTotal.toFixed(2)}</td>
@@ -889,7 +1060,13 @@ export default function EditOrderModal({
                           {new Date(estimatedArrivalDate).toLocaleDateString()}
                         </p>
                       )}
-                      {!orderCreationDate && !factoryDepartureDate && !estimatedDepartureDate && !estimatedArrivalDate && (
+                      {deliveryDate && (
+                        <p className="text-sm">
+                          <span className="font-medium">Delivery Date:</span>{" "}
+                          {new Date(deliveryDate).toLocaleDateString()}
+                        </p>
+                      )}
+                      {!orderCreationDate && !factoryDepartureDate && !estimatedDepartureDate && !estimatedArrivalDate && !deliveryDate && (
                         <p className="text-sm text-gray-500">No timeline dates set</p>
                       )}
                       {timelineNotes && (
@@ -964,7 +1141,7 @@ export default function EditOrderModal({
             ) : (
               <button
                 onClick={handleSubmit}
-                disabled={isUpdating}
+                disabled={isUpdating || !!dateValidationError}
                 className="flex items-center px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUpdating ? "Updating..." : "Update Order"}

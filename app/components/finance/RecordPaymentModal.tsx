@@ -184,9 +184,18 @@ export default function RecordPaymentModal({
   const formatCurrency = (amount: number, currency?: string) => {
     const invoice = unpaidInvoices?.find(inv => inv._id === selectedInvoiceId);
     const currencyToUse = currency || invoice?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
+    
+    // For EUR, use custom formatting to ensure symbol appears before number
+    if (currencyToUse === 'EUR') {
+      return `€${new Intl.NumberFormat('en-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(amount || 0)}`;
+    }
+    
+    // Use appropriate locale based on currency for other currencies
     const locale = currencyToUse === 'USD' ? 'en-US' : 
                    currencyToUse === 'PKR' ? 'en-PK' : 
-                   currencyToUse === 'EUR' ? 'en-DE' :
                    currencyToUse === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',

@@ -3,21 +3,34 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Settings, Save, AlertCircle, CheckCircle2, Package, Info } from "lucide-react";
+import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, Users, DollarSign, FileText, User, Calendar } from "lucide-react";
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 
 export default function SettingsPage() {
+  // Dashboard Settings State
+  const [dashboardOrderLimit, setDashboardOrderLimit] = useState<string>("5");
+  const [currentDashboardLimit, setCurrentDashboardLimit] = useState<number>(5);
+  const [dashboardHasChanges, setDashboardHasChanges] = useState(false);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+
+  // Shipment Settings State
   const [monthlyLimit, setMonthlyLimit] = useState<string>("150000");
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [currentLimit, setCurrentLimit] = useState<number>(150000);
+  const [shipmentHasChanges, setShipmentHasChanges] = useState(false);
+  const [shipmentLoading, setShipmentLoading] = useState(false);
+
+  // Fiscal Year Settings State
+  const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("");
+  const [currentFiscalYear, setCurrentFiscalYear] = useState<number>(0);
+  const [fiscalYearHasChanges, setFiscalYearHasChanges] = useState(false);
+  const [fiscalYearLoading, setFiscalYearLoading] = useState(false);
 
   // Try to get from Convex, fallback to localStorage
   const currentLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
   const setMonthlyShipmentLimit = useMutation(api.migrations.setMonthlyShipmentLimit);
-  
-  const [currentLimit, setCurrentLimit] = useState<number>(150000);
 
   // Load limit from database or localStorage
   useEffect(() => {
@@ -36,16 +49,109 @@ export default function SettingsPage() {
     }
   }, [currentLimitFromDB]);
 
+  // Load dashboard order limit from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('dashboardOrderLimit');
+    if (saved) {
+      const savedLimit = parseInt(saved);
+      setCurrentDashboardLimit(savedLimit);
+      setDashboardOrderLimit(savedLimit.toString());
+    }
+  }, []);
+
+  // Load fiscal year setting from localStorage
+  useEffect(() => {
+    const loadFiscalYear = () => {
+      const saved = localStorage.getItem('selectedFiscalYear');
+      const systemCurrentYear = getCurrentFiscalYear();
+      
+      if (saved) {
+        const savedYear = parseInt(saved);
+        setCurrentFiscalYear(savedYear); // Set currentFiscalYear to the saved value
+        setSelectedFiscalYear(savedYear.toString());
+        setFiscalYearHasChanges(savedYear !== systemCurrentYear);
+    } else {
+      // Smart default: Use current fiscal year, but ensure it's at least 2025
+      const defaultYear = Math.max(2025, systemCurrentYear);
+      setCurrentFiscalYear(defaultYear); // Set currentFiscalYear to the default value
+      setSelectedFiscalYear(defaultYear.toString());
+      setFiscalYearHasChanges(defaultYear !== systemCurrentYear);
+    }
+    };
+
+    // Load initial value
+    loadFiscalYear();
+
+    // Listen for localStorage changes (when settings are updated from other pages)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'selectedFiscalYear') {
+        loadFiscalYear();
+      }
+    };
+
+    // Listen for custom events (for same-tab updates)
+    const handleCustomStorageChange = (e: CustomEvent) => {
+      if (e.detail.key === 'selectedFiscalYear') {
+        loadFiscalYear();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+    };
+  }, []);
+
   const handleLimitChange = (value: string) => {
     setMonthlyLimit(value);
-    setHasChanges(value !== currentLimit.toString());
+    setShipmentHasChanges(value !== currentLimit.toString());
   };
 
-  const handleSave = async () => {
+  const handleDashboardLimitChange = (value: string) => {
+    setDashboardOrderLimit(value);
+    setDashboardHasChanges(value !== currentDashboardLimit.toString());
+  };
+
+  const handleSaveDashboardSettings = async () => {
+    const dashboardLimitValue = parseInt(dashboardOrderLimit);
+    
+    if (isNaN(dashboardLimitValue) || dashboardLimitValue < 1 || dashboardLimitValue > 20) {
+      toast.error("Dashboard order limit must be between 1 and 20");
+      return;
+    }
+
+    setDashboardLoading(true);
+    try {
+      // Save dashboard order limit to localStorage
+      localStorage.setItem('dashboardOrderLimit', dashboardLimitValue.toString());
+      setCurrentDashboardLimit(dashboardLimitValue);
+      
+      toast.success("Dashboard settings updated successfully!");
+      setDashboardHasChanges(false);
+      
+      // Show info about page refresh
+      setTimeout(() => {
+        toast.success("Refresh the page to see changes in dashboard", {
+          duration: 4000,
+          icon: "ℹ️",
+        });
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to update dashboard settings:", error);
+      toast.error("Failed to update dashboard settings. Please try again.");
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  const handleSaveShipmentSettings = async () => {
     const limitValue = parseInt(monthlyLimit);
     
     if (isNaN(limitValue) || limitValue < 0) {
-      toast.error("Please enter a valid positive number");
+      toast.error("Please enter a valid positive number for monthly limit");
       return;
     }
 
@@ -54,7 +160,7 @@ export default function SettingsPage() {
       return;
     }
 
-    setIsLoading(true);
+    setShipmentLoading(true);
     try {
       // Try to save to database first
       if (setMonthlyShipmentLimit) {
@@ -65,7 +171,7 @@ export default function SettingsPage() {
           });
           setCurrentLimit(limitValue);
           toast.success("Monthly limit updated successfully in database!");
-          setHasChanges(false);
+          setShipmentHasChanges(false);
           return;
         } catch (dbError) {
           console.warn("Database save failed, falling back to localStorage:", dbError);
@@ -76,8 +182,8 @@ export default function SettingsPage() {
       localStorage.setItem('monthlyShipmentLimit', limitValue.toString());
       setCurrentLimit(limitValue);
       
-      toast.success("Monthly limit updated successfully!");
-      setHasChanges(false);
+      toast.success("Shipment settings updated successfully!");
+      setShipmentHasChanges(false);
       
       // Show info about page refresh only for localStorage
       setTimeout(() => {
@@ -90,13 +196,65 @@ export default function SettingsPage() {
       console.error("Failed to update monthly limit:", error);
       toast.error("Failed to update monthly limit. Please try again.");
     } finally {
-      setIsLoading(false);
+      setShipmentLoading(false);
     }
   };
 
-  const handleReset = () => {
+  const handleResetDashboard = () => {
+    setDashboardOrderLimit(currentDashboardLimit.toString());
+    setDashboardHasChanges(false);
+  };
+
+  const handleResetShipment = () => {
     setMonthlyLimit(currentLimit.toString());
-    setHasChanges(false);
+    setShipmentHasChanges(false);
+  };
+
+  const handleFiscalYearChange = (value: string) => {
+    setSelectedFiscalYear(value);
+    setFiscalYearHasChanges(value !== currentFiscalYear.toString());
+  };
+
+  const handleSaveSystemSettings = async () => {
+    const fiscalYearValue = parseInt(selectedFiscalYear);
+    
+    if (isNaN(fiscalYearValue) || fiscalYearValue < 2020 || fiscalYearValue > 2030) {
+      toast.error("Please select a valid fiscal year between 2020 and 2030");
+      return;
+    }
+
+    setFiscalYearLoading(true);
+    try {
+      // Save fiscal year setting to localStorage
+      localStorage.setItem('selectedFiscalYear', fiscalYearValue.toString());
+      setCurrentFiscalYear(fiscalYearValue);
+      
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent('localStorageChange', {
+        detail: { key: 'selectedFiscalYear', value: fiscalYearValue }
+      }));
+      
+      toast.success("System settings updated successfully!");
+      setFiscalYearHasChanges(false);
+      
+      // Show info about immediate update
+      setTimeout(() => {
+        toast.success("All dashboards have been updated automatically", {
+          duration: 4000,
+          icon: "✅",
+        });
+      }, 1000);
+    } catch (error) {
+      console.error("Failed to update system settings:", error);
+      toast.error("Failed to update system settings. Please try again.");
+    } finally {
+      setFiscalYearLoading(false);
+    }
+  };
+
+  const handleResetFiscalYear = () => {
+    setSelectedFiscalYear(currentFiscalYear.toString());
+    setFiscalYearHasChanges(false);
   };
 
   return (
@@ -110,11 +268,230 @@ export default function SettingsPage() {
         <Settings className="h-8 w-8 text-gray-400" />
       </div>
 
-      {/* Monthly Limit Settings Card */}
+      {/* System Settings */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center">
-            <Package className="h-5 w-5 text-blue-500 mr-2" />
+            <Settings className="h-5 w-5 text-purple-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">System Settings</h2>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">Configure global system preferences</p>
+        </div>
+        
+        <div className="p-6">
+          <div className="max-w-md">
+            <label htmlFor="fiscalYear" className="block text-sm font-medium text-gray-700 mb-2">
+              <Calendar className="h-4 w-4 inline mr-1" />
+              Default Fiscal Year for Dashboards
+            </label>
+            <div className="relative">
+              <select
+                id="fiscalYear"
+                value={selectedFiscalYear}
+                onChange={(e) => handleFiscalYearChange(e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              >
+                {getFiscalYearOptions().map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-2 text-sm text-gray-500">
+              This setting controls which fiscal year data is displayed in all dashboards by default
+            </p>
+            
+            {/* Current Status */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <div className="flex items-center text-sm">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+                <span className="text-gray-700">
+                  Current setting: <strong>{getFiscalYearLabel(currentFiscalYear)}</strong>
+                </span>
+              </div>
+              {fiscalYearHasChanges && (
+                <div className="flex items-center text-sm mt-2">
+                  <AlertCircle className="h-4 w-4 text-orange-500 mr-2" />
+                  <span className="text-orange-700">
+                    Will be updated to: <strong>{getFiscalYearLabel(parseInt(selectedFiscalYear))}</strong>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Info Notice */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="flex items-start text-sm">
+                <Info className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
+                <div className="text-blue-700">
+                  <p><strong>Note:</strong> This setting affects all dashboard views across the system. The system automatically detects the current fiscal year, but you can override it here for historical data viewing.</p>
+                  <p className="mt-1 text-xs">Changes will take effect immediately across all dashboard pages.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="mt-6 flex items-center space-x-3">
+            <button
+              onClick={handleSaveSystemSettings}
+              disabled={!fiscalYearHasChanges || fiscalYearLoading}
+              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+                fiscalYearHasChanges && !fiscalYearLoading
+                  ? "bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  : "bg-gray-400 cursor-not-allowed"
+              }`}
+            >
+              {fiscalYearLoading ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              {fiscalYearLoading ? "Saving..." : "Save System Settings"}
+            </button>
+            
+            {fiscalYearHasChanges && (
+              <button
+                onClick={handleResetFiscalYear}
+                disabled={fiscalYearLoading}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Dashboard Settings */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center">
+            <Settings className="h-5 w-5 text-blue-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Dashboard Settings</h2>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">Configure dashboard display preferences</p>
+        </div>
+        
+        <div className="p-6">
+          <div className="max-w-md">
+            <label htmlFor="dashboardOrderLimit" className="block text-sm font-medium text-gray-700 mb-2">
+              Dashboard Order Limit
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                id="dashboardOrderLimit"
+                value={dashboardOrderLimit}
+                onChange={(e) => handleDashboardLimitChange(e.target.value)}
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="5"
+                min="1"
+                max="20"
+                step="1"
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 text-sm"></span>
+              </div>
+            </div>
+            <p className="mt-2 text-sm text-gray-500">
+              Number of orders to display in each status column on the dashboard
+            </p>
+            
+            {/* Current Status */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <div className="flex items-center text-sm">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+                <span className="text-gray-700">
+                  Current limit: <strong>{currentDashboardLimit} orders</strong>
+                </span>
+              </div>
+              {dashboardHasChanges && (
+                <div className="flex items-center text-sm mt-2">
+                  <AlertCircle className="h-4 w-4 text-orange-500 mr-2" />
+                  <span className="text-orange-700">
+                    Will be updated to: <strong>{dashboardOrderLimit} orders</strong>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex items-center space-x-3">
+              <button
+                onClick={handleSaveDashboardSettings}
+                disabled={!dashboardHasChanges || dashboardLoading}
+                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+                  dashboardHasChanges && !dashboardLoading
+                    ? "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    : "bg-gray-400 cursor-not-allowed"
+                }`}
+              >
+                {dashboardLoading ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                {dashboardLoading ? "Saving..." : "Save Dashboard Settings"}
+              </button>
+              
+              {dashboardHasChanges && (
+                <button
+                  onClick={handleResetDashboard}
+                  disabled={dashboardLoading}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+
+      {/* Order Settings */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center">
+            <FileText className="h-5 w-5 text-orange-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Order Settings</h2>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">Configure order processing preferences</p>
+        </div>
+        
+        <div className="p-6">
+          <div className="text-center py-8 text-gray-500">
+            <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-lg font-medium">Coming Soon</p>
+            <p className="text-sm">Order-specific settings will be added here</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Finance Settings */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center">
+            <DollarSign className="h-5 w-5 text-green-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Finance Settings</h2>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">Configure financial reporting and payment preferences</p>
+        </div>
+        
+        <div className="p-6">
+          <div className="text-center py-8 text-gray-500">
+            <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-lg font-medium">Coming Soon</p>
+            <p className="text-sm">Finance-specific settings will be added here</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Shipment Settings */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center">
+            <Package className="h-5 w-5 text-green-500 mr-2" />
             <h2 className="text-lg font-semibold text-gray-900">Shipment Settings</h2>
           </div>
           <p className="text-sm text-gray-600 mt-1">Configure monthly shipment limits and thresholds</p>
@@ -138,7 +515,7 @@ export default function SettingsPage() {
                 step="1000"
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                <span className="text-gray-500 text-sm">kg</span>
+                <span className="text-gray-500 text-sm"></span>
               </div>
             </div>
             <p className="mt-2 text-sm text-gray-500">
@@ -153,7 +530,7 @@ export default function SettingsPage() {
                   Current limit: <strong>{currentLimit.toLocaleString()} kg</strong>
                 </span>
               </div>
-              {hasChanges && (
+              {shipmentHasChanges && (
                 <div className="flex items-center text-sm mt-2">
                   <AlertCircle className="h-4 w-4 text-orange-500 mr-2" />
                   <span className="text-orange-700">
@@ -180,26 +557,26 @@ export default function SettingsPage() {
           {/* Action Buttons */}
           <div className="mt-6 flex items-center space-x-3">
             <button
-              onClick={handleSave}
-              disabled={!hasChanges || isLoading}
+              onClick={handleSaveShipmentSettings}
+              disabled={!shipmentHasChanges || shipmentLoading}
               className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
-                hasChanges && !isLoading
+                shipmentHasChanges && !shipmentLoading
                   ? "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   : "bg-gray-400 cursor-not-allowed"
               }`}
             >
-              {isLoading ? (
+              {shipmentLoading ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
               ) : (
                 <Save className="h-4 w-4 mr-2" />
               )}
-              {isLoading ? "Saving..." : "Save Changes"}
+              {shipmentLoading ? "Saving..." : "Save Shipment Settings"}
             </button>
             
-            {hasChanges && (
+            {shipmentHasChanges && (
               <button
-                onClick={handleReset}
-                disabled={isLoading}
+                onClick={handleResetShipment}
+                disabled={shipmentLoading}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Reset
@@ -209,17 +586,21 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Future Settings Placeholder */}
+      {/* User Settings */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Additional Settings</h2>
-          <p className="text-sm text-gray-600 mt-1">More configuration options coming soon</p>
+          <div className="flex items-center">
+            <User className="h-5 w-5 text-indigo-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">User Settings</h2>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">Configure user account and system preferences</p>
         </div>
         
         <div className="p-6">
           <div className="text-center py-8 text-gray-500">
-            <Settings className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-sm">Additional settings will be available in future updates</p>
+            <User className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <p className="text-lg font-medium">Coming Soon</p>
+            <p className="text-sm">User-specific settings will be added here</p>
           </div>
         </div>
       </div>
