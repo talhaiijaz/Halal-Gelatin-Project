@@ -152,6 +152,7 @@ export const list = query({
           order: order ? {
             _id: order._id,
             orderNumber: order.orderNumber,
+            status: order.status,
           } : null,
           payments,
           totalPayments,
