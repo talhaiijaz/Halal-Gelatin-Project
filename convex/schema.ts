@@ -216,7 +216,6 @@ export default defineSchema({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
-    accountType: v.union(v.literal("checking"), v.literal("savings"), v.literal("business")),
     status: v.union(v.literal("active"), v.literal("inactive")),
     approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),

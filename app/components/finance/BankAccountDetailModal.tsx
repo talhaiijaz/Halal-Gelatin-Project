@@ -62,11 +62,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
             ) : (
               <>
                 {/* Top Summary */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="card p-4">
-                    <p className="text-sm text-gray-500">Account Type</p>
-                    <p className="text-xl font-bold text-gray-900 capitalize">{bankAccount.accountType}</p>
-                  </div>
+                <div className="grid grid-cols-1 gap-4">
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Status</p>
                     <p className={`text-xl font-bold ${
@@ -115,14 +111,6 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                       <Calendar className="h-4 w-4 mr-2" /> Created Date
                     </h3>
                     <p className="text-sm font-medium text-gray-900">{formatDate(bankAccount.createdAt)}</p>
-                  </div>
-                  <div className="card p-4">
-                    <h3 className="font-medium text-gray-900 mb-2 flex items-center">
-                      <CreditCard className="h-4 w-4 mr-2" /> Account Type
-                    </h3>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                      {bankAccount.accountType}
-                    </span>
                   </div>
                 </div>
 

@@ -233,7 +233,30 @@ export const migrateRemoveBankBalances = mutation({
         bankName: account.bankName,
         accountNumber: account.accountNumber,
         currency: account.currency,
-        accountType: account.accountType,
+        status: account.status,
+        createdAt: account.createdAt,
+      });
+      updatedCount++;
+    }
+
+    return { updatedCount };
+  },
+});
+
+// Migration to remove accountType field from bank accounts
+export const removeAccountTypeFromBankAccounts = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const bankAccounts = await ctx.db.query("bankAccounts").collect();
+    let updatedCount = 0;
+
+    for (const account of bankAccounts) {
+      // Patch each account to remove accountType field
+      await ctx.db.patch(account._id, {
+        accountName: account.accountName,
+        bankName: account.bankName,
+        accountNumber: account.accountNumber,
+        currency: account.currency,
         status: account.status,
         createdAt: account.createdAt,
       });

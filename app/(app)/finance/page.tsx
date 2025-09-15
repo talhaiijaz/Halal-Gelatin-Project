@@ -24,7 +24,6 @@ import {
   ChevronUp,
   ChevronDown,
   Search,
-  Eye,
   Mail,
   Send,
   Clock,
@@ -44,9 +43,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts";
 
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
@@ -87,8 +83,6 @@ export default function FinancePage() {
   // Fetch dashboard data
   const dashboardStats = useQuery(api.finance.getDashboardStats, { year: selectedYear });
   const monthlyStats = useQuery(api.finance.getMonthlyOrderStats, { year: selectedYear });
-  const revenueByType = useQuery(api.finance.getRevenueByCustomerType, { fiscalYear: selectedYear });
-  const topCustomers = useQuery(api.finance.getTopCustomers, { limit: 5, fiscalYear: selectedYear });
   
   // Fetch invoices data
   const invoices = useQuery(api.invoices.list, { fiscalYear: selectedYear });
@@ -216,13 +210,6 @@ export default function FinancePage() {
     return true;
   });
 
-  const COLORS = ["#B8621B", "#D4722C", "#96501A", "#E88A3C", "#A65E2A"];
-
-  // Prepare pie chart data for revenue by type
-  const pieData = revenueByType ? [
-    { name: "Local", value: revenueByType.local.revenue },
-    { name: "International", value: revenueByType.international.revenue },
-  ].filter((d) => d.value > 0) : [];
 
   return (
     <div>
@@ -373,76 +360,8 @@ export default function FinancePage() {
               </ResponsiveContainer>
             </div>
 
-            {/* Revenue by Type Pie Chart */}
-            <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Revenue by Customer Type
-              </h2>
-              {pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(((percent ?? 0) * 100).toFixed(0))}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => formatCurrency(Number(value), 'USD')} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-[300px] text-gray-500">
-                  No data available
-                </div>
-              )}
-            </div>
           </div>
 
-          {/* Top Customers */}
-          {topCustomers && topCustomers.length > 0 && (
-            <div className="card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Top Customers by Revenue
-              </h2>
-              <div className="space-y-3">
-                {topCustomers.map((customer, index) => (
-                  <div key={customer.clientId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-primary text-white rounded-full flex items-center justify-center text-sm font-bold">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{customer.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {customer.city}, {customer.country} • {customer.orderCount} orders
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">
-                        {formatCurrency(customer.revenue, customer.type === 'local' ? 'PKR' : 'USD')}
-                      </p>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        customer.type === "local" 
-                          ? "bg-blue-100 text-blue-800" 
-                          : "bg-green-100 text-green-800"
-                      }`}>
-                        {customer.type}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -561,11 +480,8 @@ export default function FinancePage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[16%]">
                       Amount
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">
                       Status
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-[6%]">
-                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -579,13 +495,12 @@ export default function FinancePage() {
                         <td className="px-6 py-4"><div className="w-24 h-4 bg-gray-200 rounded animate-pulse" /></td>
                         <td className="px-6 py-4"><div className="w-16 h-4 bg-gray-200 rounded animate-pulse" /></td>
                         <td className="px-6 py-4"><div className="w-16 h-4 bg-gray-200 rounded animate-pulse" /></td>
-                        <td className="px-6 py-4"><div className="w-8 h-4 bg-gray-200 rounded animate-pulse" /></td>
                       </tr>
                     ))
                   ) : filteredInvoices?.length === 0 ? (
                     // Empty state
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={5} className="px-6 py-12 text-center">
                         <FileText className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
                         <p className="mt-1 text-sm text-gray-500">
@@ -645,13 +560,6 @@ export default function FinancePage() {
                               {invoice.status.replace("_", " ")}
                             </span>
                           </span>
-                        </td>
-                        <td className="py-2 text-sm text-center">
-                          <div className="flex items-center justify-center">
-                            <div className="flex items-center justify-center w-8 h-8 rounded text-gray-600">
-                              <Eye className="h-4 w-4" />
-                            </div>
-                          </div>
                         </td>
                       </tr>
                     ))
@@ -735,10 +643,8 @@ export default function FinancePage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">Customer</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Invoice</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[8%]">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">Amount</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Reference</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Bank Account</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[6%]">View</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[22%]">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[26%]">Bank Account</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -790,7 +696,6 @@ export default function FinancePage() {
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.reference}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {payment.bankAccount ? (
                           <div>
@@ -800,9 +705,6 @@ export default function FinancePage() {
                         ) : (
                           "-"
                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                        <Eye className="h-4 w-4" />
                       </td>
                     </tr>
                   ))}
@@ -853,20 +755,14 @@ export default function FinancePage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
                       Account Details
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
                       Bank
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
                       Currency
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[5%]">
-                      View
                     </th>
                   </tr>
                 </thead>
@@ -885,22 +781,16 @@ export default function FinancePage() {
                           <div className="animate-pulse h-4 bg-gray-200 rounded w-2/3"></div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="animate-pulse h-4 bg-gray-200 rounded w-1/2"></div>
-                        </td>
-                        <td className="px-6 py-4">
                           <div className="animate-pulse h-4 bg-gray-200 rounded w-1/3"></div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="animate-pulse h-4 bg-gray-200 rounded w-2/3"></div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="animate-pulse h-4 bg-gray-200 rounded w-8"></div>
-                        </td>
                       </tr>
                     ))
                   ) : bankAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={4} className="px-6 py-12 text-center">
                         <Building2 className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No bank accounts</h3>
                         <p className="mt-1 text-sm text-gray-500">
@@ -941,11 +831,6 @@ export default function FinancePage() {
                           <div className="text-sm text-gray-900">{account.bankName}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                            {account.accountType}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{account.currency}</div>
                         </td>
                         <td className="px-6 py-4">
@@ -956,11 +841,6 @@ export default function FinancePage() {
                           }`}>
                             {account.status}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm">
-                          <div className="flex items-center justify-center">
-                            <Eye className="h-4 w-4 text-gray-400" />
-                          </div>
                         </td>
                       </tr>
                     ))

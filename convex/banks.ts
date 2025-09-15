@@ -44,7 +44,6 @@ export const create = mutation({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
-    accountType: v.union(v.literal("checking"), v.literal("savings"), v.literal("business")),
   },
   handler: async (ctx, args) => {
     // Check if account number already exists
@@ -62,7 +61,6 @@ export const create = mutation({
       bankName: args.bankName,
       accountNumber: args.accountNumber,
       currency: args.currency,
-      accountType: args.accountType,
       status: "active",
       createdAt: Date.now(),
     });
@@ -80,7 +78,6 @@ export const update = mutation({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
-    accountType: v.union(v.literal("checking"), v.literal("savings"), v.literal("business")),
     status: v.union(v.literal("active"), v.literal("inactive")),
   },
   handler: async (ctx, args) => {
@@ -104,7 +101,6 @@ export const update = mutation({
       bankName: args.bankName,
       accountNumber: args.accountNumber,
       currency: args.currency,
-      accountType: args.accountType,
       status: args.status,
     });
 
