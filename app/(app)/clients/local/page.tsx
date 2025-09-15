@@ -172,8 +172,11 @@ export default function LocalClientsPage() {
     if (statusA !== statusB) {
       return statusA - statusB;
     }
-    // Finally sort by creation date (descending - latest first)
-    return b.createdAt - a.createdAt;
+    // Finally sort by order creation date (descending - latest first)
+    // Use orderCreationDate if available, fallback to createdAt
+    const dateA = a.orderCreationDate || a.createdAt;
+    const dateB = b.orderCreationDate || b.createdAt;
+    return dateB - dateA;
   });
 
   // Get unique values for filters
