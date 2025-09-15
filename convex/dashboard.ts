@@ -555,19 +555,35 @@ export const getOrdersByStatus = query({
       return orders;
     };
 
-    // Get orders by status, sorted by createdAt (latest first)
+    // Get orders by status, sorted by order creation date (latest first)
     const [pendingOrders, inProductionOrders, shippedOrders, deliveredOrders] = await Promise.all([
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "pending")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+        filterByFiscalYear(orders).sort((a, b) => {
+          const dateA = a.orderCreationDate || a.createdAt;
+          const dateB = b.orderCreationDate || b.createdAt;
+          return dateB - dateA;
+        }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "in_production")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+        filterByFiscalYear(orders).sort((a, b) => {
+          const dateA = a.orderCreationDate || a.createdAt;
+          const dateB = b.orderCreationDate || b.createdAt;
+          return dateB - dateA;
+        }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "shipped")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+        filterByFiscalYear(orders).sort((a, b) => {
+          const dateA = a.orderCreationDate || a.createdAt;
+          const dateB = b.orderCreationDate || b.createdAt;
+          return dateB - dateA;
+        }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "delivered")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => b.createdAt - a.createdAt).slice(0, limit)
+        filterByFiscalYear(orders).sort((a, b) => {
+          const dateA = a.orderCreationDate || a.createdAt;
+          const dateB = b.orderCreationDate || b.createdAt;
+          return dateB - dateA;
+        }).slice(0, limit)
       ),
     ]);
 
