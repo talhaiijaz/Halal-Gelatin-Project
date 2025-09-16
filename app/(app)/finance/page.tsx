@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
 import RecordPaymentModal from "@/app/components/finance/RecordPaymentModal";
 import EditPaymentModal, { EditablePayment } from "@/app/components/finance/EditPaymentModal";
@@ -11,6 +12,7 @@ import PaymentDetailModal from "@/app/components/finance/PaymentDetailModal";
 import BankAccountModal from "@/app/components/finance/BankAccountModal";
 import DeleteBankConfirmModal from "@/app/components/finance/DeleteBankConfirmModal";
 import BankAccountDetailModal from "@/app/components/finance/BankAccountDetailModal";
+import BankingDashboard from "@/app/components/finance/BankingDashboard";
 import { 
   TrendingUp,
   DollarSign,
@@ -32,7 +34,8 @@ import {
   XCircle,
   Building2,
   Edit,
-  Trash2
+  Trash2,
+  Settings
 } from "lucide-react";
 import {
   BarChart,
@@ -46,7 +49,17 @@ import {
 } from "recharts";
 
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { formatDateForDisplay } from "@/app/utils/dateUtils";
 import { useMutation } from "convex/react";
+
+// Helper function to format currency
+const formatCurrency = (amount: number, currency: string) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 2,
+  }).format(amount);
+};
 
 export default function FinancePage() {
   // Calculate current fiscal year
@@ -66,7 +79,9 @@ export default function FinancePage() {
   const [isDeleteBankModalOpen, setIsDeleteBankModalOpen] = useState(false);
   const [selectedBankAccount, setSelectedBankAccount] = useState<any>(null);
   const [isBankDetailModalOpen, setIsBankDetailModalOpen] = useState(false);
-  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string | null>(null);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<Id<"bankAccounts"> | null>(null);
+  const [isEditBankModalOpen, setIsEditBankModalOpen] = useState(false);
+  const [bankAccountToEdit, setBankAccountToEdit] = useState<any>(null);
   const [isEditPaymentOpen, setIsEditPaymentOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<EditablePayment | null>(null);
   const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false);
@@ -94,7 +109,7 @@ export default function FinancePage() {
   const paymentStats = useQuery(api.payments.getStats, { fiscalYear: selectedYear });
   
   // Fetch banks data
-  const bankAccounts = useQuery(api.banks.list);
+  const bankAccounts = useQuery(api.banks.listWithBalances);
   const bankStats = useQuery(api.banks.getStats);
   
   // Mutations
@@ -207,7 +222,10 @@ export default function FinancePage() {
           if (invoice.issueDate < lastMonthStart || invoice.issueDate > lastMonthEnd) return false;
           break;
         case "overdue":
-          if (invoice.dueDate >= now || invoice.outstandingBalance === 0) return false;
+          // Only consider shipped/delivered orders as overdue
+          const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+          const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+          if (invoice.dueDate >= now || outstandingAmount === 0) return false;
           break;
       }
     }
@@ -234,8 +252,6 @@ export default function FinancePage() {
     // Then sort by invoice creation date (descending - latest first)
     return b.issueDate - a.issueDate;
   });
-
-
   return (
     <div>
       {/* Header */}
@@ -342,10 +358,10 @@ export default function FinancePage() {
             <div className="card p-4">
               <p className="text-sm text-gray-500">Advance Payments</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsPKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Payments received before invoicing
@@ -356,8 +372,8 @@ export default function FinancePage() {
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Only for shipped/delivered orders
@@ -422,10 +438,10 @@ export default function FinancePage() {
             <div className="card p-4">
               <p className="text-sm text-gray-500">Advance Payments</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsPKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Payments received before invoicing
@@ -436,8 +452,8 @@ export default function FinancePage() {
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Only for shipped/delivered orders
@@ -597,7 +613,7 @@ export default function FinancePage() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {new Date(invoice.issueDate).toLocaleDateString()}
+                            {formatDateForDisplay(invoice.issueDate)}
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -606,12 +622,23 @@ export default function FinancePage() {
                           </div>
                           <div className="text-xs text-gray-500">
                             Paid: {formatCurrency(invoice.totalPaid, invoice.currency)}
+                            {invoice.advancePaid > 0 && (
+                              <span className="text-blue-600">
+                                {" "}({formatCurrency(invoice.advancePaid, invoice.currency)} advance)
+                              </span>
+                            )}
                           </div>
-                          {invoice.outstandingBalance > 0 && (
-                            <div className="text-xs text-red-600 font-medium">
-                              Outstanding: {formatCurrency(invoice.outstandingBalance, invoice.currency)}
-                            </div>
-                          )}
+                          {(() => {
+                            // Only show outstanding for shipped/delivered orders
+                            const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+                            const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+                            
+                            return outstandingAmount > 0 && (
+                              <div className="text-xs text-red-600 font-medium">
+                                Outstanding: {formatCurrency(outstandingAmount, invoice.currency)}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full ${getStatusColor(invoice.status)}`}>
@@ -680,10 +707,10 @@ export default function FinancePage() {
             <div className="card p-4">
               <p className="text-sm text-gray-500">Advance Payments</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsPKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency((dashboardStats as any)?.advancePaymentsAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsPKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(dashboardStats?.advancePaymentsAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Payments received before invoicing
@@ -694,8 +721,8 @@ export default function FinancePage() {
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency((dashboardStats as any)?.totalOutstandingAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Only for shipped/delivered orders
@@ -798,11 +825,118 @@ export default function FinancePage() {
       {/* Banks Tab */}
       {activeTab === "banks" && (
         <div className="space-y-6">
-          {/* Bank Statistics */}
-          
+          {/* Banking System Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Banking System</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Comprehensive bank account management and transaction tracking
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedBankAccount(null);
+                setIsBankModalOpen(true);
+              }}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Bank Account</span>
+            </button>
+          </div>
 
-          {/* Bank Accounts Table */}
-          <div className="card overflow-hidden">
+          {/* Bank Account Selection */}
+          {bankAccounts && bankAccounts.length > 0 && (
+            <div className="card p-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Bank Account</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {bankAccounts.map((account) => (
+                  <div
+                    key={account._id}
+                    className={`p-4 border rounded-lg transition-colors ${
+                      selectedBankAccountId === account._id
+                        ? "border-primary bg-primary/5"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => setSelectedBankAccountId(account._id)}
+                      >
+                        <h4 className="font-medium text-gray-900">{account.accountName}</h4>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBankAccountToEdit(account);
+                            setIsEditBankModalOpen(true);
+                          }}
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                          title="Edit bank account"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </button>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          account.status === "active" 
+                            ? "bg-green-100 text-green-800" 
+                            : "bg-gray-100 text-gray-800"
+                        }`}>
+                          {account.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div 
+                      className="cursor-pointer"
+                      onClick={() => setSelectedBankAccountId(account._id)}
+                    >
+                      <p className="text-sm text-gray-600 mb-1">{account.bankName}</p>
+                      <p className="text-sm text-gray-500 mb-2">#{account.accountNumber}</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {account.currentBalance !== undefined 
+                          ? formatCurrency(account.currentBalance, account.currency)
+                          : "-"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Banking Dashboard */}
+          {selectedBankAccountId && (
+            <BankingDashboard bankAccountId={selectedBankAccountId} />
+          )}
+
+          {/* Empty State */}
+          {bankAccounts && bankAccounts.length === 0 && (
+            <div className="text-center py-12">
+              <Building2 className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No bank accounts</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Start by adding your first bank account to begin managing transactions.
+              </p>
+              <div className="mt-4">
+                <button
+                  onClick={() => {
+                    setSelectedBankAccount(null);
+                    setIsBankModalOpen(true);
+                  }}
+                  className="btn-primary flex items-center space-x-2 mx-auto"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Bank Account
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Legacy Bank Accounts Table - Hidden for now */}
+          <div className="hidden">
+            <div className="card overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div>
@@ -829,14 +963,17 @@ export default function FinancePage() {
               <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
                       Account Details
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Bank
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Currency
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
+                      Balance
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Status
@@ -863,11 +1000,14 @@ export default function FinancePage() {
                         <td className="px-6 py-4">
                           <div className="animate-pulse h-4 bg-gray-200 rounded w-2/3"></div>
                         </td>
+                        <td className="px-6 py-4">
+                          <div className="animate-pulse h-4 bg-gray-200 rounded w-2/3"></div>
+                        </td>
                       </tr>
                     ))
                   ) : bankAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center">
+                      <td colSpan={5} className="px-6 py-12 text-center">
                         <Building2 className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No bank accounts</h3>
                         <p className="mt-1 text-sm text-gray-500">
@@ -911,6 +1051,14 @@ export default function FinancePage() {
                           <div className="text-sm text-gray-900">{account.currency}</div>
                         </td>
                         <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {account.currentBalance !== undefined 
+                              ? formatCurrency(account.currentBalance, account.currency)
+                              : "-"
+                            }
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             account.status === "active" 
                               ? "bg-green-100 text-green-800" 
@@ -925,6 +1073,7 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         </div>
       )}
@@ -971,6 +1120,21 @@ export default function FinancePage() {
         onSuccess={() => {
           // Refresh data
         }}
+      />
+
+      {/* Edit Bank Account Modal */}
+      <BankAccountModal
+        isOpen={isEditBankModalOpen}
+        onClose={() => {
+          setIsEditBankModalOpen(false);
+          setBankAccountToEdit(null);
+        }}
+        onSuccess={() => {
+          setIsEditBankModalOpen(false);
+          setBankAccountToEdit(null);
+          // Refresh data
+        }}
+        bankAccount={bankAccountToEdit}
       />
 
       <EditPaymentModal

@@ -54,8 +54,9 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
   const formatDate = (ts?: number) => (ts ? new Date(ts).toLocaleDateString() : "-");
 
   const payments = invoice?.payments || [];
-  const advanceTotal = payments.filter((p: any) => p.type === "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
-  const invoicePaymentTotal = payments.filter((p: any) => p.type !== "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  // Use the calculated values from the query if available, otherwise calculate locally
+  const advanceTotal = invoice?.advancePaid ?? payments.filter((p: any) => p.type === "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  const invoicePaymentTotal = invoice?.invoicePaid ?? payments.filter((p: any) => p.type !== "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -91,7 +92,14 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                   </div>
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Outstanding</p>
-                    <p className="text-xl font-bold text-orange-600">{formatCurrency(invoice.outstandingBalance, invoice.currency)}</p>
+                    <p className="text-xl font-bold text-orange-600">
+                      {(() => {
+                        // Only show outstanding for shipped/delivered orders
+                        const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+                        const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+                        return formatCurrency(outstandingAmount, invoice.currency);
+                      })()}
+                    </p>
                   </div>
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Advance Paid</p>
@@ -254,7 +262,14 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
           {invoice && (
             <div className="border-t px-6 py-4 flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Outstanding: <span className="font-semibold text-orange-600">{formatCurrency(invoice.outstandingBalance, invoice.currency)}</span>
+                Outstanding: <span className="font-semibold text-orange-600">
+                  {(() => {
+                    // Only show outstanding for shipped/delivered orders
+                    const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+                    const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+                    return formatCurrency(outstandingAmount, invoice.currency);
+                  })()}
+                </span>
               </div>
               <button
                 className="btn-primary"

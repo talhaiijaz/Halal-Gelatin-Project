@@ -168,6 +168,7 @@ export const update = mutation({
     taxId: v.optional(v.string()),
     type: v.optional(v.union(v.literal("local"), v.literal("international"))),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
+    profilePictureId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;

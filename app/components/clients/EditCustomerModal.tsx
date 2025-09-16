@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { X } from "lucide-react";
+import { X, Camera, Building } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
+import toast from "react-hot-toast";
 
 interface Client {
   _id: Id<"clients">;
@@ -18,6 +19,7 @@ interface Client {
   taxId: string;
   type: "local" | "international";
   status: "active" | "inactive";
+  profilePictureId?: Id<"_storage">;
 }
 
 interface EditCustomerModalProps {
@@ -28,7 +30,12 @@ interface EditCustomerModalProps {
 
 export default function EditCustomerModal({ isOpen, onClose, client }: EditCustomerModalProps) {
   const updateClient = useMutation(api.clients.update);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<File | null>(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     name: "",
     contactPerson: "",
@@ -64,44 +71,49 @@ export default function EditCustomerModal({ isOpen, onClose, client }: EditCusto
 
     setIsSubmitting(true);
     try {
-      await updateClient({
+      // Upload profile picture if selected
+      let profilePictureId = client.profilePictureId;
+      if (profilePicture) {
+        const uploadedId = await uploadProfilePicture();
+        if (uploadedId) {
+          profilePictureId = uploadedId;
+        }
+      }
+
+      const updateData: any = {
         id: client._id,
         ...formData,
+      };
+      
+      // Only include profilePictureId if it's not null/undefined
+      if (profilePictureId !== null && profilePictureId !== undefined) {
+        updateData.profilePictureId = profilePictureId;
+      }
+      
+      // Remove any empty string values to avoid validation issues
+      Object.keys(updateData).forEach(key => {
+        if (updateData[key] === '') {
+          delete updateData[key];
+        }
       });
+      
+      await updateClient(updateData);
+      
+      toast.success("Client updated successfully");
       onClose();
     } catch (error) {
       console.error("Failed to update client:", error);
       
-      // Provide more specific error messages based on the error type
+      // Show the actual error message for debugging
       let errorMessage = "Failed to update client. Please try again.";
       
       if (error instanceof Error) {
-        const errorStr = error.message.toLowerCase();
-        
-        if (errorStr.includes("validation") || errorStr.includes("invalid")) {
-          errorMessage = "Invalid client data. Please check all required fields and try again.";
-        } else if (errorStr.includes("duplicate") || errorStr.includes("already exists")) {
-          errorMessage = "A client with this name or contact information already exists. Please use a different name or contact details.";
-        } else if (errorStr.includes("name") || errorStr.includes("company")) {
-          errorMessage = "Company name is invalid or missing. Please provide a valid company name.";
-        } else if (errorStr.includes("email") || errorStr.includes("contact")) {
-          errorMessage = "Contact information is invalid. Please check email and phone number format.";
-        } else if (errorStr.includes("network") || errorStr.includes("connection")) {
-          errorMessage = "Network connection error. Please check your internet connection and try again.";
-        } else if (errorStr.includes("permission") || errorStr.includes("unauthorized")) {
-          errorMessage = "You don't have permission to update clients. Please contact your administrator.";
-        } else if (errorStr.includes("not found") || errorStr.includes("doesn't exist")) {
-          errorMessage = "Client not found. The client may have been deleted or you don't have access to it.";
-        } else {
-          // For other errors, show the actual error message if it's not too technical
-          const cleanMessage = error.message.replace(/^Error: /, '').replace(/^ConvexError: /, '');
-          if (cleanMessage.length < 100 && !cleanMessage.includes('internal') && !cleanMessage.includes('server')) {
-            errorMessage = `Error: ${cleanMessage}`;
-          }
-        }
+        // For now, show the actual error message to help debug
+        const cleanMessage = error.message.replace(/^Error: /, '').replace(/^ConvexError: /, '');
+        errorMessage = `Error: ${cleanMessage}`;
       }
       
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -112,6 +124,58 @@ export default function EditCustomerModal({ isOpen, onClose, client }: EditCusto
       ...prev,
       [e.target.name]: e.target.value,
     }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please upload an image file');
+        return;
+      }
+
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Image size must be less than 5MB');
+        return;
+      }
+
+      setProfilePicture(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfilePicturePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadProfilePicture = async (): Promise<Id<"_storage"> | null> => {
+    if (!profilePicture) return null;
+
+    setIsUploadingPicture(true);
+    try {
+      // Get upload URL
+      const uploadUrl = await generateUploadUrl();
+
+      // Upload file to Convex storage
+      const result = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": profilePicture.type },
+        body: profilePicture,
+      });
+
+      const { storageId } = await result.json();
+      return storageId;
+    } catch (error) {
+      console.error('Upload failed:', error);
+      toast.error('Failed to upload profile picture');
+      return null;
+    } finally {
+      setIsUploadingPicture(false);
+    }
   };
 
   if (!isOpen || !client) return null;
@@ -138,6 +202,61 @@ export default function EditCustomerModal({ isOpen, onClose, client }: EditCusto
 
           <form onSubmit={handleSubmit} className="p-6">
             <div className="space-y-4">
+              {/* Profile Picture Section */}
+              <div className="flex items-center space-x-4 mb-6">
+                <div className="flex-shrink-0">
+                  {profilePicturePreview ? (
+                    <img
+                      src={profilePicturePreview}
+                      alt="Profile preview"
+                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-300"
+                    />
+                  ) : client.profilePictureId ? (
+                    <img
+                      src={`/api/files/${client.profilePictureId}`}
+                      alt={client.name}
+                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-300"
+                      onError={(e) => {
+                        const img = e.currentTarget;
+                        const fallback = img.nextElementSibling as HTMLElement;
+                        img.style.display = 'none';
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-300">
+                      <Building className="h-8 w-8 text-gray-400" />
+                    </div>
+                  )}
+                  {client.profilePictureId && !profilePicturePreview && (
+                    <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-300 hidden">
+                      <Building className="h-8 w-8 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex-1">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    id="profile-picture-upload"
+                  />
+                  <label
+                    htmlFor="profile-picture-upload"
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    {profilePicture ? 'Change Picture' : 'Upload Picture'}
+                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    JPG, PNG or GIF (max 5MB)
+                  </p>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Company Name
@@ -292,10 +411,10 @@ export default function EditCustomerModal({ isOpen, onClose, client }: EditCusto
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingPicture}
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? "Updating..." : "Update Customer"}
+                {isSubmitting ? (isUploadingPicture ? "Uploading Picture..." : "Updating...") : "Update Customer"}
               </button>
             </div>
           </form>

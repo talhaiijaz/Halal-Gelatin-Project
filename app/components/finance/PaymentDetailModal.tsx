@@ -290,7 +290,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                 )}
 
                 {/* Activity Log */}
-                <ActivityLog entityId={String(paymentId)} entityTable="payments" title="Payment Activity" limit={5} />
+                <ActivityLog entityId={String(paymentId)} entityTable="payments" title="Payment Activity" limit={5} collapsible={true} defaultExpanded={false} />
               </>
             )}
           </div>

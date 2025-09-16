@@ -216,12 +216,56 @@ export default defineSchema({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
+    openingBalance: v.optional(v.number()), // Opening balance when bank account is created
+    currentBalance: v.optional(v.number()), // Current balance (calculated from all transactions)
     status: v.union(v.literal("active"), v.literal("inactive")),
     approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
   })
     .index("by_currency", ["currency"])
     .index("by_status", ["status"]),
+
+  // Bank Transactions table - comprehensive banking system
+  bankTransactions: defineTable({
+    bankAccountId: v.id("bankAccounts"),
+    transactionType: v.union(
+      v.literal("deposit"),           // Money coming in
+      v.literal("withdrawal"),        // Money going out
+      v.literal("transfer_in"),       // Transfer from another account
+      v.literal("transfer_out"),      // Transfer to another account
+      v.literal("payment_received"),  // Payment from customer (linked to payment)
+      v.literal("fee"),               // Bank fees
+      v.literal("interest"),          // Interest earned
+      v.literal("adjustment")         // Manual adjustments
+    ),
+    amount: v.number(), // Positive for deposits, negative for withdrawals
+    currency: v.string(),
+    description: v.string(), // Transaction description
+    reference: v.optional(v.string()), // Reference number or check number
+    // Link to related entities
+    paymentId: v.optional(v.id("payments")), // If this is from a customer payment
+    relatedBankAccountId: v.optional(v.id("bankAccounts")), // For transfers
+    // Currency conversion support for transfers between different currencies
+    originalAmount: v.optional(v.number()), // Original amount before conversion
+    originalCurrency: v.optional(v.string()), // Original currency before conversion
+    exchangeRate: v.optional(v.number()), // Exchange rate used for conversion (1 originalCurrency = ? targetCurrency)
+    convertedAmountUSD: v.optional(v.number()), // Amount converted to USD for reporting
+    // Transaction details
+    transactionDate: v.number(),
+    effectiveDate: v.optional(v.number()), // When transaction actually takes effect
+    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("cancelled")),
+    // Additional metadata
+    notes: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())), // For categorization
+    recordedBy: v.optional(v.id("users")),
+    approvedBy: v.optional(v.id("users")),
+    createdAt: v.number(),
+  })
+    .index("by_bank_account", ["bankAccountId"])
+    .index("by_transaction_type", ["transactionType"])
+    .index("by_date", ["transactionDate"])
+    .index("by_status", ["status"])
+    .index("by_payment", ["paymentId"]),
 
   // Audit Logs table
   logs: defineTable({

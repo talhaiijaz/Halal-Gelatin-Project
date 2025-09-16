@@ -1,7 +1,10 @@
 /**
  * Fiscal Year Utilities
  * Handles fiscal year calculations for July 1 to June 30
+ * All calculations use Pakistan timezone (PKT - UTC+5) for consistency
  */
+
+import { getCurrentPakistanDate } from './dateUtils';
 
 export interface FiscalYearRange {
   startDate: number; // timestamp
@@ -11,12 +14,13 @@ export interface FiscalYearRange {
 
 /**
  * Get the current fiscal year
+ * Uses Pakistan timezone for consistency
  * @returns The current fiscal year number (e.g., 2024 for FY 2024-25)
  */
 export function getCurrentFiscalYear(): number {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // 0-11 (Jan = 0, Dec = 11)
+  const now = getCurrentPakistanDate(); // Use Pakistan timezone
+  const currentYear = now.getUTCFullYear();
+  const currentMonth = now.getUTCMonth(); // 0-11 (Jan = 0, Dec = 11)
   
   // If we're in July (6) or later, we're in the next fiscal year
   // e.g., July 2024 = FY 2024-25
@@ -29,12 +33,14 @@ export function getCurrentFiscalYear(): number {
 
 /**
  * Get fiscal year range for a given fiscal year
+ * Uses Pakistan timezone for consistency
  * @param fiscalYear The fiscal year (e.g., 2024 for FY 2024-25)
  * @returns Object with startDate, endDate, and fiscalYear
  */
 export function getFiscalYearRange(fiscalYear: number): FiscalYearRange {
-  const startDate = new Date(fiscalYear, 6, 1).getTime(); // July 1
-  const endDate = new Date(fiscalYear + 1, 5, 30, 23, 59, 59, 999).getTime(); // June 30
+  // Create dates in Pakistan timezone (UTC+5)
+  const startDate = new Date(Date.UTC(fiscalYear, 6, 1, 5, 0, 0)).getTime(); // July 1, 5 AM UTC = July 1, 10 AM PKT
+  const endDate = new Date(Date.UTC(fiscalYear + 1, 5, 30, 18, 59, 59, 999)).getTime(); // June 30, 6:59 PM UTC = June 30, 11:59 PM PKT
   
   return {
     startDate,
@@ -45,13 +51,18 @@ export function getFiscalYearRange(fiscalYear: number): FiscalYearRange {
 
 /**
  * Get the fiscal year for a given date
+ * Uses Pakistan timezone for consistency
  * @param date The date to check
  * @returns The fiscal year number
  */
 export function getFiscalYearForDate(date: Date | number): number {
   const dateObj = typeof date === 'number' ? new Date(date) : date;
-  const year = dateObj.getFullYear();
-  const month = dateObj.getMonth(); // 0-11
+  
+  // Convert to Pakistan timezone
+  const pakistanTime = new Date(dateObj.getTime() + (5 * 60 * 60 * 1000)); // UTC+5
+  
+  const year = pakistanTime.getUTCFullYear();
+  const month = pakistanTime.getUTCMonth(); // 0-11
   
   // If we're in July (6) or later, we're in the next fiscal year
   if (month >= 6) { // July = 6

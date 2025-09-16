@@ -2,7 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 
-// Backfill missing fiscalYear on orders using createdAt (or orderCreationDate if present)
+// Backfill missing fiscalYear on orders using factoryDepartureDate (or orderCreationDate, or createdAt as fallback)
 export const backfillFiscalYear = mutation({
   args: {},
   returns: v.object({ updated: v.number(), totalMissing: v.number() }),
@@ -12,7 +12,7 @@ export const backfillFiscalYear = mutation({
 
     let updated = 0;
     for (const order of missing) {
-      const timestamp = (order as any).orderCreationDate ?? order.createdAt;
+      const timestamp = (order as any).factoryDepartureDate ?? (order as any).orderCreationDate ?? order.createdAt;
       const date = new Date(timestamp);
       const year = date.getFullYear();
       const month = date.getMonth(); // 0-11, July = 6
@@ -34,6 +34,7 @@ export const debugFiscalYears = query({
     fiscalYear: v.optional(v.number()),
     createdAt: v.number(),
     orderCreationDate: v.optional(v.number()),
+    factoryDepartureDate: v.optional(v.number()),
   })),
   handler: async (ctx) => {
     const orders = await ctx.db.query("orders").collect();
@@ -43,6 +44,7 @@ export const debugFiscalYears = query({
       fiscalYear: order.fiscalYear,
       createdAt: order.createdAt,
       orderCreationDate: order.orderCreationDate,
+      factoryDepartureDate: order.factoryDepartureDate,
     }));
   },
 });
@@ -69,9 +71,10 @@ export const seedDeliveriesFromOrders = mutation({
       const destinationParts = [client?.city, client?.country].filter(Boolean);
       const destination = destinationParts.join(", ") || "Unknown";
 
-      // Choose scheduled date heuristically
+      // Choose scheduled date heuristically - prioritize factory departure date
       const scheduledDate = (order as any).estimatedArrivalDate
         || (order as any).estimatedDepartureDate
+        || (order as any).factoryDepartureDate
         || (order as any).orderCreationDate
         || order.createdAt;
 
@@ -108,7 +111,7 @@ export const migrateInvoiceStatuses = mutation({
       let newStatus: "unpaid" | "partially_paid" | "paid";
 
       // Determine new status based on payment information
-      if (invoice.outstandingBalance === 0) {
+      if (invoice.totalPaid >= invoice.amount) {
         newStatus = "paid";
       } else if (invoice.totalPaid > 0) {
         newStatus = "partially_paid";
@@ -125,6 +128,50 @@ export const migrateInvoiceStatuses = mutation({
     }
 
     return { updatedCount };
+  },
+});
+
+// Fix invoice statuses and outstanding balances
+export const fixInvoiceStatusesAndBalances = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const invoices = await ctx.db.query("invoices").collect();
+    let updatedCount = 0;
+
+    for (const invoice of invoices) {
+      // Get all payments for this invoice
+      const payments = await ctx.db
+        .query("payments")
+        .withIndex("by_invoice", q => q.eq("invoiceId", invoice._id))
+        .collect();
+      
+      // Calculate actual total paid
+      const actualTotalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const actualOutstandingBalance = Math.max(0, invoice.amount - actualTotalPaid);
+      
+      // Determine correct status based on payments, not outstanding balance
+      let correctStatus: "unpaid" | "partially_paid" | "paid";
+      if (actualTotalPaid >= invoice.amount) {
+        correctStatus = "paid";
+      } else if (actualTotalPaid > 0) {
+        correctStatus = "partially_paid";
+      } else {
+        correctStatus = "unpaid";
+      }
+      
+      // Update if status, totalPaid, or outstandingBalance is incorrect
+      if (invoice.status !== correctStatus || invoice.totalPaid !== actualTotalPaid || invoice.outstandingBalance !== actualOutstandingBalance) {
+        await ctx.db.patch(invoice._id, {
+          status: correctStatus,
+          totalPaid: actualTotalPaid,
+          outstandingBalance: actualOutstandingBalance,
+          updatedAt: Date.now(),
+        });
+        updatedCount++;
+      }
+    }
+    
+    return { updatedCount, totalInvoices: invoices.length };
   },
 });
 

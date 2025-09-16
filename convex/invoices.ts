@@ -58,7 +58,8 @@ export const createForOrder = mutation({
     }
 
     const invoiceNumber = await generateInvoiceNumber(ctx);
-    const issueDate = args.issueDate || Date.now();
+    // Use order creation date as invoice issue date, fallback to provided issueDate or current time
+    const issueDate = args.issueDate || order.orderCreationDate || Date.now();
     const dueDate = args.dueDate || (issueDate + (30 * 24 * 60 * 60 * 1000)); // 30 days default
 
     const invoiceId = await ctx.db.insert("invoices", {
@@ -71,7 +72,7 @@ export const createForOrder = mutation({
       amount: order.totalAmount,
       currency: order.currency,
       totalPaid: 0,
-      outstandingBalance: 0, // New invoices don't have outstanding amounts until shipped
+      outstandingBalance: order.totalAmount, // New invoices have full amount outstanding
       notes: "",
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -140,9 +141,24 @@ export const list = query({
           .collect();
 
         const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+        
+        // Calculate advance and invoice payments separately
+        const advancePaid = payments
+          .filter((p: any) => p.type === "advance")
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        
+        const invoicePaid = payments
+          .filter((p: any) => p.type !== "advance")
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        // Calculate outstanding balance based on order status
+        // Only show outstanding for shipped/delivered orders
+        const shouldShowOutstanding = order?.status === "shipped" || order?.status === "delivered";
+        const calculatedOutstandingBalance = shouldShowOutstanding ? invoice.outstandingBalance : 0;
 
         return {
           ...invoice,
+          outstandingBalance: calculatedOutstandingBalance, // Override with calculated value
           client: client ? {
             _id: client._id,
             name: client.name,
@@ -156,6 +172,8 @@ export const list = query({
           } : null,
           payments,
           totalPayments,
+          advancePaid,
+          invoicePaid,
         };
       })
     );
@@ -198,12 +216,29 @@ export const get = query({
       })
     );
 
+    // Calculate advance and invoice payments separately
+    const advancePaid = paymentsWithBankAccounts
+      .filter((p: any) => p.type === "advance")
+      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+    
+    const invoicePaid = paymentsWithBankAccounts
+      .filter((p: any) => p.type !== "advance")
+      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+    // Calculate outstanding balance based on order status
+    // Only show outstanding for shipped/delivered orders
+    const shouldShowOutstanding = order?.status === "shipped" || order?.status === "delivered";
+    const calculatedOutstandingBalance = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+
     return {
       ...invoice,
+      outstandingBalance: calculatedOutstandingBalance, // Override with calculated value
       client,
       order,
       orderItems,
       payments: paymentsWithBankAccounts,
+      advancePaid,
+      invoicePaid,
     };
   },
 });
@@ -379,7 +414,7 @@ export const fixInvoiceStatuses = mutation({
       
       // Determine correct status
       let correctStatus: "unpaid" | "partially_paid" | "paid";
-      if (actualOutstandingBalance === 0) {
+      if (actualTotalPaid >= invoice.amount) {
         correctStatus = "paid";
       } else if (actualTotalPaid > 0) {
         correctStatus = "partially_paid";

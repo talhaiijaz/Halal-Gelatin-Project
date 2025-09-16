@@ -2,6 +2,30 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
+// Helper function to update bank account balance based on all transactions
+async function updateBankAccountBalance(ctx: any, bankAccountId: Id<"bankAccounts">) {
+  const bankAccount = await ctx.db.get(bankAccountId);
+  if (!bankAccount) return;
+
+  // Get all transactions for this bank account
+  const transactions = await ctx.db
+    .query("bankTransactions")
+    .filter((q: any) => q.eq(q.field("bankAccountId"), bankAccountId))
+    .collect();
+
+  // Calculate current balance: opening balance + sum of all transactions
+  const openingBalance = bankAccount.openingBalance || 0;
+  const totalTransactions = transactions.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
+  const currentBalance = openingBalance + totalTransactions;
+
+  // Update the bank account
+  await ctx.db.patch(bankAccountId, {
+    currentBalance: currentBalance,
+  });
+
+  return currentBalance;
+}
+
 // Helper function to format currency
 function formatCurrency(amount: number, currency: string = "USD"): string {
   return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
@@ -167,7 +191,7 @@ export const recordPayment = mutation({
         metadata: { invoiceId: args.invoiceId, clientId, netCash, withheldAmount, rate },
       });
 
-      // If linked to a bank account, also log activity under that bank account
+      // If linked to a bank account, also log activity under that bank account and update balance
       if (args.bankAccountId) {
         const bank = await ctx.db.get(args.bankAccountId);
         const client = await ctx.db.get(clientId!);
@@ -187,12 +211,32 @@ export const recordPayment = mutation({
             rate,
           },
         });
+
+        // Create bank transaction for the payment
+        const now = Date.now();
+        await ctx.db.insert("bankTransactions", {
+          bankAccountId: args.bankAccountId,
+          transactionType: "payment_received",
+          amount: args.amount,
+          currency: currency,
+          description: `Payment received from ${client?.name || "Customer"}: ${args.reference}`,
+          reference: args.reference,
+          paymentId: paymentId,
+          transactionDate: args.paymentDate || now, // Use the payment date entered by user
+          status: "completed",
+          notes: args.notes,
+          recordedBy: undefined as any,
+          createdAt: now,
+        });
+
+        // Update bank account balance after creating transaction
+        await updateBankAccountBalance(ctx, args.bankAccountId);
       }
       // Update invoice aggregates
       const newTotalPaid = invoice.totalPaid + args.amount; // invoice credited by gross amount
       const newOutstandingBalance = Math.max(0, invoice.amount - newTotalPaid);
       let newStatus: "unpaid" | "partially_paid" | "paid";
-      if (newOutstandingBalance === 0) newStatus = "paid";
+      if (newTotalPaid >= invoice.amount) newStatus = "paid";
       else if (newTotalPaid > 0) newStatus = "partially_paid";
       else newStatus = "unpaid";
 
@@ -289,7 +333,7 @@ export const recordPayment = mutation({
       message: `Advance payment recorded for client ${client.name || String(client._id)}: ${args.amount}`,
       metadata: { clientId, netCashAdvance, withheldForAdvance, rateForAdvance },
     });
-    // If linked to a bank account, also log activity under that bank account
+    // If linked to a bank account, also log activity under that bank account and update balance
     if (args.bankAccountId) {
       const bank = await ctx.db.get(args.bankAccountId);
       await logEvent(ctx, {
@@ -307,6 +351,26 @@ export const recordPayment = mutation({
           rate: rateForAdvance,
         },
       });
+
+      // Create bank transaction for the advance payment
+      const now = Date.now();
+      await ctx.db.insert("bankTransactions", {
+        bankAccountId: args.bankAccountId,
+        transactionType: "payment_received",
+        amount: args.amount,
+        currency: currency,
+        description: `Advance payment received from ${client.name || "Customer"}: ${args.reference}`,
+        reference: args.reference,
+        paymentId: paymentId,
+        transactionDate: args.paymentDate || now, // Use the payment date entered by user
+        status: "completed",
+        notes: args.notes,
+        recordedBy: undefined as any,
+        createdAt: now,
+      });
+
+      // Update bank account balance after creating transaction
+      await updateBankAccountBalance(ctx, args.bankAccountId);
     }
 
     return paymentId;
@@ -545,8 +609,29 @@ export const getUnpaidInvoices = query({
         const client = await ctx.db.get(invoice.clientId);
         const order = await ctx.db.get(invoice.orderId);
 
+        // Get payments for this invoice to calculate advance and invoice payments
+        const payments = await ctx.db
+          .query("payments")
+          .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
+          .collect();
+
+        // Calculate advance and invoice payments separately
+        const advancePaid = payments
+          .filter((p: any) => p.type === "advance")
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        
+        const invoicePaid = payments
+          .filter((p: any) => p.type !== "advance")
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        // Calculate outstanding balance based on order status
+        // Only show outstanding for shipped/delivered orders
+        const shouldShowOutstanding = order?.status === "shipped" || order?.status === "delivered";
+        const calculatedOutstandingBalance = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+
         return {
           ...invoice,
+          outstandingBalance: calculatedOutstandingBalance, // Override with calculated value
           client: client ? {
             _id: client._id,
             name: client.name,
@@ -555,7 +640,10 @@ export const getUnpaidInvoices = query({
           order: order ? {
             _id: order._id,
             orderNumber: order.orderNumber,
+            status: order.status,
           } : null,
+          advancePaid,
+          invoicePaid,
         };
       })
     );
@@ -604,42 +692,70 @@ export const deletePayment = mutation({
     const payment = await ctx.db.get(args.paymentId);
     if (!payment) throw new Error("Payment not found");
 
-    // If this payment is advance, just delete it
-    if (!payment.invoiceId) {
-      await ctx.db.delete(args.paymentId);
-      return { success: true };
+    // Get related entities for logging and bank account updates
+    const client = await ctx.db.get(payment.clientId);
+    const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
+    const bankAccount = payment.bankAccountId ? await ctx.db.get(payment.bankAccountId) : null;
+
+    // If payment is linked to a bank account, handle bank transaction deletion
+    if (payment.bankAccountId) {
+      // Find and delete the corresponding bank transaction
+      const bankTransaction = await ctx.db
+        .query("bankTransactions")
+        .filter(q => q.eq(q.field("paymentId"), args.paymentId))
+        .first();
+
+      if (bankTransaction) {
+        // Delete the bank transaction
+        await ctx.db.delete(bankTransaction._id);
+
+        // Update bank account balance
+        await updateBankAccountBalance(ctx, payment.bankAccountId);
+
+        // Log bank account activity
+        await logEvent(ctx, {
+          entityTable: "banks",
+          entityId: String(payment.bankAccountId),
+          action: "update",
+          message: `Payment deleted${bankAccount ? ` from ${bankAccount.accountName}` : ""}: ${formatCurrency(payment.amount, payment.currency)}${client ? ` from ${client.name}` : ""}`,
+          metadata: {
+            paymentId: args.paymentId,
+            bankTransactionId: bankTransaction._id,
+            invoiceId: payment.invoiceId,
+            clientId: payment.clientId,
+            method: payment.method,
+            reference: payment.reference,
+            amount: payment.amount,
+            currency: payment.currency,
+          },
+        });
+      }
     }
 
-    // Get the invoice to update
-    const invoice = await ctx.db.get(payment.invoiceId);
-    if (!invoice) throw new Error("Invoice not found");
+    // If this payment is linked to an invoice, update invoice aggregates
+    if (payment.invoiceId && invoice) {
+      // Update invoice
+      const newTotalPaid = Math.max(0, invoice.totalPaid - payment.amount);
+      const newOutstandingBalance = invoice.amount - newTotalPaid;
+      
+      // Determine new status
+      let newStatus: "unpaid" | "partially_paid" | "paid";
+      if (newTotalPaid === 0) {
+        newStatus = "unpaid";
+      } else if (newOutstandingBalance > 0) {
+        newStatus = "partially_paid";
+      } else {
+        newStatus = "paid";
+      }
 
-    // Update invoice
-    const newTotalPaid = Math.max(0, invoice.totalPaid - payment.amount);
-    const newOutstandingBalance = invoice.amount - newTotalPaid;
-    
-    // Determine new status
-    let newStatus: "unpaid" | "partially_paid" | "paid";
-    if (newTotalPaid === 0) {
-      newStatus = "unpaid";
-    } else if (newOutstandingBalance > 0) {
-      newStatus = "partially_paid";
-    } else {
-      newStatus = "paid";
+      await ctx.db.patch(payment.invoiceId, {
+        totalPaid: newTotalPaid,
+        outstandingBalance: newOutstandingBalance,
+        status: newStatus,
+        updatedAt: Date.now(),
+      });
     }
 
-    await ctx.db.patch(payment.invoiceId!, {
-      totalPaid: newTotalPaid,
-      outstandingBalance: newOutstandingBalance,
-      status: newStatus,
-      updatedAt: Date.now(),
-    });
-
-
-
-    // Get additional details for logging
-    const client = invoice ? await ctx.db.get(invoice.clientId) : null;
-    
     // Delete the payment
     await ctx.db.delete(args.paymentId);
     
@@ -653,7 +769,12 @@ export const deletePayment = mutation({
       entityId: String(args.paymentId),
       action: "delete",
       message: logMessage,
-      metadata: { invoiceLinked: !!payment.invoiceId },
+      metadata: { 
+        paymentId: args.paymentId, 
+        payment,
+        bankAccountId: payment.bankAccountId,
+        invoiceId: payment.invoiceId,
+      },
     });
 
     return { success: true };
@@ -674,7 +795,86 @@ export const updatePayment = mutation({
     const existing = await ctx.db.get(args.paymentId);
     if (!existing) throw new Error("Payment not found");
 
+    // Handle bank account changes
+    const oldBankAccountId = existing.bankAccountId;
+    const newBankAccountId = args.bankAccountId;
+    const bankAccountChanged = oldBankAccountId !== newBankAccountId;
+    const amountChanged = existing.amount !== args.amount;
 
+    // If bank account changed or amount changed, update bank transactions
+    if ((bankAccountChanged || amountChanged) && (oldBankAccountId || newBankAccountId)) {
+      // Find existing bank transaction
+      const existingBankTransaction = await ctx.db
+        .query("bankTransactions")
+        .filter(q => q.eq(q.field("paymentId"), args.paymentId))
+        .first();
+
+      if (existingBankTransaction) {
+        // If bank account changed, remove from old account and add to new account
+        if (bankAccountChanged) {
+          // Delete old transaction
+          await ctx.db.delete(existingBankTransaction._id);
+          
+          // Update old bank account balance
+          if (oldBankAccountId) {
+            await updateBankAccountBalance(ctx, oldBankAccountId);
+          }
+
+          // Create new transaction in new bank account
+          if (newBankAccountId) {
+            const client = await ctx.db.get(existing.clientId);
+            const newBankAccount = await ctx.db.get(newBankAccountId);
+            
+            await ctx.db.insert("bankTransactions", {
+              bankAccountId: newBankAccountId,
+              transactionType: "payment_received",
+              amount: args.amount,
+              currency: existing.currency,
+              description: `Payment received from ${client?.name || "Customer"}: ${args.reference}`,
+              reference: args.reference,
+              paymentId: args.paymentId,
+              transactionDate: args.paymentDate,
+              status: "completed",
+              notes: args.notes,
+              recordedBy: undefined as any,
+              createdAt: Date.now(),
+            });
+
+            // Update new bank account balance
+            await updateBankAccountBalance(ctx, newBankAccountId);
+
+            // Log bank account activity
+            await logEvent(ctx, {
+              entityTable: "banks",
+              entityId: String(newBankAccountId),
+              action: "update",
+              message: `Payment updated${newBankAccount ? ` in ${newBankAccount.accountName}` : ""}: ${formatCurrency(args.amount, existing.currency)}${client ? ` from ${client.name}` : ""}`,
+              metadata: {
+                paymentId: args.paymentId,
+                oldBankAccountId,
+                newBankAccountId,
+                oldAmount: existing.amount,
+                newAmount: args.amount,
+                reference: args.reference,
+              },
+            });
+          }
+        } else if (amountChanged) {
+          // Just update the amount in the existing transaction
+          await ctx.db.patch(existingBankTransaction._id, {
+            amount: args.amount,
+            description: `Payment received from ${(await ctx.db.get(existing.clientId))?.name || "Customer"}: ${args.reference}`,
+            reference: args.reference,
+            notes: args.notes,
+          });
+
+          // Update bank account balance
+          if (oldBankAccountId) {
+            await updateBankAccountBalance(ctx, oldBankAccountId);
+          }
+        }
+      }
+    }
 
     // Update invoice aggregates if linked to invoice
     if (existing.invoiceId) {

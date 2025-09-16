@@ -158,7 +158,7 @@ export const generateOrderPDF = async (order: OrderData) => {
   const orderInfo = [
     ['Order Number:', order.orderNumber],
     ['Status:', order.status.toUpperCase().replace('_', ' ')],
-    ['Order Date:', new Date(order.createdAt).toLocaleDateString()],
+    ['Order Date:', new Date(order.factoryDepartureDate || order.orderCreationDate || order.createdAt).toLocaleDateString()],
     ['Expected Delivery:', new Date(order.expectedDeliveryDate).toLocaleDateString()],
     ['Total Amount:', `${order.currency} ${order.totalAmount.toLocaleString()}`],
   ];

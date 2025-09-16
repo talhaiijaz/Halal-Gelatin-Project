@@ -105,17 +105,22 @@ export const getDashboardStats = query({
     // Get clients for currency classification
     const clients = await ctx.db.query("clients").collect();
     
-    // Calculate revenue by currency using payments
+    // Calculate revenue by currency using orders (not payments)
     const revenueByCurrency: Record<string, number> = {};
     const paidByCurrency: Record<string, number> = {};
     const advancePaymentsByCurrency: Record<string, number> = {};
     
+    // Revenue comes from orders
+    activeYearOrders.forEach(order => {
+      const currency = order.currency;
+      revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + order.totalAmount;
+    });
+    
+    // Payments come from actual payments
     yearPayments.forEach(payment => {
       const currency = payment.currency;
       const amount = payment.amount;
       
-      // Add to revenue totals
-      revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + amount;
       paidByCurrency[currency] = (paidByCurrency[currency] || 0) + amount;
       
       // Track advance payments separately
@@ -241,10 +246,10 @@ export const getMonthlyOrderStats = query({
       const monthStart = new Date(monthYear, monthIndex, 1).getTime();
       const monthEnd = new Date(monthYear, monthIndex + 1, 0, 23, 59, 59).getTime();
       
-      // Use explicit orderCreationDate when available; fall back to createdAt
-      // This ensures backdated orders (entered later) are counted in the correct month
+      // Use factoryDepartureDate when available; fall back to orderCreationDate, then createdAt
+      // This ensures orders are counted in the correct month based on factory departure date
       const monthOrders = orders.filter(order => {
-        const orderTimestamp = (order as any).orderCreationDate ?? order.createdAt;
+        const orderTimestamp = (order as any).factoryDepartureDate ?? (order as any).orderCreationDate ?? order.createdAt;
         return orderTimestamp >= monthStart && orderTimestamp <= monthEnd;
       });
 

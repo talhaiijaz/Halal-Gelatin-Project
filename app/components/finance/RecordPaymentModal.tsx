@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { X } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
+import { dateStringToTimestamp } from "@/app/utils/dateUtils";
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -59,9 +60,12 @@ export default function RecordPaymentModal({
     if (selectedInvoiceId && unpaidInvoices) {
       const invoice = unpaidInvoices.find(inv => inv._id === selectedInvoiceId);
       if (invoice) {
+        // Only auto-fill outstanding amount for shipped/delivered orders
+        const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+        const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
         setFormData(prev => ({
           ...prev,
-          amount: invoice.outstandingBalance.toString(),
+          amount: outstandingAmount.toString(),
           conversionRateToUSD: "",
         }));
       }
@@ -112,7 +116,7 @@ export default function RecordPaymentModal({
         amount: parseFloat(formData.amount),
         method: formData.method,
         reference: formData.reference,
-        paymentDate: new Date(formData.paymentDate).getTime(),
+        paymentDate: dateStringToTimestamp(formData.paymentDate),
         notes: formData.notes || undefined,
         bankAccountId: formData.method === "bank_transfer" && selectedBankAccountId ? (selectedBankAccountId as Id<"bankAccounts">) : undefined,
         withheldTaxRate: rate > 0 ? rate : undefined,
@@ -281,7 +285,12 @@ export default function RecordPaymentModal({
                         {(invoice.invoiceNumber && invoice.invoiceNumber.trim() !== "")
                           ? `${invoice.invoiceNumber} • ${invoice.order?.orderNumber || "Order"}`
                           : `${invoice.order?.orderNumber || "Order"}`
-                        } - {formatCurrency(invoice.outstandingBalance, invoice.currency)} outstanding
+                        } - {(() => {
+                          // Only show outstanding for shipped/delivered orders
+                          const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+                          const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+                          return formatCurrency(outstandingAmount, invoice.currency);
+                        })()} outstanding
                       </option>
                     ))}
                   </select>
@@ -309,9 +318,19 @@ export default function RecordPaymentModal({
                         </p>
                         <p className="text-sm">
                           <span className="font-medium">Paid:</span> {formatCurrency(invoice.totalPaid, invoice.currency)}
+                          {invoice.advancePaid > 0 && (
+                            <span className="text-blue-600">
+                              {" "}({formatCurrency(invoice.advancePaid, invoice.currency)} advance)
+                            </span>
+                          )}
                         </p>
                         <p className="text-sm font-medium text-primary">
-                          Outstanding: {formatCurrency(invoice.outstandingBalance, invoice.currency)}
+                          Outstanding: {(() => {
+                            // Only show outstanding for shipped/delivered orders
+                            const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+                            const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+                            return formatCurrency(outstandingAmount, invoice.currency);
+                          })()}
                         </p>
                       </div>
                     );
@@ -382,7 +401,10 @@ export default function RecordPaymentModal({
                       {selectedInvoiceId && unpaidInvoices && (() => {
                         const inv = unpaidInvoices.find(i => i._id === selectedInvoiceId);
                         if (!inv) return null;
-                        const newOutstanding = Math.max(0, inv.outstandingBalance - gross);
+                        // Only calculate outstanding for shipped/delivered orders
+                        const shouldShowOutstanding = inv.order?.status === "shipped" || inv.order?.status === "delivered";
+                        const currentOutstanding = shouldShowOutstanding ? inv.outstandingBalance : 0;
+                        const newOutstanding = Math.max(0, currentOutstanding - gross);
                         return (
                           <div className="col-span-2">
                             <div className="text-gray-600">Outstanding after this payment</div>

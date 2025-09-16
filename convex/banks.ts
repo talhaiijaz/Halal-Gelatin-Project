@@ -2,6 +2,30 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
+// Helper function to update bank account balance based on all transactions
+async function updateBankAccountBalance(ctx: any, bankAccountId: Id<"bankAccounts">) {
+  const bankAccount = await ctx.db.get(bankAccountId);
+  if (!bankAccount) return;
+
+  // Get all transactions for this bank account
+  const transactions = await ctx.db
+    .query("bankTransactions")
+    .filter((q: any) => q.eq(q.field("bankAccountId"), bankAccountId))
+    .collect();
+
+  // Calculate current balance: opening balance + sum of all transactions
+  const openingBalance = bankAccount.openingBalance || 0;
+  const totalTransactions = transactions.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
+  const currentBalance = openingBalance + totalTransactions;
+
+  // Update the bank account
+  await ctx.db.patch(bankAccountId, {
+    currentBalance: currentBalance,
+  });
+
+  return currentBalance;
+}
+
 async function logBankEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
     await ctx.db.insert("logs", {
@@ -25,6 +49,7 @@ export const list = query({
   },
 });
 
+
 // Get bank account by ID
 export const get = query({
   args: { id: v.id("bankAccounts") },
@@ -44,6 +69,7 @@ export const create = mutation({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
+    openingBalance: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Check if account number already exists
@@ -61,11 +87,36 @@ export const create = mutation({
       bankName: args.bankName,
       accountNumber: args.accountNumber,
       currency: args.currency,
+      openingBalance: args.openingBalance,
       status: "active",
       createdAt: Date.now(),
     });
 
-    await logBankEvent(ctx, { entityId: String(bankAccountId), action: "create", message: `Bank account created: ${args.accountName} (${args.bankName})` });
+    // If opening balance is provided, create an initial deposit transaction
+    if (args.openingBalance && args.openingBalance !== 0) {
+      await ctx.db.insert("bankTransactions", {
+        bankAccountId: bankAccountId,
+        transactionType: "deposit",
+        amount: args.openingBalance,
+        currency: args.currency,
+        description: `Initial opening balance`,
+        reference: "OPENING_BALANCE",
+        transactionDate: Date.now(),
+        status: "completed",
+        notes: `Opening balance set to ${args.openingBalance} ${args.currency}`,
+        recordedBy: undefined as any, // TODO: Get from auth context
+        createdAt: Date.now(),
+      });
+
+      // Update the current balance
+      await updateBankAccountBalance(ctx, bankAccountId);
+    }
+
+    await logBankEvent(ctx, { 
+      entityId: String(bankAccountId), 
+      action: "create", 
+      message: `Bank account created: ${args.accountName} (${args.bankName})${args.openingBalance ? ` with opening balance of ${args.openingBalance} ${args.currency}` : ''}` 
+    });
     return bankAccountId;
   },
 });
@@ -78,9 +129,16 @@ export const update = mutation({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
+    openingBalance: v.optional(v.number()),
     status: v.union(v.literal("active"), v.literal("inactive")),
   },
   handler: async (ctx, args) => {
+    // Get the current bank account
+    const currentAccount = await ctx.db.get(args.id);
+    if (!currentAccount) {
+      throw new Error("Bank account not found");
+    }
+
     // Check if account number already exists (excluding current account)
     const existingAccount = await ctx.db
       .query("bankAccounts")
@@ -96,16 +154,109 @@ export const update = mutation({
       throw new Error("Account number already exists");
     }
 
+    // Check if opening balance has changed
+    const oldOpeningBalance = currentAccount.openingBalance || 0;
+    const newOpeningBalance = args.openingBalance || 0;
+    const openingBalanceChanged = oldOpeningBalance !== newOpeningBalance;
+
+    // Update the bank account
     await ctx.db.patch(args.id, {
       accountName: args.accountName,
       bankName: args.bankName,
       accountNumber: args.accountNumber,
       currency: args.currency,
+      openingBalance: args.openingBalance,
       status: args.status,
     });
 
-    await logBankEvent(ctx, { entityId: String(args.id), action: "update", message: `Bank account updated: ${args.accountName} (${args.bankName})` });
+    // If opening balance changed, create an adjustment transaction
+    if (openingBalanceChanged) {
+      const adjustmentAmount = newOpeningBalance - oldOpeningBalance;
+      
+      // Only create transaction if there's an actual change
+      if (adjustmentAmount !== 0) {
+        await ctx.db.insert("bankTransactions", {
+          bankAccountId: args.id,
+          transactionType: "adjustment",
+          amount: adjustmentAmount,
+          currency: args.currency,
+          description: `Opening balance adjustment: ${oldOpeningBalance} → ${newOpeningBalance}`,
+          reference: "BALANCE_ADJUSTMENT",
+          transactionDate: Date.now(),
+          status: "completed",
+          notes: `Opening balance updated from ${oldOpeningBalance} to ${newOpeningBalance}`,
+          recordedBy: undefined as any, // TODO: Get from auth context
+          createdAt: Date.now(),
+        });
+
+        // Update the current balance after the adjustment
+        await updateBankAccountBalance(ctx, args.id);
+      }
+    }
+
+    await logBankEvent(ctx, { 
+      entityId: String(args.id), 
+      action: "update", 
+      message: `Bank account updated: ${args.accountName} (${args.bankName})${openingBalanceChanged ? ` - Opening balance adjusted from ${oldOpeningBalance} to ${newOpeningBalance}` : ''}` 
+    });
+    
     return { success: true };
+  },
+});
+
+// Get all payments for a specific bank account
+export const getPayments = query({
+  args: {
+    bankAccountId: v.id("bankAccounts"),
+  },
+  handler: async (ctx, args) => {
+    const payments = await ctx.db
+      .query("payments")
+      .filter(q => q.eq(q.field("bankAccountId"), args.bankAccountId))
+      .collect();
+
+    // Sort by payment date (most recent first)
+    return payments.sort((a, b) => b.paymentDate - a.paymentDate);
+  },
+});
+
+// Calculate and update current balance for a bank account
+export const updateCurrentBalance = mutation({
+  args: {
+    bankAccountId: v.id("bankAccounts"),
+  },
+  handler: async (ctx, args) => {
+    const currentBalance = await updateBankAccountBalance(ctx, args.bankAccountId);
+    return currentBalance;
+  },
+});
+
+// Get bank account with calculated current balance
+export const getWithBalance = query({
+  args: {
+    id: v.id("bankAccounts"),
+  },
+  handler: async (ctx, args) => {
+    const bankAccount = await ctx.db.get(args.id);
+    if (!bankAccount) {
+      return null;
+    }
+
+    // Get all transactions for this bank account
+    const transactions = await ctx.db
+      .query("bankTransactions")
+      .filter(q => q.eq(q.field("bankAccountId"), args.id))
+      .collect();
+
+    // Calculate current balance
+    const totalTransactions = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+    const openingBalance = bankAccount.openingBalance || 0;
+    const currentBalance = openingBalance + totalTransactions;
+
+    return {
+      ...bankAccount,
+      currentBalance: currentBalance,
+    };
   },
 });
 
@@ -124,6 +275,35 @@ export const remove = mutation({
     
     await logBankEvent(ctx, { entityId: String(args.id), action: "delete", message: logMessage });
     return { success: true };
+  },
+});
+
+// List all bank accounts with current balances
+export const listWithBalances = query({
+  args: {},
+  handler: async (ctx) => {
+    const bankAccounts = await ctx.db.query("bankAccounts").collect();
+    
+    // Calculate current balance for each account
+    const accountsWithBalances = await Promise.all(
+      bankAccounts.map(async (account) => {
+        const transactions = await ctx.db
+          .query("bankTransactions")
+          .filter(q => q.eq(q.field("bankAccountId"), account._id))
+          .collect();
+
+        const totalTransactions = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+        const openingBalance = account.openingBalance || 0;
+        const currentBalance = openingBalance + totalTransactions;
+
+        return {
+          ...account,
+          currentBalance: currentBalance,
+        };
+      })
+    );
+
+    return accountsWithBalances.sort((a, b) => a.accountName.localeCompare(b.accountName));
   },
 });
 

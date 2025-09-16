@@ -18,7 +18,8 @@ import {
   Edit,
   UserCheck,
   UserX,
-  Plus
+  Plus,
+  X
 } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -28,6 +29,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import ActivityLog from "@/app/components/ActivityLog";
+import EditCustomerModal from "@/app/components/clients/EditCustomerModal";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -36,10 +38,16 @@ export default function ClientDetailPage() {
   
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
+  const [isEditClientOpen, setIsEditClientOpen] = useState(false);
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [ordersLimit, setOrdersLimit] = useState(10);
 
   // Fetch client data
   const client = useQuery(api.clients.get, { id: clientId });
   const updateClient = useMutation(api.clients.update);
+  
+  // Fetch all orders for this client
+  const allOrders = useQuery(api.orders.list, { clientId });
 
   const formatCurrency = (amount: number, currency: string = 'USD') => {
     // For EUR, use custom formatting to ensure symbol appears before number
@@ -102,6 +110,7 @@ export default function ClientDetailPage() {
       toast.error("Failed to update client status");
     }
   };
+
 
   if (!client) {
     return (
@@ -168,32 +177,62 @@ export default function ClientDetailPage() {
         </div>
         
         <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center min-w-0">
-              <span className="truncate" title={client.name}>
-                {client.name}
-              </span>
-              <span className={`ml-3 flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                client.type === 'local' 
-                  ? 'bg-blue-100 text-blue-800' 
-                  : 'bg-purple-100 text-purple-800'
-              }`}>
-                {client.type === 'local' ? <MapPin className="h-3 w-3 mr-1" /> : <Globe className="h-3 w-3 mr-1" />}
-                {client.type}
-              </span>
-            </h1>
-            <p className="mt-1 text-sm text-gray-600 truncate" title={`Contact: ${client.contactPerson}`}>
-              Contact: {client.contactPerson}
-            </p>
+          <div className="flex items-start gap-4 flex-1 min-w-0">
+            {/* Client Profile Picture */}
+            <div className="flex-shrink-0">
+              {client.profilePictureId ? (
+                <div className="relative">
+                  <img
+                    src={`/api/files/${client.profilePictureId}`}
+                    alt={client.name}
+                    className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg"
+                    onError={(e) => {
+                      // Hide the image and show fallback
+                      const img = e.currentTarget;
+                      const fallback = img.nextElementSibling as HTMLElement;
+                      img.style.display = 'none';
+                      if (fallback) fallback.classList.remove('hidden');
+                    }}
+                  />
+                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center hidden border-4 border-white shadow-lg">
+                    <Building className="h-8 w-8 text-primary" />
+                  </div>
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center border-4 border-white shadow-lg">
+                  <Building className="h-8 w-8 text-primary" />
+                </div>
+              )}
+            </div>
+
+            {/* Client Info */}
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center min-w-0">
+                <span className="truncate" title={client.name}>
+                  {client.name}
+                </span>
+                <span className={`ml-3 flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  client.type === 'local' 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-purple-100 text-purple-800'
+                }`}>
+                  {client.type === 'local' ? <MapPin className="h-3 w-3 mr-1" /> : <Globe className="h-3 w-3 mr-1" />}
+                  {client.type}
+                </span>
+              </h1>
+              <p className="mt-1 text-sm text-gray-600 truncate" title={`Contact: ${client.contactPerson}`}>
+                Contact: {client.contactPerson}
+              </p>
+            </div>
           </div>
           
           <div className="flex items-center gap-3 flex-shrink-0">
             <button
-              onClick={() => setIsCreateOrderOpen(true)}
+              onClick={() => setIsEditClientOpen(true)}
               className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              New Order
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Client
             </button>
             
             <button
@@ -288,18 +327,35 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {/* Quick Stats */}
+
+          {/* Activity Log */}
           <div className="card p-6 mt-6">
+            <button
+              onClick={() => setIsActivityLogOpen(true)}
+              className="w-full flex items-center justify-center px-4 py-3 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <FileText className="h-5 w-5 mr-2" />
+              View Client Activity
+            </button>
+          </div>
+
+        </div>
+
+        {/* All Orders Section */}
+        <div className="lg:col-span-2">
+          {/* Quick Stats - moved above orders */}
+          <div className="card p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h2>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <Package className="h-6 w-6 text-blue-600 mx-auto mb-1" />
-                <div className="text-lg font-semibold text-gray-900">{client.totalOrders || 0}</div>
+                <div className="text-lg font-semibold text-gray-900">{allOrders?.length || 0}</div>
                 <div className="text-xs text-gray-600">Total Orders</div>
               </div>
               
-              <div className="text-center p-3 bg-green-50 rounded-lg">
+              <div className="text-center p-3 bg-red-50 rounded-lg">
+                <DollarSign className="h-6 w-6 text-red-600 mx-auto mb-1" />
                 <div className="text-xs text-gray-600">Outstanding</div>
                 {client.type === 'international' && client.outstandingByCurrency ? (
                   <div className="mt-1 space-y-1">
@@ -317,60 +373,83 @@ export default function ClientDetailPage() {
                   </div>
                 )}
               </div>
+
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <DollarSign className="h-6 w-6 text-green-600 mx-auto mb-1" />
+                <div className="text-xs text-gray-600">Total Revenue</div>
+                <div className="text-lg font-semibold text-gray-900 mt-1">
+                  {allOrders ? formatCurrency(
+                    allOrders.reduce((sum, order) => {
+                      if (order.invoice) {
+                        return sum + (order.invoice.totalPaid || 0);
+                      }
+                      return sum;
+                    }, 0),
+                    client.type === 'local' ? 'PKR' : 'USD'
+                  ) : formatCurrency(0, client.type === 'local' ? 'PKR' : 'USD')}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Activity Log */}
-          <div className="card p-6 mt-6">
-            <ActivityLog entityId={String(clientId)} entityTable="clients" title="Client Activity" limit={5} />
-          </div>
-        </div>
-
-        {/* Recent Orders */}
-        <div className="lg:col-span-2">
+          {/* All Orders */}
           <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <Package className="h-5 w-5 mr-2" />
-                Recent Orders
+                All Orders
               </h2>
-              <Link
-                href={`/orders?client=${client._id}`}
-                className="text-sm text-primary hover:text-primary-dark"
+              <button
+                onClick={() => setIsCreateOrderOpen(true)}
+                className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
               >
-                View All Orders
-              </Link>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Order
+              </button>
             </div>
             
-            {client.recentOrders && client.recentOrders.length > 0 ? (
-              <div className="space-y-3">
-                {client.recentOrders.map((order) => (
-                  <div 
-                    key={order._id} 
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
-                    onClick={() => setSelectedOrderId(order._id)}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="text-lg">{getStatusIcon(order.status)}</span>
-                      <div>
+            {allOrders && allOrders.length > 0 ? (
+              <div>
+                <div className="space-y-3">
+                  {allOrders.slice(0, ordersLimit).map((order) => (
+                    <div 
+                      key={order._id} 
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                      onClick={() => setSelectedOrderId(order._id)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="text-lg">{getStatusIcon(order.status)}</span>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            {order.invoiceNumber || order.orderNumber}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatDate(order.factoryDepartureDate || order.orderCreationDate || order.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
-                          {order.orderNumber}
+                          {formatCurrency(order.totalAmount, order.currency)}
                         </p>
-                        <p className="text-xs text-gray-500">
-                          {formatDate(order.createdAt)}
+                        <p className="text-xs text-gray-500 capitalize">
+                          {order.status.replace("_", " ")}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">
-                        {formatCurrency(order.totalAmount, order.currency)}
-                      </p>
-                      <p className="text-xs text-gray-500 capitalize">
-                        {order.status.replace("_", " ")}
-                      </p>
-                    </div>
+                  ))}
+                </div>
+                
+                {allOrders.length > ordersLimit && (
+                  <div className="mt-4 text-center">
+                    <button
+                      onClick={() => setOrdersLimit(ordersLimit + 10)}
+                      className="px-4 py-2 text-sm text-primary hover:text-primary-dark border border-primary rounded-lg hover:bg-primary/5 transition-colors"
+                    >
+                      Load More Orders ({allOrders.length - ordersLimit} remaining)
+                    </button>
                   </div>
-                ))}
+                )}
               </div>
             ) : (
               <div className="text-center py-8">
@@ -413,6 +492,31 @@ export default function ClientDetailPage() {
         onClose={() => setSelectedOrderId(null)}
         orderId={selectedOrderId}
       />
+
+      {/* Edit Client Modal */}
+      <EditCustomerModal
+        isOpen={isEditClientOpen}
+        onClose={() => setIsEditClientOpen(false)}
+        client={client}
+      />
+
+      {/* Activity Log Modal */}
+      {isActivityLogOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Client Activity</h2>
+              <button
+                onClick={() => setIsActivityLogOpen(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <ActivityLog entityId={String(clientId)} entityTable="clients" title="" limit={50} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

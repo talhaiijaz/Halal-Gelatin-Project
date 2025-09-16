@@ -7,8 +7,6 @@ import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation"
 import CustomerCard from "@/app/components/clients/CustomerCard";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import AddCustomerModal from "@/app/components/clients/AddCustomerModal";
-import EditCustomerModal from "@/app/components/clients/EditCustomerModal";
-import DeleteConfirmModal from "@/app/components/clients/DeleteConfirmModal";
 import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import { 
   Search, 
@@ -23,8 +21,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Edit,
-  Trash2,
   DollarSign,
   AlertCircle,
   Users,
@@ -44,9 +40,6 @@ export default function InternationalClientsPage() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [selectedClientForOrder, setSelectedClientForOrder] = useState<Id<"clients"> | null>(null);
-  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState(false);
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [selectedClientForEdit, setSelectedClientForEdit] = useState<any>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [customerFilter, setCustomerFilter] = useState<string>("");
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | undefined>(undefined);
@@ -173,11 +166,11 @@ export default function InternationalClientsPage() {
     if (statusA !== statusB) {
       return statusA - statusB;
     }
-    // Finally sort by order creation date (descending - latest first)
-    // Use orderCreationDate if available, fallback to createdAt
-    const dateA = a.orderCreationDate || a.createdAt;
-    const dateB = b.orderCreationDate || b.createdAt;
-    return dateB - dateA;
+    // Finally sort by factory departure date (ascending - nearest first)
+    // Use factoryDepartureDate if available, fallback to orderCreationDate, then createdAt
+    const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+    const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+    return dateA - dateB;
   });
 
   // Get unique customers for filter
@@ -677,6 +670,9 @@ export default function InternationalClientsPage() {
                       Quantity
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fac. Dep. Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Delivery Date
                     </th>
                   </tr>
@@ -686,6 +682,7 @@ export default function InternationalClientsPage() {
                     // Loading state
                     Array.from({ length: 5 }).map((_, index) => (
                       <tr key={index}>
+                        <td className="px-4 py-4"><Skeleton /></td>
                         <td className="px-4 py-4"><Skeleton /></td>
                         <td className="px-4 py-4"><Skeleton /></td>
                         <td className="px-4 py-4"><Skeleton /></td>
@@ -786,6 +783,11 @@ export default function InternationalClientsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-900">
+                            <div className="truncate" title={order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}>
+                              {order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900">
                             <div className="truncate" title={order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}>
                               {order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}
                             </div>
@@ -796,7 +798,7 @@ export default function InternationalClientsPage() {
                   ) : (
                     // Empty state when no orders match filters
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={7} className="px-6 py-12 text-center">
                         <Package className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No international orders found</h3>
                         <p className="mt-1 text-sm text-gray-500">
@@ -945,29 +947,6 @@ export default function InternationalClientsPage() {
                     </Link>
                   </div>
                   
-                  {/* Secondary Actions */}
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => {
-                        setSelectedClientForEdit(client);
-                        setIsEditCustomerOpen(true);
-                      }}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-blue-50 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors"
-                    >
-                      <Edit className="h-4 w-4 mr-2" />
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedClientForEdit(client);
-                        setIsDeleteConfirmOpen(true);
-                      }}
-                      className="flex-1 inline-flex items-center justify-center px-3 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </button>
-                  </div>
                 </div>
               </div>
             ))}
@@ -1014,26 +993,6 @@ export default function InternationalClientsPage() {
         type="international"
       />
 
-      <EditCustomerModal
-        isOpen={isEditCustomerOpen}
-        onClose={() => {
-          setIsEditCustomerOpen(false);
-          setSelectedClientForEdit(null);
-        }}
-        client={selectedClientForEdit}
-      />
-
-      <DeleteConfirmModal
-        isOpen={isDeleteConfirmOpen}
-        onClose={() => {
-          setIsDeleteConfirmOpen(false);
-          setSelectedClientForEdit(null);
-        }}
-        client={selectedClientForEdit}
-        onSuccess={() => {
-          toast.success("Customer deleted successfully!");
-        }}
-      />
     </div>
   );
 }

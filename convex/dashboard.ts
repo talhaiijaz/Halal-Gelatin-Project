@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
 // Universal logs queries
@@ -202,10 +202,11 @@ export const getStats = query({
     const startOfPrevYear = new Date(prevFiscalYear, 6, 1).getTime();
     const endOfPrevYear = new Date(prevFiscalYear + 1, 5, 30, 23, 59, 59, 999).getTime();
 
-    // Current fiscal year data
-    const currentYearOrders = orders.filter(o => 
-      o.createdAt >= startOfYear && o.createdAt <= endOfYear
-    );
+    // Current fiscal year data - use factoryDepartureDate if available, fallback to orderCreationDate, then createdAt
+    const currentYearOrders = orders.filter(o => {
+      const orderDate = o.factoryDepartureDate || o.orderCreationDate || o.createdAt;
+      return orderDate >= startOfYear && orderDate <= endOfYear;
+    });
     const currentYearInvoices = invoices.filter(i => 
       i.createdAt >= startOfYear && i.createdAt <= endOfYear
     );
@@ -213,10 +214,11 @@ export const getStats = query({
       c.createdAt >= startOfYear && c.createdAt <= endOfYear
     );
 
-    // Previous fiscal year data for comparison
-    const prevYearOrders = orders.filter(o => 
-      o.createdAt >= startOfPrevYear && o.createdAt <= endOfPrevYear
-    );
+    // Previous fiscal year data for comparison - use factoryDepartureDate if available, fallback to orderCreationDate, then createdAt
+    const prevYearOrders = orders.filter(o => {
+      const orderDate = o.factoryDepartureDate || o.orderCreationDate || o.createdAt;
+      return orderDate >= startOfPrevYear && orderDate <= endOfPrevYear;
+    });
     const prevYearInvoices = invoices.filter(i => 
       i.createdAt >= startOfPrevYear && i.createdAt <= endOfPrevYear
     );
@@ -343,14 +345,17 @@ export const getRecentOrders = query({
       .query("orders")
       .collect();
 
-    // Sort orders: first by fiscal year (descending), then by creation date (descending)
+    // Sort orders: first by fiscal year (descending), then by factory departure date (descending)
     orders.sort((a, b) => {
       // First sort by fiscal year (descending - latest year first)
       if (a.fiscalYear !== b.fiscalYear) {
         return (b.fiscalYear || 0) - (a.fiscalYear || 0);
       }
-      // Then sort by creation date (descending - latest first)
-      return b.createdAt - a.createdAt;
+      // Then sort by factory departure date (ascending - nearest first)
+      // Use factoryDepartureDate if available, fallback to orderCreationDate, then createdAt
+      const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+      const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+      return dateA - dateB;
     });
 
     // Take the first 'limit' orders
@@ -394,12 +399,15 @@ export const getRecentActivity = query({
     // Get recent orders
     const allOrders = await ctx.db.query("orders").collect();
     
-    // Sort orders: first by fiscal year (descending), then by creation date (descending)
+    // Sort orders: first by fiscal year (descending), then by factory departure date (ascending - nearest first)
     allOrders.sort((a, b) => {
       if (a.fiscalYear !== b.fiscalYear) {
         return (b.fiscalYear || 0) - (a.fiscalYear || 0);
       }
-      return b.createdAt - a.createdAt;
+      // Use factoryDepartureDate if available, fallback to orderCreationDate, then createdAt
+      const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+      const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+      return dateA - dateB;
     });
     
     const recentOrders = allOrders.slice(0, 3);
@@ -486,6 +494,7 @@ export const getOrdersByStatus = query({
       totalAmount: v.number(),
       createdAt: v.number(),
       deliveryDate: v.optional(v.number()),
+      factoryDepartureDate: v.optional(v.number()),
     })),
     inProductionOrders: v.array(v.object({
       _id: v.id("orders"),
@@ -496,6 +505,7 @@ export const getOrdersByStatus = query({
       totalAmount: v.number(),
       createdAt: v.number(),
       deliveryDate: v.optional(v.number()),
+      factoryDepartureDate: v.optional(v.number()),
     })),
     shippedOrders: v.array(v.object({
       _id: v.id("orders"),
@@ -506,6 +516,7 @@ export const getOrdersByStatus = query({
       totalAmount: v.number(),
       createdAt: v.number(),
       deliveryDate: v.optional(v.number()),
+      factoryDepartureDate: v.optional(v.number()),
     })),
     deliveredOrders: v.array(v.object({
       _id: v.id("orders"),
@@ -516,6 +527,7 @@ export const getOrdersByStatus = query({
       totalAmount: v.number(),
       createdAt: v.number(),
       deliveryDate: v.optional(v.number()),
+      factoryDepartureDate: v.optional(v.number()),
     })),
   }),
   handler: async (ctx, args) => {
@@ -542,6 +554,7 @@ export const getOrdersByStatus = query({
             totalAmount: order.totalAmount,
             createdAt: order.createdAt,
             ...(order.deliveryDate && { deliveryDate: order.deliveryDate }),
+            ...(order.factoryDepartureDate && { factoryDepartureDate: order.factoryDepartureDate }),
           };
         })
       );
@@ -555,34 +568,34 @@ export const getOrdersByStatus = query({
       return orders;
     };
 
-    // Get orders by status, sorted by order creation date (latest first)
+    // Get orders by status, sorted by factory departure date (nearest first)
     const [pendingOrders, inProductionOrders, shippedOrders, deliveredOrders] = await Promise.all([
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "pending")).collect().then(orders => 
         filterByFiscalYear(orders).sort((a, b) => {
-          const dateA = a.orderCreationDate || a.createdAt;
-          const dateB = b.orderCreationDate || b.createdAt;
-          return dateB - dateA;
+          const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+          const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+          return dateA - dateB;
         }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "in_production")).collect().then(orders => 
         filterByFiscalYear(orders).sort((a, b) => {
-          const dateA = a.orderCreationDate || a.createdAt;
-          const dateB = b.orderCreationDate || b.createdAt;
-          return dateB - dateA;
+          const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+          const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+          return dateA - dateB;
         }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "shipped")).collect().then(orders => 
         filterByFiscalYear(orders).sort((a, b) => {
-          const dateA = a.orderCreationDate || a.createdAt;
-          const dateB = b.orderCreationDate || b.createdAt;
-          return dateB - dateA;
+          const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+          const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+          return dateA - dateB;
         }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "delivered")).collect().then(orders => 
         filterByFiscalYear(orders).sort((a, b) => {
-          const dateA = a.orderCreationDate || a.createdAt;
-          const dateB = b.orderCreationDate || b.createdAt;
-          return dateB - dateA;
+          const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+          const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+          return dateA - dateB;
         }).slice(0, limit)
       ),
     ]);

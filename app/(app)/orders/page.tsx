@@ -125,7 +125,7 @@ function OrdersPageContent() {
     if (!orders) return;
 
     const csvContent = [
-      ["Invoice Number", "Client", "Status", "Total Amount", "Paid Amount", "Outstanding Amount", "Currency", "Quantity (kg)", "Delivery Date", "Created Date"],
+      ["Invoice Number", "Client", "Status", "Total Amount", "Paid Amount", "Outstanding Amount", "Currency", "Quantity (kg)", "Delivery Date", "Factory Departure Date"],
       ...orders.map(order => {
         const metrics = calculateFinancialMetrics(order);
         return [
@@ -138,7 +138,9 @@ function OrdersPageContent() {
           order.currency,
           order.items?.reduce((total, item) => total + (item.quantityKg || 0), 0).toFixed(2) || "0",
           order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : "Not set",
-          new Date(order.createdAt).toLocaleDateString()
+          order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 
+            order.orderCreationDate ? new Date(order.orderCreationDate).toLocaleDateString() : 
+            new Date(order.createdAt).toLocaleDateString()
         ];
       })
     ].map(row => row.join(",")).join("\n");
@@ -186,11 +188,11 @@ function OrdersPageContent() {
     if (statusA !== statusB) {
       return statusA - statusB;
     }
-    // Finally sort by order creation date (descending - latest first)
-    // Use orderCreationDate if available, fallback to createdAt
-    const dateA = a.orderCreationDate || a.createdAt;
-    const dateB = b.orderCreationDate || b.createdAt;
-    return dateB - dateA;
+    // Finally sort by factory departure date (ascending - nearest first)
+    // Use factoryDepartureDate if available, fallback to orderCreationDate, then createdAt
+    const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+    const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+    return dateA - dateB;
   });
 
 
@@ -279,6 +281,9 @@ function OrdersPageContent() {
                   Quantity
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Fac. Dep. Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Delivery Date
                 </th>
               </tr>
@@ -288,6 +293,7 @@ function OrdersPageContent() {
                 // Loading state
                 Array.from({ length: 5 }).map((_, index) => (
                   <tr key={index}>
+                    <td className="px-4 py-4"><Skeleton /></td>
                     <td className="px-4 py-4"><Skeleton /></td>
                     <td className="px-4 py-4"><Skeleton /></td>
                     <td className="px-4 py-4"><Skeleton /></td>
@@ -352,6 +358,11 @@ function OrdersPageContent() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm text-gray-900">
+                        <div className="truncate" title={order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}>
+                          {order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900">
                         <div className="truncate" title={order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}>
                           {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}
                         </div>
@@ -362,7 +373,7 @@ function OrdersPageContent() {
               ) : (
                 // Empty state when no orders match filters
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <Package className="mx-auto h-12 w-12 text-gray-400" />
                     <h3 className="mt-2 text-sm font-medium text-gray-900">No orders found</h3>
                     <p className="mt-1 text-sm text-gray-500">

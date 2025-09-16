@@ -8,6 +8,8 @@ import { Id } from "@/convex/_generated/dataModel";
 import DocumentUpload from "./DocumentUpload";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, isDateInFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
+import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
+import toast from "react-hot-toast";
 
 interface OrderItem {
   product: string;
@@ -66,6 +68,7 @@ export default function EditOrderModal({
   // Timeline fields
   const [orderCreationDate, setOrderCreationDate] = useState("");
   const [factoryDepartureDate, setFactoryDepartureDate] = useState("");
+  const [factoryDepartureDateError, setFactoryDepartureDateError] = useState("");
   const [estimatedDepartureDate, setEstimatedDepartureDate] = useState("");
   const [estimatedArrivalDate, setEstimatedArrivalDate] = useState("");
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -161,11 +164,11 @@ export default function EditOrderModal({
       );
       setGstRateInputs(gstInputs);
       
-      setOrderCreationDate(order.orderCreationDate ? new Date(order.orderCreationDate).toISOString().split('T')[0] : "");
-      setFactoryDepartureDate(order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toISOString().split('T')[0] : "");
-      setEstimatedDepartureDate(order.estimatedDepartureDate ? new Date(order.estimatedDepartureDate).toISOString().split('T')[0] : "");
-      setEstimatedArrivalDate(order.estimatedArrivalDate ? new Date(order.estimatedArrivalDate).toISOString().split('T')[0] : "");
-      setDeliveryDate(order.deliveryDate ? new Date(order.deliveryDate).toISOString().split('T')[0] : "");
+      setOrderCreationDate(order.orderCreationDate ? timestampToDateString(order.orderCreationDate) : "");
+      setFactoryDepartureDate(order.factoryDepartureDate ? timestampToDateString(order.factoryDepartureDate) : "");
+      setEstimatedDepartureDate(order.estimatedDepartureDate ? timestampToDateString(order.estimatedDepartureDate) : "");
+      setEstimatedArrivalDate(order.estimatedArrivalDate ? timestampToDateString(order.estimatedArrivalDate) : "");
+      setDeliveryDate(order.deliveryDate ? timestampToDateString(order.deliveryDate) : "");
       setTimelineNotes(order.timelineNotes || "");
       setShipmentMethod(order.shipmentMethod || "");
       setShippingCompany(order.shippingCompany || "");
@@ -356,6 +359,24 @@ export default function EditOrderModal({
   const handleSubmit = async () => {
     if (!selectedClientId || !orderId || isUpdating || dateValidationError) return;
 
+    // Validate that factory departure date is provided
+    if (!factoryDepartureDate) {
+      setFactoryDepartureDateError("Factory departure date is required!");
+      toast.error("❌ Factory departure date not added! Please provide a factory departure date for this order.", {
+        duration: 5000,
+        style: {
+          background: '#fee2e2',
+          color: '#dc2626',
+          border: '1px solid #fca5a5',
+          fontSize: '14px',
+          fontWeight: '500'
+        }
+      });
+      return;
+    } else {
+      setFactoryDepartureDateError(""); // Clear error if date is provided
+    }
+
     console.log('Updating order...', { orderId, currentStep });
     setIsUpdating(true);
     try {
@@ -365,11 +386,11 @@ export default function EditOrderModal({
         notes,
         freightCost: freightCost || 0,
         // Timeline fields
-        orderCreationDate: orderCreationDate ? new Date(orderCreationDate).getTime() : undefined,
-        factoryDepartureDate: factoryDepartureDate ? new Date(factoryDepartureDate).getTime() : undefined,
-        estimatedDepartureDate: estimatedDepartureDate ? new Date(estimatedDepartureDate).getTime() : undefined,
-        estimatedArrivalDate: estimatedArrivalDate ? new Date(estimatedArrivalDate).getTime() : undefined,
-        deliveryDate: deliveryDate ? new Date(deliveryDate).getTime() : undefined,
+        orderCreationDate: orderCreationDate ? dateStringToTimestamp(orderCreationDate) : undefined,
+        factoryDepartureDate: dateStringToTimestamp(factoryDepartureDate),
+        estimatedDepartureDate: estimatedDepartureDate ? dateStringToTimestamp(estimatedDepartureDate) : undefined,
+        estimatedArrivalDate: estimatedArrivalDate ? dateStringToTimestamp(estimatedArrivalDate) : undefined,
+        deliveryDate: deliveryDate ? dateStringToTimestamp(deliveryDate) : undefined,
         timelineNotes,
         // Shipment information
         shipmentMethod: shipmentMethod || undefined,
@@ -851,14 +872,30 @@ export default function EditOrderModal({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Factory Departure Date
+                      Factory Departure Date <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="date"
                       value={factoryDepartureDate}
-                      onChange={(e) => setFactoryDepartureDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      onChange={(e) => {
+                        setFactoryDepartureDate(e.target.value);
+                        if (e.target.value) {
+                          setFactoryDepartureDateError(""); // Clear error when user selects a date
+                        }
+                      }}
+                      required
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
+                        factoryDepartureDateError ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}
                     />
+                    <p className="text-xs text-red-600 mt-1">
+                      Factory departure date is required for all orders
+                    </p>
+                    {factoryDepartureDateError && (
+                      <p className="text-xs text-red-500 mt-1 font-medium">
+                        {factoryDepartureDateError}
+                      </p>
+                    )}
                   </div>
 
                   <div>

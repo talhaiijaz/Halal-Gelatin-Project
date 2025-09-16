@@ -93,11 +93,17 @@ export const list = query({
     }
 
     if (args.startDate) {
-      orders = orders.filter(o => o.createdAt >= args.startDate!);
+      orders = orders.filter(o => {
+        const orderDate = o.factoryDepartureDate || o.orderCreationDate || o.createdAt;
+        return orderDate >= args.startDate!;
+      });
     }
 
     if (args.endDate) {
-      orders = orders.filter(o => o.createdAt <= args.endDate!);
+      orders = orders.filter(o => {
+        const orderDate = o.factoryDepartureDate || o.orderCreationDate || o.createdAt;
+        return orderDate <= args.endDate!;
+      });
     }
 
     if (args.fiscalYear) {
@@ -124,11 +130,11 @@ export const list = query({
       if (statusA !== statusB) {
         return statusA - statusB;
       }
-      // Finally sort by order creation date (descending - latest first)
-      // Use orderCreationDate if available, fallback to createdAt
-      const dateA = a.orderCreationDate || a.createdAt;
-      const dateB = b.orderCreationDate || b.createdAt;
-      return dateB - dateA;
+      // Finally sort by factory departure date (ascending - nearest first)
+      // Use factoryDepartureDate if available, fallback to orderCreationDate, then createdAt
+      const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
+      const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
+      return dateA - dateB;
     });
 
     // Fetch client data for each order
@@ -248,7 +254,7 @@ export const create = mutation({
     freightCost: v.optional(v.number()),
     // Timeline fields
     orderCreationDate: v.optional(v.number()),
-    factoryDepartureDate: v.optional(v.number()),
+    factoryDepartureDate: v.number(), // Required factory departure date
     estimatedDepartureDate: v.optional(v.number()),
     estimatedArrivalDate: v.optional(v.number()),
     deliveryDate: v.optional(v.number()), // Actual delivery date
@@ -285,6 +291,11 @@ export const create = mutation({
     
     if (existingOrder) {
       throw new Error(`Invoice number ${args.invoiceNumber} already exists. Please use a unique invoice number.`);
+    }
+
+    // Validate that factory departure date is provided
+    if (!args.factoryDepartureDate) {
+      throw new Error("Factory departure date is required. Please provide a factory departure date for this order.");
     }
 
     // Validate order creation date against fiscal year
@@ -399,7 +410,8 @@ export const create = mutation({
     }
 
     // Create invoice automatically
-    const issueDate = Date.now();
+    // Use order creation date as invoice issue date, fallback to current time if not set
+    const issueDate = args.orderCreationDate || Date.now();
     const dueDate = issueDate + (30 * 24 * 60 * 60 * 1000); // 30 days from issue
 
     // Use the provided invoice number (required field)
@@ -415,7 +427,7 @@ export const create = mutation({
       amount: totalAmount,
       currency: currencyToUse,
       totalPaid: 0,
-      outstandingBalance: 0, // New orders don't have outstanding amounts until shipped
+      outstandingBalance: totalAmount, // New invoices have full amount outstanding
       notes: `Invoice for Order ${orderNumber}`,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -542,17 +554,19 @@ export const updateStatus = mutation({
         const invoiceNumber = order.invoiceNumber;
 
         // Create invoice
+        // Use order creation date as invoice issue date, fallback to current time if not set
+        const issueDate = order.orderCreationDate || Date.now();
         await ctx.db.insert("invoices", {
           invoiceNumber: invoiceNumber,
           orderId: args.orderId,
           clientId: order.clientId,
-          issueDate: Date.now(),
-          dueDate: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+          issueDate: issueDate,
+          dueDate: issueDate + (30 * 24 * 60 * 60 * 1000), // 30 days
           status: "unpaid",
           amount: order.totalAmount,
           currency: order.currency,
           totalPaid: 0,
-          outstandingBalance: 0, // New invoices don't have outstanding amounts until shipped
+          outstandingBalance: order.totalAmount, // New invoices have full amount outstanding
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
@@ -583,7 +597,7 @@ export const updateStatus = mutation({
       if (invoice) {
         const newOutstandingBalance = invoice.amount - invoice.totalPaid;
         let newStatus: "unpaid" | "partially_paid" | "paid";
-        if (newOutstandingBalance === 0) newStatus = "paid";
+        if (invoice.totalPaid >= invoice.amount) newStatus = "paid";
         else if (invoice.totalPaid > 0) newStatus = "partially_paid";
         else newStatus = "unpaid";
         
@@ -619,7 +633,7 @@ export const updateStatus = mutation({
       if (invoice) {
         const newOutstandingBalance = invoice.amount - invoice.totalPaid;
         let newStatus: "unpaid" | "partially_paid" | "paid";
-        if (newOutstandingBalance === 0) newStatus = "paid";
+        if (invoice.totalPaid >= invoice.amount) newStatus = "paid";
         else if (invoice.totalPaid > 0) newStatus = "partially_paid";
         else newStatus = "unpaid";
         
@@ -697,7 +711,7 @@ export const addItems = mutation({
       const newAmount = invoice.amount + additionalAmount;
       const newOutstandingBalance = newAmount - invoice.totalPaid;
       let newStatus: "unpaid" | "partially_paid" | "paid";
-      if (newOutstandingBalance === 0) newStatus = "paid";
+      if (invoice.totalPaid >= newAmount) newStatus = "paid";
       else if (invoice.totalPaid > 0) newStatus = "partially_paid";
       else newStatus = "unpaid";
       
@@ -711,17 +725,19 @@ export const addItems = mutation({
       // Create invoice if it doesn't exist using the order's invoice number
       const invoiceNumber = order.invoiceNumber;
 
+      // Use order creation date as invoice issue date, fallback to current time if not set
+      const issueDate = order.orderCreationDate || Date.now();
       await ctx.db.insert("invoices", {
         invoiceNumber: invoiceNumber,
         orderId: args.orderId,
         clientId: order.clientId,
-        issueDate: Date.now(),
-        dueDate: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days
+        issueDate: issueDate,
+        dueDate: issueDate + (30 * 24 * 60 * 60 * 1000), // 30 days
         status: "unpaid",
         amount: order.totalAmount + additionalAmount,
         currency: order.currency,
         totalPaid: 0,
-        outstandingBalance: 0, // New invoices don't have outstanding amounts until shipped
+        outstandingBalance: order.totalAmount + additionalAmount, // New invoices have full amount outstanding
         notes: "",
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -1098,7 +1114,7 @@ export const update = mutation({
     freightCost: v.optional(v.number()),
     // Timeline fields
     orderCreationDate: v.optional(v.number()),
-    factoryDepartureDate: v.optional(v.number()),
+    factoryDepartureDate: v.number(), // Required factory departure date
     estimatedDepartureDate: v.optional(v.number()),
     estimatedArrivalDate: v.optional(v.number()),
     deliveryDate: v.optional(v.number()), // Actual delivery date
@@ -1132,6 +1148,11 @@ export const update = mutation({
     const cleanUpdateData = Object.fromEntries(
       Object.entries(updateData).filter(([_, value]) => value !== undefined)
     );
+
+    // Validate that factory departure date is provided
+    if (!args.factoryDepartureDate) {
+      throw new Error("Factory departure date is required. Please provide a factory departure date for this order.");
+    }
 
     // If items are provided, recalculate total amount
     if (items && items.length > 0) {
@@ -1216,7 +1237,7 @@ export const update = mutation({
           : 0; // Only outstanding if order is shipped or delivered
         
         let newStatus: "unpaid" | "partially_paid" | "paid";
-        if (newOutstandingBalance === 0) newStatus = "paid";
+        if (invoice.totalPaid >= (cleanUpdateData as any).totalAmount) newStatus = "paid";
         else if (invoice.totalPaid > 0) newStatus = "partially_paid";
         else newStatus = "unpaid";
         
@@ -1298,9 +1319,10 @@ export const migrateInvoiceNumbers = mutation({
     let updatedCount = 0;
     
     for (const order of ordersWithoutInvoiceNumbers) {
-      // Generate a unique invoice number
-      const year = new Date(order.createdAt).getFullYear();
-      const timestamp = order.createdAt.toString().slice(-6);
+      // Generate a unique invoice number using factory departure date
+      const orderDate = order.factoryDepartureDate || order.orderCreationDate || order.createdAt;
+      const year = new Date(orderDate).getFullYear();
+      const timestamp = orderDate.toString().slice(-6);
       const invoiceNumber = `INV-${year}-${timestamp}`;
       
       // Check if this invoice number already exists

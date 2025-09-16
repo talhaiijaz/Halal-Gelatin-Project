@@ -220,13 +220,13 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                   <h3 className="font-medium text-gray-900 mb-3">Order Information</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500">Order Number</p>
-                      <p className="font-medium text-gray-900">{order.orderNumber}</p>
+                      <p className="text-sm text-gray-500">Invoice Number</p>
+                      <p className="font-medium text-gray-900">{order.invoiceNumber}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Date</p>
+                      <p className="text-sm text-gray-500">Factory Departure Date</p>
                       <p className="font-medium text-gray-900">
-                        {formatDate(order.createdAt)}
+                        {formatDate(order.factoryDepartureDate || order.orderCreationDate || order.createdAt)}
                       </p>
                     </div>
                     <div>
@@ -795,7 +795,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                 </div>
 
                 {/* Activity Log */}
-                <ActivityLog entityId={String(orderId)} entityTable="orders" title="Order Activity" limit={5} />
+                <ActivityLog entityId={String(orderId)} entityTable="orders" title="Order Activity" limit={5} collapsible={true} defaultExpanded={false} />
               </div>
             )}
           </div>

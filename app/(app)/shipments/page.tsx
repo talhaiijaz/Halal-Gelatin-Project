@@ -98,39 +98,44 @@ export default function ShipmentsPage() {
       // Debug: Log order details
       console.log(`Processing order: ${order.invoiceNumber} (${order.orderNumber})`);
       console.log(`  Stored fiscalYear: ${order.fiscalYear}`);
+      console.log(`  Factory departure date: ${order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toISOString().split('T')[0] : 'Not set'}`);
       console.log(`  Order creation date: ${order.orderCreationDate ? new Date(order.orderCreationDate).toISOString().split('T')[0] : 'Not set'}`);
       
       // Get fiscal year and month from order data
       let fiscalYear: number;
       let fiscalMonth: string;
       
-      // Use stored fiscalYear field if available, otherwise calculate from orderCreationDate
+      // Use stored fiscalYear field if available, otherwise calculate from factoryDepartureDate
       if (order.fiscalYear !== undefined && order.fiscalYear !== null) {
         fiscalYear = order.fiscalYear;
         
-        // Calculate fiscal month from orderCreationDate
-        if (order.orderCreationDate) {
-          const date = new Date(order.orderCreationDate);
+        // Calculate fiscal month from factoryDepartureDate (preferred) or orderCreationDate
+        const orderDate = order.factoryDepartureDate || order.orderCreationDate;
+        if (orderDate) {
+          const date = new Date(orderDate);
           const month = date.getMonth(); // 0-11
           const fiscalMonthIndex = month >= 6 ? month - 6 : month + 6;
           fiscalMonth = fiscalMonths[fiscalMonthIndex];
         } else {
-          // Fallback to current fiscal month if no orderCreationDate
+          // Fallback to current fiscal month if no date available
           fiscalMonth = getCurrentFiscalMonth();
         }
-      } else if (order.orderCreationDate) {
-        // Fallback: calculate fiscal year from orderCreationDate if fiscalYear not stored
-        const date = new Date(order.orderCreationDate);
-        fiscalYear = getFiscalYearForDate(date);
-        
-        // Map calendar month to fiscal month
-        const month = date.getMonth(); // 0-11
-        const fiscalMonthIndex = month >= 6 ? month - 6 : month + 6;
-        fiscalMonth = fiscalMonths[fiscalMonthIndex];
       } else {
-        // Final fallback to current fiscal year and month
-        fiscalYear = getCurrentFiscalYear();
-        fiscalMonth = getCurrentFiscalMonth();
+        // Fallback: calculate fiscal year from factoryDepartureDate (preferred) or orderCreationDate
+        const orderDate = order.factoryDepartureDate || order.orderCreationDate;
+        if (orderDate) {
+          const date = new Date(orderDate);
+          fiscalYear = getFiscalYearForDate(date);
+          
+          // Map calendar month to fiscal month
+          const month = date.getMonth(); // 0-11
+          const fiscalMonthIndex = month >= 6 ? month - 6 : month + 6;
+          fiscalMonth = fiscalMonths[fiscalMonthIndex];
+        } else {
+          // Final fallback to current fiscal year and month
+          fiscalYear = getCurrentFiscalYear();
+          fiscalMonth = getCurrentFiscalMonth();
+        }
       }
       
       console.log(`  Calculated fiscalYear: ${fiscalYear}, fiscalMonth: ${fiscalMonth}`);

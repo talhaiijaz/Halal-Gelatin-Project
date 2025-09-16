@@ -21,6 +21,7 @@ import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/app/utils/fiscalYear";
+import { formatDateForDisplay } from "@/app/utils/dateUtils";
 
 export default function DashboardPage() {
   console.log("DashboardPage rendering...");
@@ -117,33 +118,37 @@ export default function DashboardPage() {
       let totalQuantity = 0;
       
       orders.forEach(order => {
-        // Use stored fiscalYear field if available, otherwise calculate from orderCreationDate
+        // Use stored fiscalYear field if available, otherwise calculate from factoryDepartureDate
         let orderFiscalYear: number;
         let orderFiscalMonth: string;
         
         if (order.fiscalYear !== undefined && order.fiscalYear !== null) {
           orderFiscalYear = order.fiscalYear;
           
-          // Calculate fiscal month from orderCreationDate
-          if (order.orderCreationDate) {
-            const orderDate = new Date(order.orderCreationDate);
-            const orderMonth = orderDate.getMonth();
+          // Calculate fiscal month from factoryDepartureDate (preferred) or orderCreationDate
+          const orderDate = order.factoryDepartureDate || order.orderCreationDate;
+          if (orderDate) {
+            const date = new Date(orderDate);
+            const orderMonth = date.getMonth();
             const orderFiscalMonthIndex = orderMonth >= 6 ? orderMonth - 6 : orderMonth + 6;
             orderFiscalMonth = fiscalMonths[orderFiscalMonthIndex];
           } else {
-            // Skip this order if no orderCreationDate available
+            // Skip this order if no date available
             return;
           }
-        } else if (order.orderCreationDate) {
-          // Fallback: calculate fiscal year from orderCreationDate if fiscalYear not stored
-          const orderDate = new Date(order.orderCreationDate);
-          orderFiscalYear = getFiscalYearForDate(orderDate);
-          const orderMonth = orderDate.getMonth();
-          const orderFiscalMonthIndex = orderMonth >= 6 ? orderMonth - 6 : orderMonth + 6;
-          orderFiscalMonth = fiscalMonths[orderFiscalMonthIndex];
         } else {
-          // Skip this order if no fiscal year or creation date available
-          return;
+          // Fallback: calculate fiscal year from factoryDepartureDate (preferred) or orderCreationDate
+          const orderDate = order.factoryDepartureDate || order.orderCreationDate;
+          if (orderDate) {
+            const date = new Date(orderDate);
+            orderFiscalYear = getFiscalYearForDate(date);
+            const orderMonth = date.getMonth();
+            const orderFiscalMonthIndex = orderMonth >= 6 ? orderMonth - 6 : orderMonth + 6;
+            orderFiscalMonth = fiscalMonths[orderFiscalMonthIndex];
+          } else {
+            // Skip this order if no date available
+            return;
+          }
         }
         
         if (orderFiscalYear === fiscalYear && orderFiscalMonth === fiscalMonth) {
@@ -498,7 +503,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {ordersData.pendingOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-orange-600 font-medium mb-1">Invoice Number</p>
                         <p className="text-orange-800 font-semibold">{order.invoiceNumber}</p>
@@ -510,6 +515,12 @@ export default function DashboardPage() {
                       <div>
                         <p className="text-orange-600 font-medium mb-1">Customer Name</p>
                         <p className="text-orange-800 font-semibold">{order.clientName}</p>
+                      </div>
+                      <div>
+                        <p className="text-orange-600 font-medium mb-1">Fac. Dep. Date</p>
+                        <p className="text-orange-800 font-semibold">
+                          {formatDateForDisplay(order.factoryDepartureDate)}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -539,7 +550,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {ordersData.inProductionOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-blue-600 font-medium mb-1">Invoice Number</p>
                         <p className="text-blue-800 font-semibold">{order.invoiceNumber}</p>
@@ -551,6 +562,12 @@ export default function DashboardPage() {
                       <div>
                         <p className="text-blue-600 font-medium mb-1">Customer Name</p>
                         <p className="text-blue-800 font-semibold">{order.clientName}</p>
+                      </div>
+                      <div>
+                        <p className="text-blue-600 font-medium mb-1">Fac. Dep. Date</p>
+                        <p className="text-blue-800 font-semibold">
+                          {formatDateForDisplay(order.factoryDepartureDate)}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -580,7 +597,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {ordersData.shippedOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-purple-600 font-medium mb-1">Invoice Number</p>
                         <p className="text-purple-800 font-semibold">{order.invoiceNumber}</p>
@@ -592,6 +609,12 @@ export default function DashboardPage() {
                       <div>
                         <p className="text-purple-600 font-medium mb-1">Customer Name</p>
                         <p className="text-purple-800 font-semibold">{order.clientName}</p>
+                      </div>
+                      <div>
+                        <p className="text-purple-600 font-medium mb-1">Fac. Dep. Date</p>
+                        <p className="text-purple-800 font-semibold">
+                          {formatDateForDisplay(order.factoryDepartureDate)}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -621,7 +644,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {ordersData.deliveredOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
                         <p className="text-green-600 font-medium mb-1">Invoice Number</p>
                         <p className="text-green-800 font-semibold">{order.invoiceNumber}</p>
@@ -633,6 +656,12 @@ export default function DashboardPage() {
                       <div>
                         <p className="text-green-600 font-medium mb-1">Customer Name</p>
                         <p className="text-green-800 font-semibold">{order.clientName}</p>
+                      </div>
+                      <div>
+                        <p className="text-green-600 font-medium mb-1">Fac. Dep. Date</p>
+                        <p className="text-green-800 font-semibold">
+                          {formatDateForDisplay(order.factoryDepartureDate)}
+                        </p>
                       </div>
                     </div>
                     {order.deliveryDate && (

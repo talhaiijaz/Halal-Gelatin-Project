@@ -16,7 +16,8 @@ interface BankAccountDetailModalProps {
 }
 
 export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose }: BankAccountDetailModalProps) {
-  const bankAccount = useQuery(api.banks.get, bankAccountId ? { id: bankAccountId } : "skip");
+  const bankAccount = useQuery(api.banks.getWithBalance, bankAccountId ? { id: bankAccountId } : "skip");
+  const payments = useQuery(api.banks.getPayments, bankAccountId ? { bankAccountId } : "skip");
   const [bodyOverflow, setBodyOverflow] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -34,6 +35,13 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
   if (!isOpen || !bankAccountId) return null;
 
   const formatDate = (ts?: number) => (ts ? new Date(ts).toLocaleDateString() : "-");
+  const formatCurrency = (amount: number, currency: string) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 2,
+    }).format(amount);
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -101,6 +109,22 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                       <label className="text-xs text-gray-500 uppercase tracking-wide">Currency</label>
                       <p className="text-sm font-medium text-gray-900">{bankAccount.currency}</p>
                     </div>
+                    {bankAccount.openingBalance !== undefined && (
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">Opening Balance</label>
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatCurrency(bankAccount.openingBalance, bankAccount.currency)}
+                        </p>
+                      </div>
+                    )}
+                    {bankAccount.currentBalance !== undefined && (
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase tracking-wide">Current Balance</label>
+                        <p className="text-sm font-medium text-gray-900">
+                          {formatCurrency(bankAccount.currentBalance, bankAccount.currency)}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -112,6 +136,74 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                     </h3>
                     <p className="text-sm font-medium text-gray-900">{formatDate(bankAccount.createdAt)}</p>
                   </div>
+                  <div className="card p-4">
+                    <h3 className="font-medium text-gray-900 mb-2 flex items-center">
+                      <DollarSign className="h-4 w-4 mr-2" /> Balance Summary
+                    </h3>
+                    <div className="space-y-1">
+                      <div className="text-sm text-gray-600">
+                        Opening: {formatCurrency(bankAccount.openingBalance || 0, bankAccount.currency)}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Payments: {formatCurrency((bankAccount.currentBalance || 0) - (bankAccount.openingBalance || 0), bankAccount.currency)}
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 border-t pt-1">
+                        Total: {formatCurrency(bankAccount.currentBalance || 0, bankAccount.currency)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payments Received */}
+                <div className="card p-4">
+                  <h3 className="font-medium text-gray-900 mb-4 flex items-center">
+                    <CreditCard className="h-4 w-4 mr-2" /> Payments Received
+                  </h3>
+                  {payments === undefined ? (
+                    <div className="text-center py-4 text-gray-500">Loading payments...</div>
+                  ) : payments.length === 0 ? (
+                    <div className="text-center py-4 text-gray-500">No payments received yet</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {payments.map((payment: any) => (
+                        <div key={payment._id} className="border border-gray-200 rounded-lg p-3">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                                  payment.type === "advance" ? "bg-orange-100 text-orange-800" : "bg-green-100 text-green-800"
+                                }`}>
+                                  {payment.type === "advance" ? "Advance" : "Invoice"}
+                                </span>
+                                <span className="text-sm text-gray-600">{formatDate(payment.paymentDate)}</span>
+                              </div>
+                              <div className="text-sm text-gray-900 font-medium">
+                                {formatCurrency(payment.amount, payment.currency)}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Reference: {payment.reference}
+                              </div>
+                              {payment.method && (
+                                <div className="text-xs text-gray-500">
+                                  Method: {payment.method.replace('_', ' ').toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-medium text-green-600">
+                                {formatCurrency(payment.amount, payment.currency)}
+                              </div>
+                              {payment.convertedAmountUSD && payment.convertedAmountUSD !== payment.amount && (
+                                <div className="text-xs text-blue-600">
+                                  ≈ {formatCurrency(payment.convertedAmountUSD, 'USD')}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Activity Log */}
@@ -119,6 +211,8 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                   entityId={String(bankAccountId)} 
                   entityTable="banks"
                   title="Bank Account Activity"
+                  collapsible={true}
+                  defaultExpanded={false}
                 />
               </>
             )}

@@ -64,7 +64,7 @@ export default function ReportsPage() {
     if (!financeStats || !paymentStats || !invoices || !orders || !clients) return null;
 
     const filteredOrders = orders.filter(order => {
-      const orderDate = order.createdAt;
+      const orderDate = order.factoryDepartureDate || order.orderCreationDate || order.createdAt;
       if (startDate && orderDate < startDate) return false;
       if (endDate && orderDate > endDate) return false;
       return true;
