@@ -16,7 +16,7 @@ interface OrderItem {
   quantityKg: number;
   unitPrice: number; // Rate per kg
   exclusiveValue: number; // Quantity × Rate (before GST)
-  gstRate: number; // GST percentage (default 18%)
+  gstRate: number; // GST percentage (default 0%)
   gstAmount: number; // GST amount calculated
   inclusiveTotal: number; // Total including GST
   // Discount fields
@@ -319,7 +319,7 @@ export default function CreateOrderModal({
       quantityKg: 0,
       unitPrice: 0,
       exclusiveValue: 0,
-      gstRate: 18, // Default to 18% GST
+      gstRate: 0, // Default to 0% GST
       gstAmount: 0,
       inclusiveTotal: 0,
       // Discount fields
@@ -331,7 +331,7 @@ export default function CreateOrderModal({
       lotNumbers: [],
     }]);
     setLotNumbersInputs([""]);
-    setGstRateInputs(["18"]); // Reset the GST rate input strings
+    setGstRateInputs(["0"]); // Reset the GST rate input strings
     setSelectedFiscalYear(getCurrentFiscalYear()); // Reset to current fiscal year
     setOrderCreationDate(() => {
       // Reset to today's date in YYYY-MM-DD format

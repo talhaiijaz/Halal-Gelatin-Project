@@ -109,7 +109,7 @@ export default function ReportsPage() {
           ["Total Revenue", "$" + metrics.totalRevenue.toFixed(2)],
           ["Revenue Growth", metrics.revenueGrowth.toFixed(1) + "%"],
           ["Total Orders", metrics.totalOrders],
-          ["Outstanding Amount", "$" + metrics.outstandingAmount.toFixed(2)],
+          ["Receivables Amount", "$" + metrics.outstandingAmount.toFixed(2)],
           [""],
           ["Payment Methods", "Amount"],
           ["Bank Transfer", "$" + (metrics.paymentMethods.bank_transfer?.amount || 0).toFixed(2)],
@@ -147,7 +147,7 @@ export default function ReportsPage() {
           [""],
           ["Metric", "Value"],
           ["Total Collected", "$" + metrics.totalRevenue.toFixed(2)],
-          ["Outstanding", "$" + metrics.outstandingAmount.toFixed(2)],
+          ["Receivables", "$" + metrics.outstandingAmount.toFixed(2)],
           ["Paid Invoices", metrics.paidInvoices],
           ["Unpaid Invoices", metrics.unpaidInvoices],
         ].map(row => row.join(",")).join("\n");
@@ -280,7 +280,7 @@ export default function ReportsPage() {
             <div className="card">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Outstanding</p>
+                  <p className="text-sm font-medium text-gray-600">Receivables</p>
                   <p className="mt-2 text-3xl font-bold text-gray-900">
                     {metrics ? `$${metrics.outstandingAmount.toFixed(2)}` : <Skeleton width={120} />}
                   </p>
@@ -408,7 +408,7 @@ export default function ReportsPage() {
             <div className="card">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Outstanding</p>
+                  <p className="text-sm font-medium text-gray-600">Receivables</p>
                   <p className="mt-2 text-3xl font-bold text-gray-900">
                     {metrics ? `$${metrics.outstandingAmount.toFixed(2)}` : <Skeleton width={120} />}
                   </p>

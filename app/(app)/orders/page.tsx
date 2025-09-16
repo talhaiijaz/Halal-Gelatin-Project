@@ -125,7 +125,7 @@ function OrdersPageContent() {
     if (!orders) return;
 
     const csvContent = [
-      ["Invoice Number", "Client", "Status", "Total Amount", "Paid Amount", "Outstanding Amount", "Currency", "Quantity (kg)", "Delivery Date", "Factory Departure Date"],
+      ["Invoice Number", "Client", "Status", "Total Amount", "Paid Amount", "Receivables Amount", "Currency", "Quantity (kg)", "Delivery Date", "Factory Departure Date"],
       ...orders.map(order => {
         const metrics = calculateFinancialMetrics(order);
         return [
@@ -346,7 +346,7 @@ function OrdersPageContent() {
                             )}
                           </div>
                           <div className={`text-xs font-medium ${metrics.outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                            Outstanding: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency) : 
+                            Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency) : 
                                          order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency) : 
                                          "Not due"}
                           </div>

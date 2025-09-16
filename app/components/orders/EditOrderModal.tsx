@@ -16,7 +16,7 @@ interface OrderItem {
   quantityKg: number;
   unitPrice: number; // Rate per kg
   exclusiveValue: number; // Quantity × Rate (before GST)
-  gstRate: number; // GST percentage (default 18%)
+  gstRate: number; // GST percentage (default 0%)
   gstAmount: number; // GST amount calculated
   inclusiveTotal: number; // Total including GST
   // Discount fields
@@ -137,7 +137,7 @@ export default function EditOrderModal({
         quantityKg: item.quantityKg,
         unitPrice: item.unitPrice,
         exclusiveValue: item.exclusiveValue || 0,
-        gstRate: item.gstRate || 18,
+        gstRate: item.gstRate ?? 0,
         gstAmount: item.gstAmount || 0,
         inclusiveTotal: item.inclusiveTotal || 0,
         // Discount fields
@@ -160,7 +160,7 @@ export default function EditOrderModal({
       
       // Set GST rate inputs for each item
       const gstInputs = order.items.map((item: any) => 
-        String(item.gstRate || 18)
+        String(item.gstRate ?? 0)
       );
       setGstRateInputs(gstInputs);
       

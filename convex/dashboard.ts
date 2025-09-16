@@ -89,7 +89,9 @@ export const getStats = query({
     totalOrders: v.optional(v.object({
       value: v.number(),
     })),
-    // New financial metrics
+    // Pipeline value (pending + in_production)
+    currentPendingOrdersValue: v.number(),
+    // Back-compat aliases
     totalOrderValue: v.number(),
     totalOrderValueUSD: v.number(),
     totalOrderValuePKR: v.number(),
@@ -237,15 +239,16 @@ export const getStats = query({
     const prevYearRevenue = prevYearInvoices.reduce((sum, inv) => sum + inv.amount, 0);
 
     // Calculate new financial metrics
-    // 1. Total Order Value - sum of all orders regardless of status
-    const totalOrderValue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-    const totalOrderValueUSD = orders
+    // Pipeline Order Value - sum of pending + in_production
+    const pipelineOrders = orders.filter(o => ["pending", "in_production"].includes(o.status));
+    const currentPendingOrdersValue = pipelineOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const totalOrderValueUSD = pipelineOrders
       .filter(o => {
         const client = clients.find(c => c._id === o.clientId);
         return client?.type === "international";
       })
       .reduce((sum, order) => sum + order.totalAmount, 0);
-    const totalOrderValuePKR = orders
+    const totalOrderValuePKR = pipelineOrders
       .filter(o => {
         const client = clients.find(c => c._id === o.clientId);
         return client?.type === "local";
@@ -289,8 +292,9 @@ export const getStats = query({
       totalOrders: {
         value: totalOrders,
       },
-      // New financial metrics
-      totalOrderValue,
+      // Pipeline metrics (and back-compat aliases)
+      currentPendingOrdersValue,
+      totalOrderValue: currentPendingOrdersValue,
       totalOrderValueUSD,
       totalOrderValuePKR,
       advancePayments,

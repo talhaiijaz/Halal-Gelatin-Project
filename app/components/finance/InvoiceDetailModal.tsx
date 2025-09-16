@@ -5,6 +5,8 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { X, FileText, User, Package, DollarSign, Calendar } from "lucide-react";
+import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { type Payment, type OrderItem } from "@/app/types";
 
 
 interface InvoiceDetailModalProps {
@@ -30,33 +32,14 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
 
   if (!isOpen || !invoiceId) return null;
 
-  const formatCurrency = (amount: number, currency?: string) => {
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount || 0)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, { 
-      style: "currency", 
-      currency: currency || "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount || 0);
-  };
+  // Note: formatCurrency is now imported from utils/currencyFormat
 
   const formatDate = (ts?: number) => (ts ? new Date(ts).toLocaleDateString() : "-");
 
   const payments = invoice?.payments || [];
   // Use the calculated values from the query if available, otherwise calculate locally
-  const advanceTotal = invoice?.advancePaid ?? payments.filter((p: any) => p.type === "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
-  const invoicePaymentTotal = invoice?.invoicePaid ?? payments.filter((p: any) => p.type !== "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  const advanceTotal = invoice?.advancePaid ?? payments.filter((p: Payment) => p.type === "advance").reduce((s: number, p: Payment) => s + (p.amount || 0), 0);
+  const invoicePaymentTotal = invoice?.invoicePaid ?? payments.filter((p: Payment) => p.type !== "advance").reduce((s: number, p: Payment) => s + (p.amount || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -88,26 +71,26 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                 <div className="grid grid-cols-2 gap-4">
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Amount</p>
-                    <p className="text-xl font-bold text-gray-900">{formatCurrency(invoice.amount, invoice.currency)}</p>
+                    <p className="text-xl font-bold text-gray-900">{formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}</p>
                   </div>
                   <div className="card p-4">
-                    <p className="text-sm text-gray-500">Outstanding</p>
+                    <p className="text-sm text-gray-500">Receivables</p>
                     <p className="text-xl font-bold text-orange-600">
                       {(() => {
                         // Only show outstanding for shipped/delivered orders
                         const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
                         const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
-                        return formatCurrency(outstandingAmount, invoice.currency);
+                        return formatCurrency(outstandingAmount, invoice.currency as SupportedCurrency);
                       })()}
                     </p>
                   </div>
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Advance Paid</p>
-                    <p className="text-xl font-bold text-blue-600">{formatCurrency(advanceTotal, invoice.currency)}</p>
+                    <p className="text-xl font-bold text-blue-600">{formatCurrency(advanceTotal, invoice.currency as SupportedCurrency)}</p>
                   </div>
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Invoice Payments</p>
-                    <p className="text-xl font-bold text-green-600">{formatCurrency(invoicePaymentTotal, invoice.currency)}</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(invoicePaymentTotal, invoice.currency as SupportedCurrency)}</p>
                   </div>
                 </div>
 
@@ -158,12 +141,12 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                           </tr>
                         </thead>
                         <tbody className="divide-y">
-                          {(invoice as any).orderItems.map((it: any, idx: number) => (
+                          {(invoice as any).orderItems.map((it: OrderItem, idx: number) => (
                             <tr key={idx}>
                               <td className="px-3 py-2">{it.product}</td>
                               <td className="px-3 py-2 text-right">{it.quantityKg}</td>
-                              <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice, invoice.currency)}/kg</td>
-                              <td className="px-3 py-2 text-right">{formatCurrency(it.inclusiveTotal || it.totalPrice, invoice.currency)}</td>
+                              <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice, invoice.currency as SupportedCurrency)}/kg</td>
+                              <td className="px-3 py-2 text-right">{formatCurrency(it.inclusiveTotal || it.totalPrice, invoice.currency as SupportedCurrency)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -199,10 +182,10 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                                 </span>
                               </td>
                               <td className="px-3 py-2 text-right text-green-700 font-medium">
-                                {formatCurrency(p.amount, invoice.currency)}
+                                {formatCurrency(p.amount, invoice.currency as SupportedCurrency)}
                                 {p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD' && (
                                   <div className="text-xs text-blue-600 mt-1">
-                                    = {formatCurrency(p.convertedAmountUSD, 'USD')}
+                                    = {formatCurrency(p.convertedAmountUSD, 'USD' as SupportedCurrency)}
                                   </div>
                                 )}
                               </td>
@@ -235,7 +218,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                             <div className="grid grid-cols-1 gap-2 text-sm">
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Original Payment:</span>
-                                <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
+                                <span className="font-medium">{formatCurrency(payment.amount, payment.currency as SupportedCurrency)}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Conversion Rate:</span>
@@ -243,7 +226,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Converted to USD:</span>
-                                <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                                <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD' as SupportedCurrency)}</span>
                               </div>
                             </div>
                           </div>
@@ -262,12 +245,12 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
           {invoice && (
             <div className="border-t px-6 py-4 flex items-center justify-between">
               <div className="text-sm text-gray-600">
-                Outstanding: <span className="font-semibold text-orange-600">
+                Receivables: <span className="font-semibold text-orange-600">
                   {(() => {
                     // Only show outstanding for shipped/delivered orders
                     const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
                     const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
-                    return formatCurrency(outstandingAmount, invoice.currency);
+                    return formatCurrency(outstandingAmount, invoice.currency as SupportedCurrency);
                   })()}
                 </span>
               </div>

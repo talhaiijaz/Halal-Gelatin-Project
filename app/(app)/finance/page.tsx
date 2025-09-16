@@ -51,15 +51,9 @@ import {
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
 import { useMutation } from "convex/react";
+import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
 
-// Helper function to format currency
-const formatCurrency = (amount: number, currency: string) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency,
-    minimumFractionDigits: 2,
-  }).format(amount);
-};
+// Note: formatCurrency is now imported from utils/currencyFormat
 
 export default function FinancePage() {
   // Calculate current fiscal year
@@ -115,26 +109,7 @@ export default function FinancePage() {
   // Mutations
   const deletePayment = useMutation(api.payments.deletePayment);
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Note: formatCurrency is now imported from utils/currencyFormat
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat("en-US").format(num);
@@ -332,15 +307,15 @@ export default function FinancePage() {
           {/* Financial Summary (split by currency) */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Order Value</p>
+              <p className="text-sm text-gray-500">Current Pending Orders Value</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValuePKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Based on order amounts (excluding cancelled orders)
+                Pending and in production orders only
               </p>
             </div>
             <div className="card p-4">
@@ -368,7 +343,7 @@ export default function FinancePage() {
               </p>
             </div>
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Outstanding</p>
+              <p className="text-sm text-gray-500">Receivables</p>
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
@@ -412,15 +387,15 @@ export default function FinancePage() {
           {/* Financial Summary Cards - Same as Dashboard */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Order Value</p>
+              <p className="text-sm text-gray-500">Current Pending Orders Value</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValuePKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Based on order amounts (excluding cancelled orders)
+                Pending and in production orders only
               </p>
             </div>
             <div className="card p-4">
@@ -448,7 +423,7 @@ export default function FinancePage() {
               </p>
             </div>
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Outstanding</p>
+              <p className="text-sm text-gray-500">Receivables</p>
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>
@@ -580,7 +555,7 @@ export default function FinancePage() {
                         <FileText className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
                         <p className="mt-1 text-sm text-gray-500">
-                          Invoices will appear here when orders are confirmed.
+                          Invoices will appear here once orders move to production.
                         </p>
                       </td>
                     </tr>
@@ -635,7 +610,7 @@ export default function FinancePage() {
                             
                             return outstandingAmount > 0 && (
                               <div className="text-xs text-red-600 font-medium">
-                                Outstanding: {formatCurrency(outstandingAmount, invoice.currency)}
+                                Receivables: {formatCurrency(outstandingAmount, invoice.currency)}
                               </div>
                             );
                           })()}
@@ -681,15 +656,15 @@ export default function FinancePage() {
           {/* Financial Summary Cards - Same as Dashboard */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Total Order Value</p>
+              <p className="text-sm text-gray-500">Current Pending Orders Value</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenuePKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency(dashboardStats?.totalRevenueAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueUSD || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValuePKR || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueEUR || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueAED || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Based on order amounts (excluding cancelled orders)
+                Pending and in production orders only
               </p>
             </div>
             <div className="card p-4">
@@ -717,7 +692,7 @@ export default function FinancePage() {
               </p>
             </div>
             <div className="card p-4">
-              <p className="text-sm text-gray-500">Outstanding</p>
+              <p className="text-sm text-gray-500">Receivables</p>
               <div className="mt-1 space-y-1">
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingUSD || 0, 'USD')}</p>
                 <p className="text-xl font-bold text-orange-600">{formatCurrency(dashboardStats?.totalOutstandingPKR || 0, 'PKR')}</p>

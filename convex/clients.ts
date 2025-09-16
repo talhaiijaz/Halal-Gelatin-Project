@@ -334,6 +334,10 @@ export const getStats = query({
     totalRevenue: v.number(),
     outstandingAmount: v.number(),
     outstandingByCurrency: v.record(v.string(), v.number()),
+    // Pipeline value: pending + in_production
+    currentPendingOrdersValue: v.number(),
+    currentPendingValueByCurrency: v.record(v.string(), v.number()),
+    // Back-compat aliases
     totalOrderValue: v.number(),
     totalOrderValueByCurrency: v.record(v.string(), v.number()),
     orderValueByCurrency: v.record(v.string(), v.number()),
@@ -423,14 +427,15 @@ export const getStats = query({
     const outstandingAmount = shippedOrDeliveredInvoices
       .reduce((sum, inv) => sum + inv.outstandingBalance, 0);
 
-    // Calculate total order value
-    const totalOrderValue = clientOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+    // Calculate pipeline order value (pending + in_production)
+    const pipelineOrders = clientOrders.filter(o => ["pending", "in_production"].includes(o.status));
+    const currentPendingOrdersValue = pipelineOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
-    // Calculate total order value by currency
-    const totalOrderValueByCurrency: Record<string, number> = {};
-    clientOrders.forEach(order => {
+    // Pipeline order value by currency
+    const currentPendingValueByCurrency: Record<string, number> = {};
+    pipelineOrders.forEach(order => {
       const currency = order.currency;
-      totalOrderValueByCurrency[currency] = (totalOrderValueByCurrency[currency] || 0) + order.totalAmount;
+      currentPendingValueByCurrency[currency] = (currentPendingValueByCurrency[currency] || 0) + order.totalAmount;
     });
 
     // Calculate advance payments from actual advance payments in payments table
@@ -463,9 +468,13 @@ export const getStats = query({
       totalRevenue,
       outstandingAmount,
       outstandingByCurrency,
-      totalOrderValue,
-      totalOrderValueByCurrency,
-      orderValueByCurrency: totalOrderValueByCurrency, // Alias for dashboard compatibility
+      // New pipeline fields
+      currentPendingOrdersValue,
+      currentPendingValueByCurrency,
+      // Backward compatibility: map old names to new pipeline values
+      totalOrderValue: currentPendingOrdersValue,
+      totalOrderValueByCurrency: currentPendingValueByCurrency,
+      orderValueByCurrency: currentPendingValueByCurrency,
       revenueByCurrency,
       advancePayments,
       advancePaymentsByCurrency,

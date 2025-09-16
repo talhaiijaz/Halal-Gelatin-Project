@@ -351,7 +351,7 @@ export default function InternationalClientsPage() {
             
             {/* Key Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Total Order Value */}
+              {/* Current Pending Orders Value */}
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-blue-200 rounded-lg">
@@ -362,18 +362,18 @@ export default function InternationalClientsPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-blue-700 mb-1">Total Order Value</p>
+                  <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
                   <p className="text-2xl font-bold text-blue-900">
                     {stats ? (
-                      stats.orderValueByCurrency ? 
-                        Object.entries(stats.orderValueByCurrency)
+                      ((stats as any).currentPendingValueByCurrency || stats.orderValueByCurrency) ? 
+                        Object.entries(((stats as any).currentPendingValueByCurrency || stats.orderValueByCurrency) as Record<string, number>)
                           .filter(([currency, amount]) => (amount as number) > 0)
                           .map(([currency, amount]) => (
                             <div key={currency} className="text-lg">
                               {formatCurrency(amount as number, currency)}
                             </div>
                           ))
-                        : formatCurrency(stats.totalOrderValue || 0, 'USD')
+                        : formatCurrency(((stats as any).currentPendingOrdersValue) || stats.totalOrderValue || 0, 'USD')
                     ) : <Skeleton width={100} height={32} />}
                   </p>
                   <p className="text-xs text-blue-600 mt-1">International orders in pipeline</p>
@@ -438,7 +438,7 @@ export default function InternationalClientsPage() {
                 </div>
               </div>
 
-              {/* Outstanding */}
+              {/* Receivables */}
               <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-red-200 rounded-lg">
@@ -449,7 +449,7 @@ export default function InternationalClientsPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
+                  <p className="text-sm font-medium text-red-700 mb-1">Receivables</p>
                   <p className="text-2xl font-bold text-red-900">
                     {stats ? (
                       stats.outstandingByCurrency ? 
@@ -482,7 +482,7 @@ export default function InternationalClientsPage() {
                     Client Summary
                   </h2>
                   <p className="text-sm text-gray-600 mt-1">
-                    Outstanding amounts and total quantities by client
+                    Receivables amounts and total quantities by client
                   </p>
                 </div>
                 <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
@@ -498,7 +498,7 @@ export default function InternationalClientsPage() {
                       Client
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
-                      Outstanding Amount
+                      Receivables Amount
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
                       Total Quantity (kg)
@@ -572,7 +572,7 @@ export default function InternationalClientsPage() {
                           </div>
                           {client.outstandingAmount > 0 && (
                             <div className="text-xs text-red-600 font-medium">
-                              Outstanding
+                              Receivables
                             </div>
                           )}
                         </td>
@@ -771,7 +771,7 @@ export default function InternationalClientsPage() {
                                 )}
                               </div>
                               <div className={`text-xs font-medium ${metrics.outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                                Outstanding: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency) : 
+                                Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency) : 
                                              order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency) : 
                                              "Not due"}
                               </div>

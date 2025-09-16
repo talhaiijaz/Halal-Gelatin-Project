@@ -30,6 +30,7 @@ import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import ActivityLog from "@/app/components/ActivityLog";
 import EditCustomerModal from "@/app/components/clients/EditCustomerModal";
+import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -49,25 +50,8 @@ export default function ClientDetailPage() {
   // Fetch all orders for this client
   const allOrders = useQuery(api.orders.list, { clientId });
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  const getClientCurrency = (clientType: string): SupportedCurrency => {
+    return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');
   };
 
   const formatDate = (timestamp: number) => {
@@ -82,8 +66,6 @@ export default function ClientDetailPage() {
     switch (status) {
       case "pending":
         return "🕐";
-      case "confirmed":
-        return "✅";
       case "in_production":
         return "🏭";
       case "shipped":
@@ -356,20 +338,20 @@ export default function ClientDetailPage() {
               
               <div className="text-center p-3 bg-red-50 rounded-lg">
                 <DollarSign className="h-6 w-6 text-red-600 mx-auto mb-1" />
-                <div className="text-xs text-gray-600">Outstanding</div>
+                <div className="text-xs text-gray-600">Receivables</div>
                 {client.type === 'international' && client.outstandingByCurrency ? (
                   <div className="mt-1 space-y-1">
                     {Object.entries(client.outstandingByCurrency)
                       .filter(([_, amount]) => (amount as number) > 0)
                       .map(([currency, amount]) => (
                         <div key={currency} className="text-sm font-semibold text-gray-900">
-                          {formatCurrency(amount as number, currency)}
+                          {formatCurrency(amount as number, currency as SupportedCurrency)}
                         </div>
                       ))}
                   </div>
                 ) : (
                   <div className="text-lg font-semibold text-gray-900 mt-1">
-                    {formatCurrency(client.outstandingAmount || 0, client.type === 'local' ? 'PKR' : 'USD')}
+                    {formatCurrency(client.outstandingAmount || 0, getClientCurrency(client.type))}
                   </div>
                 )}
               </div>
@@ -385,8 +367,8 @@ export default function ClientDetailPage() {
                       }
                       return sum;
                     }, 0),
-                    client.type === 'local' ? 'PKR' : 'USD'
-                  ) : formatCurrency(0, client.type === 'local' ? 'PKR' : 'USD')}
+                    getClientCurrency(client.type)
+                  ) : formatCurrency(0, getClientCurrency(client.type))}
                 </div>
               </div>
             </div>
@@ -430,7 +412,7 @@ export default function ClientDetailPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
-                          {formatCurrency(order.totalAmount, order.currency)}
+                          {formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}
                         </p>
                         <p className="text-xs text-gray-500 capitalize">
                           {order.status.replace("_", " ")}

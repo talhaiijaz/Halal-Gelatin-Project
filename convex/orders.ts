@@ -371,7 +371,7 @@ export const create = mutation({
     // Create order items
     for (const item of args.items) {
       const exclusiveValue = item.exclusiveValue || (item.quantityKg * item.unitPrice);
-      const gstRate = item.gstRate !== undefined ? item.gstRate : 0; // Default 18% GST, but allow 0
+      const gstRate = item.gstRate !== undefined ? item.gstRate : 0; // Default 0% GST, allow override
       const gstAmount = item.gstAmount !== undefined ? item.gstAmount : ((exclusiveValue * gstRate) / 100);
       const totalBeforeDiscount = exclusiveValue + gstAmount;
       
@@ -675,7 +675,7 @@ export const addItems = mutation({
     let additionalAmount = 0;
     for (const item of args.items) {
       const exclusiveValue = item.exclusiveValue || (item.quantityKg * item.unitPrice);
-      const gstRate = item.gstRate !== undefined ? item.gstRate : 18; // Default 18% GST, but allow 0
+      const gstRate = item.gstRate !== undefined ? item.gstRate : 0; // Default 0% GST, allow override
       const gstAmount = item.gstAmount !== undefined ? item.gstAmount : ((exclusiveValue * gstRate) / 100);
       const inclusiveTotal = item.inclusiveTotal || (exclusiveValue + gstAmount);
       
@@ -1066,12 +1066,11 @@ export const getStats = query({
     // Calculate statistics
     const statusCounts = {
       pending: 0,
-      confirmed: 0,
       in_production: 0,
       shipped: 0,
       delivered: 0,
       cancelled: 0,
-    };
+    } as Record<"pending"|"in_production"|"shipped"|"delivered"|"cancelled", number>;
 
     let totalRevenue = 0;
     let totalQuantity = 0;
@@ -1095,7 +1094,7 @@ export const getStats = query({
     return {
       totalOrders: orders.length,
       activeOrders: orders.filter(o => 
-        ["pending", "confirmed", "in_production", "shipped"].includes(o.status)
+        ["pending", "in_production", "shipped"].includes(o.status)
       ).length,
       statusCounts,
       totalRevenue,
@@ -1186,7 +1185,7 @@ export const update = mutation({
       // Create new order items
       for (const item of items) {
         const exclusiveValue = item.exclusiveValue || (item.quantityKg * item.unitPrice);
-        const gstRate = item.gstRate !== undefined ? item.gstRate : 18; // Default 18% GST, but allow 0
+        const gstRate = item.gstRate !== undefined ? item.gstRate : 0; // Default 0% GST, allow override
         const gstAmount = item.gstAmount !== undefined ? item.gstAmount : ((exclusiveValue * gstRate) / 100);
         const totalBeforeDiscount = exclusiveValue + gstAmount;
         

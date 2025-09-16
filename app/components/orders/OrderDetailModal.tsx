@@ -27,6 +27,9 @@ import ActivityLog from "../ActivityLog";
 import DatePickerModal from "../DatePickerModal";
 import { useQuery as useConvexQuery } from "convex/react";
 import { api as convexApi } from "@/convex/_generated/api";
+import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { displayError } from "@/app/utils/errorHandling";
+import { type OrderStatus, type Payment } from "@/app/types";
 
 interface OrderDetailModalProps {
   orderId: Id<"orders"> | null;
@@ -61,7 +64,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
 
   if (!isOpen || !orderId) return null;
 
-  const handleStatusUpdate = async (newStatus: any) => {
+  const handleStatusUpdate = async (newStatus: OrderStatus) => {
     // Check if changing to delivered without delivery date
     if (newStatus === "delivered" && !order?.deliveryDate) {
       setPendingStatusUpdate(newStatus);
@@ -72,9 +75,9 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
     setIsUpdating(true);
     try {
       await updateStatus({ orderId, status: newStatus });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to update status:", error);
-      alert("Failed to update order status. Please try again.");
+      displayError(error, 'alert');
     } finally {
       setIsUpdating(false);
     }
@@ -92,9 +95,9 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
         status: pendingStatusUpdate,
         deliveryDate: date.getTime()
       });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to update status:", error);
-      alert("Failed to update order status. Please try again.");
+      displayError(error, 'alert');
     } finally {
       setIsUpdating(false);
       setPendingStatusUpdate(null);
@@ -139,26 +142,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
     });
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: currency || "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
+  // Note: formatCurrency is now imported from utils/currencyFormat
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -240,7 +224,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                       <div className="mt-1">
                         <select
                           value={order.status}
-                          onChange={(e) => handleStatusUpdate(e.target.value)}
+                          onChange={(e) => handleStatusUpdate(e.target.value as OrderStatus)}
                           disabled={isUpdating}
                           className={`px-3 py-1 text-xs font-medium rounded-full ${getStatusColor(order.status)} cursor-pointer`}
                         >
@@ -337,43 +321,43 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                               </tr>
                               <tr>
                                 <td className="px-3 py-2 text-xs text-gray-600">Unit Price</td>
-                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.unitPrice, order.currency)}/kg</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.unitPrice, order.currency as SupportedCurrency)}/kg</td>
                               </tr>
                               <tr className="bg-gray-100">
                                 <td className="px-3 py-2 text-xs font-medium text-gray-700">Exclusive Value (Before GST)</td>
-                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.exclusiveValue || (item.quantityKg * item.unitPrice), order.currency)}</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.exclusiveValue || (item.quantityKg * item.unitPrice), order.currency as SupportedCurrency)}</td>
                               </tr>
                               {item.discountType && item.discountValue && (
                                 <>
                                   <tr className="bg-green-50">
                                     <td className="px-3 py-2 text-xs font-medium text-green-700">Total Before Discount</td>
-                                    <td className="px-3 py-2 text-xs text-right font-medium text-green-700">{formatCurrency((item.exclusiveValue || (item.quantityKg * item.unitPrice)) + (item.gstAmount || 0), order.currency)}</td>
+                                    <td className="px-3 py-2 text-xs text-right font-medium text-green-700">{formatCurrency((item.exclusiveValue || (item.quantityKg * item.unitPrice)) + (item.gstAmount || 0), order.currency as SupportedCurrency)}</td>
                                   </tr>
                                   <tr className="bg-green-50">
                                     <td className="px-3 py-2 text-xs font-medium text-green-700">Discount ({item.discountType === "amount" ? "Fixed Amount" : "Percentage"})</td>
                                     <td className="px-3 py-2 text-xs text-right font-medium text-green-700">
                                       {item.discountType === "amount" 
-                                        ? formatCurrency(item.discountValue, order.currency)
+                                        ? formatCurrency(item.discountValue, order.currency as SupportedCurrency)
                                         : `${item.discountValue}%`}
                                     </td>
                                   </tr>
                                   <tr className="bg-green-50">
                                     <td className="px-3 py-2 text-xs font-medium text-green-700">Discount Amount</td>
-                                    <td className="px-3 py-2 text-xs text-right font-medium text-green-700">-{formatCurrency(item.discountAmount || 0, order.currency)}</td>
+                                    <td className="px-3 py-2 text-xs text-right font-medium text-green-700">-{formatCurrency(item.discountAmount || 0, order.currency as SupportedCurrency)}</td>
                                   </tr>
                                 </>
                               )}
                               <tr>
                                 <td className="px-3 py-2 text-xs text-gray-600">GST Rate</td>
-                                <td className="px-3 py-2 text-xs text-right font-medium">{item.gstRate || 18}%</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{(item.gstRate ?? 0)}%</td>
                               </tr>
                               <tr>
                                 <td className="px-3 py-2 text-xs text-gray-600">GST Amount</td>
-                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.gstAmount || 0, order.currency)}</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.gstAmount || 0, order.currency as SupportedCurrency)}</td>
                               </tr>
                               <tr className="bg-primary/5 border-t-2 border-primary/20">
                                 <td className="px-3 py-2 text-xs font-bold text-primary">Inclusive Total (Including GST)</td>
-                                <td className="px-3 py-2 text-xs text-right font-bold text-primary">{formatCurrency(item.inclusiveTotal || item.totalPrice, order.currency)}</td>
+                                <td className="px-3 py-2 text-xs text-right font-bold text-primary">{formatCurrency(item.inclusiveTotal || item.totalPrice, order.currency as SupportedCurrency)}</td>
                               </tr>
                             </tbody>
                           </table>
@@ -391,12 +375,12 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                             <>
                               <div className="flex justify-between items-center text-sm text-gray-600">
                                 <span>Product Total:</span>
-                                <span>{formatCurrency(productTotal, order.currency)}</span>
+                                <span>{formatCurrency(productTotal, order.currency as SupportedCurrency)}</span>
                               </div>
                               {order.freightCost && order.freightCost > 0 && (
                                 <div className="flex justify-between items-center text-sm text-gray-600">
                                   <span>Freight Cost:</span>
-                                  <span>{formatCurrency(order.freightCost, order.currency)}</span>
+                                  <span>{formatCurrency(order.freightCost, order.currency as SupportedCurrency)}</span>
                                 </div>
                               )}
                             </>
@@ -405,7 +389,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                         <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                           <p className="text-lg font-bold text-gray-900">Order Total</p>
                           <p className="text-xl font-bold text-primary">
-                            {formatCurrency(order.totalAmount, order.currency)}
+                            {formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}
                           </p>
                         </div>
                       </div>
@@ -529,6 +513,19 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                               />
                               <button
                                 onClick={async () => {
+                                  // Validate invoice number
+                                  if (!newInvoiceNumber.trim()) {
+                                    displayError(new Error("Please enter an invoice number"), 'alert');
+                                    return;
+                                  }
+                                  
+                                  // Validate invoice number format (basic validation)
+                                  const invoiceRegex = /^[A-Z0-9][A-Z0-9-]{2,19}$/;
+                                  if (!invoiceRegex.test(newInvoiceNumber.trim())) {
+                                    displayError(new Error("Invoice number must be 3-20 characters long, start with a letter or number, and contain only letters, numbers, and hyphens"), 'alert');
+                                    return;
+                                  }
+                                  
                                   try {
                                     await updateInvoiceNumber({
                                       orderId: order._id,
@@ -536,35 +533,9 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                                     });
                                     setIsEditingInvoiceNumber(false);
                                     setNewInvoiceNumber("");
-                                  } catch (error) {
+                                  } catch (error: unknown) {
                                     console.error("Failed to update invoice number:", error);
-                                    
-                                    // Provide more specific error messages based on the error type
-                                    let errorMessage = "Failed to update invoice number. Please try again.";
-                                    
-                                    if (error instanceof Error) {
-                                      const errorStr = error.message.toLowerCase();
-                                      
-                                      if (errorStr.includes("validation") || errorStr.includes("invalid")) {
-                                        errorMessage = "Invalid invoice number. Please check the format and try again.";
-                                      } else if (errorStr.includes("duplicate") || errorStr.includes("already exists")) {
-                                        errorMessage = "An invoice with this number already exists. Please use a different invoice number.";
-                                      } else if (errorStr.includes("permission") || errorStr.includes("unauthorized")) {
-                                        errorMessage = "You don't have permission to update invoice numbers. Please contact your administrator.";
-                                      } else if (errorStr.includes("not found") || errorStr.includes("doesn't exist")) {
-                                        errorMessage = "Order or invoice not found. The record may have been deleted.";
-                                      } else if (errorStr.includes("network") || errorStr.includes("connection")) {
-                                        errorMessage = "Network connection error. Please check your internet connection and try again.";
-                                      } else {
-                                        // For other errors, show the actual error message if it's not too technical
-                                        const cleanMessage = error.message.replace(/^Error: /, '').replace(/^ConvexError: /, '');
-                                        if (cleanMessage.length < 100 && !cleanMessage.includes('internal') && !cleanMessage.includes('server')) {
-                                          errorMessage = `Error: ${cleanMessage}`;
-                                        }
-                                      }
-                                    }
-                                    
-                                    alert(errorMessage);
+                                    displayError(error, 'alert');
                                   }
                                 }}
                                 className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
@@ -606,11 +577,11 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                       {(() => {
                         const payments = (order as any).payments || [];
                         const advancePaid = payments
-                          .filter((p: any) => p.type === "advance")
-                          .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+                          .filter((p: Payment) => p.type === "advance")
+                          .reduce((s: number, p: Payment) => s + (p.amount || 0), 0);
                         const invoicePaid = payments
-                          .filter((p: any) => p.type !== "advance")
-                          .reduce((s: number, p: any) => s + (p.amount || 0), 0);
+                          .filter((p: Payment) => p.type !== "advance")
+                          .reduce((s: number, p: Payment) => s + (p.amount || 0), 0);
                         const totalPaid = advancePaid + invoicePaid;
                         
                         // Outstanding balance should only be calculated for shipped/delivered orders
@@ -624,26 +595,26 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                             {/* Main financial summary */}
                             <div className="grid grid-cols-2 gap-4">
                               <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                <p className="text-xs text-gray-500">Total Order Value</p>
-                                <p className="mt-1 text-lg font-semibold text-gray-900">{formatCurrency(order.invoice.amount, order.currency)}</p>
+                                <p className="text-xs text-gray-500">Order Value</p>
+                                <p className="mt-1 text-lg font-semibold text-gray-900">{formatCurrency(order.invoice.amount, order.currency as SupportedCurrency)}</p>
                               </div>
                               <div className="rounded-lg border border-gray-200 bg-white p-3">
                                 <p className="text-xs text-gray-500">Total Paid</p>
-                                <p className="mt-1 text-lg font-semibold text-green-600">{formatCurrency(totalPaid, order.currency)}</p>
+                                <p className="mt-1 text-lg font-semibold text-green-600">{formatCurrency(totalPaid, order.currency as SupportedCurrency)}</p>
                               </div>
                               <div className="rounded-lg border border-gray-200 bg-white p-3">
                                 <p className="text-xs text-gray-500">Advance Payments</p>
-                                <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(advancePaid, order.currency)}</p>
+                                <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(advancePaid, order.currency as SupportedCurrency)}</p>
                               </div>
                               <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                <p className="text-xs text-gray-500">Outstanding</p>
+                                <p className="text-xs text-gray-500">Receivables</p>
                                 <p className="mt-1 text-lg font-semibold text-orange-600">
-                                  {outstanding > 0 ? formatCurrency(outstanding, order.currency) : 
+                                  {outstanding > 0 ? formatCurrency(outstanding, order.currency as SupportedCurrency) : 
                                    order.status === "shipped" || order.status === "delivered" ? "$0" : 
                                    "Not yet due"}
                                 </p>
                                 {(order.status !== "shipped" && order.status !== "delivered") && (
-                                  <p className="text-xs text-gray-400 mt-1">Outstanding balance applies after shipment</p>
+                                  <p className="text-xs text-gray-400 mt-1">Receivables balance applies after shipment</p>
                                 )}
                               </div>
                             </div>
@@ -656,18 +627,18 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                                   {advancePaid > 0 && (
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Advance Payments:</span>
-                                      <span className="font-medium text-blue-600">{formatCurrency(advancePaid, order.currency)}</span>
+                                      <span className="font-medium text-blue-600">{formatCurrency(advancePaid, order.currency as SupportedCurrency)}</span>
                                     </div>
                                   )}
                                   {invoicePaid > 0 && (
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Invoice Payments:</span>
-                                      <span className="font-medium text-green-600">{formatCurrency(invoicePaid, order.currency)}</span>
+                                      <span className="font-medium text-green-600">{formatCurrency(invoicePaid, order.currency as SupportedCurrency)}</span>
                                     </div>
                                   )}
                                   <div className="flex justify-between pt-1 border-t border-gray-200">
                                     <span className="font-medium text-gray-700">Total Paid:</span>
-                                    <span className="font-medium text-green-600">{formatCurrency(totalPaid, order.currency)}</span>
+                                    <span className="font-medium text-green-600">{formatCurrency(totalPaid, order.currency as SupportedCurrency)}</span>
                                   </div>
                                 </div>
                               </div>
@@ -679,7 +650,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                       {/* Conversion Details for International Payments */}
                       {(() => {
                         const payments = (order as any).payments || [];
-                        const internationalPayments = payments.filter((p: any) => 
+                        const internationalPayments = payments.filter((p: Payment) => 
                           p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD'
                         );
                         
@@ -689,11 +660,11 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                           <div className="mt-4">
                             <h4 className="text-sm font-medium text-gray-700 mb-2">Currency Conversion Details</h4>
                             <div className="space-y-2">
-                              {internationalPayments.map((payment: any, index: number) => (
+                              {internationalPayments.map((payment: Payment, index: number) => (
                                 <div key={index} className="bg-blue-50 rounded-md p-3 text-sm">
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-600">Original Payment:</span>
-                                    <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
+                                    <span className="font-medium">{formatCurrency(payment.amount, payment.currency as SupportedCurrency)}</span>
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-600">Conversion Rate:</span>
@@ -701,7 +672,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-600">Converted to USD:</span>
-                                    <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                                    <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD || 0, 'USD')}</span>
                                   </div>
                                 </div>
                               ))}

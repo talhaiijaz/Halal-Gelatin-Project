@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatCurrency, type SupportedCurrency } from './currencyFormat';
 
 interface OrderData {
   _id: string;
@@ -162,7 +163,7 @@ export const generateOrderPDF = async (order: OrderData) => {
     ['Status:', order.status.toUpperCase().replace('_', ' ')],
     ['Order Date:', new Date(order.factoryDepartureDate || order.orderCreationDate || order.createdAt).toLocaleDateString()],
     ['Expected Delivery:', new Date(order.expectedDeliveryDate).toLocaleDateString()],
-    ['Total Amount:', `${order.currency} ${order.totalAmount.toLocaleString()}`],
+    ['Total Amount:', formatCurrency(order.totalAmount, order.currency as SupportedCurrency)],
   ];
   
   orderInfo.forEach(([label, value]) => {
@@ -214,7 +215,7 @@ export const generateOrderPDF = async (order: OrderData) => {
   
   if (hasGSTData) {
     // Enhanced table with GST breakdown
-    tableHeaders = ['Product', 'Quantity', 'Rate', 'Ex. Value', 'GST (18%)', 'Inclusive Total', 'Notes'];
+    tableHeaders = ['Product', 'Quantity', 'Rate', 'Ex. Value', 'GST', 'Inclusive Total', 'Notes'];
     itemsTableData = order.items.map(item => {
       const exclusiveValue = item.exclusiveValue || (item.quantityKg * item.unitPrice);
       const gstAmount = item.gstAmount || ((exclusiveValue * 18) / 100);
@@ -223,10 +224,10 @@ export const generateOrderPDF = async (order: OrderData) => {
       return [
         item.product,
         `${item.quantityKg} kg`,
-        `${order.currency} ${item.unitPrice.toFixed(2)}`,
-        `${order.currency} ${exclusiveValue.toFixed(2)}`,
-        `${order.currency} ${gstAmount.toFixed(2)}`,
-        `${order.currency} ${inclusiveTotal.toFixed(2)}`,
+        formatCurrency(item.unitPrice, order.currency as SupportedCurrency),
+        formatCurrency(exclusiveValue, order.currency as SupportedCurrency),
+        formatCurrency(gstAmount, order.currency as SupportedCurrency),
+        formatCurrency(inclusiveTotal, order.currency as SupportedCurrency),
         item.notes || '-'
       ];
     });
@@ -236,8 +237,8 @@ export const generateOrderPDF = async (order: OrderData) => {
     itemsTableData = order.items.map(item => [
       item.product,
       `${item.quantityKg} kg`,
-      `${order.currency} ${item.unitPrice.toFixed(2)}`,
-      `${order.currency} ${(item.totalPrice || (item.quantityKg * item.unitPrice)).toFixed(2)}`,
+      formatCurrency(item.unitPrice, order.currency as SupportedCurrency),
+      formatCurrency((item.totalPrice || (item.quantityKg * item.unitPrice)), order.currency as SupportedCurrency),
       item.notes || '-'
     ]);
   }
@@ -293,9 +294,13 @@ export const generateOrderPDF = async (order: OrderData) => {
     const totalExclusiveValue = order.items.reduce((sum, item) => 
       sum + (item.exclusiveValue || (item.quantityKg * item.unitPrice)), 0
     );
-    const totalGST = order.items.reduce((sum, item) => 
-      sum + (item.gstAmount || ((item.exclusiveValue || (item.quantityKg * item.unitPrice)) * 18 / 100)), 0
-    );
+    const totalGST = order.items.reduce((sum, item) => {
+      const exclusive = (item.exclusiveValue || (item.quantityKg * item.unitPrice));
+      const gst = item.gstAmount !== undefined
+        ? item.gstAmount
+        : (exclusive * ((item.gstRate ?? 0) / 100));
+      return sum + gst;
+    }, 0);
     const totalInclusive = order.items.reduce((sum, item) => 
       sum + (item.inclusiveTotal || (item.exclusiveValue || (item.quantityKg * item.unitPrice)) + (item.gstAmount || 0)), 0
     );
@@ -309,9 +314,9 @@ export const generateOrderPDF = async (order: OrderData) => {
     doc.setTextColor(80, 80, 80);
     
     const summaryInfo = [
-      ['Total Exclusive Value:', `${order.currency} ${totalExclusiveValue.toFixed(2)}`],
-      ['Total GST (18%):', `${order.currency} ${totalGST.toFixed(2)}`],
-      ['Total Inclusive Amount:', `${order.currency} ${totalInclusive.toFixed(2)}`],
+      ['Total Exclusive Value:', formatCurrency(totalExclusiveValue, order.currency as SupportedCurrency)],
+      ['Total GST:', formatCurrency(totalGST, order.currency as SupportedCurrency)],
+      ['Total Inclusive Amount:', formatCurrency(totalInclusive, order.currency as SupportedCurrency)],
     ];
     
     summaryInfo.forEach(([label, value]) => {
@@ -345,10 +350,10 @@ export const generateOrderPDF = async (order: OrderData) => {
     doc.setTextColor(80, 80, 80);
     
     const invoiceInfo = [
-      ['Invoice Number:', order.orderNumber], // Same as order number
+      ['Invoice Number:', order.invoice.invoiceNumber],
       ['Invoice Status:', order.invoice.status.toUpperCase().replace('_', ' ')],
-      ['Total Paid:', `${order.currency} ${order.invoice.totalPaid.toLocaleString()}`],
-      ['Outstanding:', `${order.currency} ${order.invoice.outstandingBalance.toLocaleString()}`],
+      ['Total Paid:', formatCurrency(order.invoice.totalPaid, order.currency as SupportedCurrency)],
+      ['Receivables:', formatCurrency(order.invoice.outstandingBalance, order.currency as SupportedCurrency)],
       ['Due Date:', new Date(order.invoice.dueDate).toLocaleDateString()],
     ];
     

@@ -6,6 +6,8 @@ import { api } from "@/convex/_generated/api";
 import { X } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { dateStringToTimestamp } from "@/app/utils/dateUtils";
+import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { parseError, displayError, validateRequiredFields, formatValidationError } from "@/app/utils/errorHandling";
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -76,29 +78,34 @@ export default function RecordPaymentModal({
     e.preventDefault();
     
     // Validate required fields
-    if (!selectedClientId) {
-      alert("Please select a customer");
+    const validation = validateRequiredFields(
+      {
+        selectedClientId,
+        selectedInvoiceId,
+        amount: formData.amount,
+        reference: formData.reference,
+        paymentDate: formData.paymentDate,
+        bankAccountId: formData.method === "bank_transfer" ? selectedBankAccountId : undefined
+      },
+      [
+        'selectedClientId',
+        'selectedInvoiceId', 
+        'amount',
+        'reference',
+        'paymentDate',
+        ...(formData.method === "bank_transfer" ? ['bankAccountId'] : [])
+      ]
+    );
+    
+    if (!validation.isValid) {
+      const errorMessage = formatValidationError(validation.missingFields);
+      displayError(new Error(errorMessage), 'alert');
       return;
     }
-    if (!selectedInvoiceId) {
-      alert("Please select an invoice");
-      return;
-    }
-    if (!formData.amount || parseFloat(formData.amount) <= 0) {
-      alert("Please enter a valid payment amount");
-      return;
-    }
-    if (!formData.reference || formData.reference.trim() === "") {
-      alert("Please enter a reference number");
-      return;
-    }
-    if (!formData.paymentDate) {
-      alert("Please select a payment date");
-      return;
-    }
-
-    if (formData.method === "bank_transfer" && !selectedBankAccountId) {
-      alert("Please select a bank account for bank transfer");
+    
+    // Additional validation for amount
+    if (parseFloat(formData.amount) <= 0) {
+      displayError(new Error('Payment amount must be greater than 0'), 'alert');
       return;
     }
 
@@ -138,41 +145,9 @@ export default function RecordPaymentModal({
       setSelectedInvoiceId("");
       setIsAdvancePayment(false);
       onClose();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to record payment:", error);
-      
-      // Provide more specific error messages based on the error type
-      let errorMessage = "Failed to record payment. Please try again.";
-      
-      if (error instanceof Error) {
-        const errorStr = error.message.toLowerCase();
-        
-        if (errorStr.includes("validation") || errorStr.includes("invalid")) {
-          errorMessage = "Invalid payment data. Please check all required fields and try again.";
-        } else if (errorStr.includes("amount") || errorStr.includes("payment")) {
-          errorMessage = "Payment amount is invalid. Please check the amount and try again.";
-        } else if (errorStr.includes("invoice") || errorStr.includes("order")) {
-          errorMessage = "Invoice information is invalid. Please select a valid invoice.";
-        } else if (errorStr.includes("client") || errorStr.includes("customer")) {
-          errorMessage = "Customer information is invalid. Please select a valid customer.";
-        } else if (errorStr.includes("bank") || errorStr.includes("account")) {
-          errorMessage = "Bank account information is invalid. Please select a valid bank account.";
-        } else if (errorStr.includes("network") || errorStr.includes("connection")) {
-          errorMessage = "Network connection error. Please check your internet connection and try again.";
-        } else if (errorStr.includes("permission") || errorStr.includes("unauthorized")) {
-          errorMessage = "You don't have permission to record payments. Please contact your administrator.";
-        } else if (errorStr.includes("duplicate") || errorStr.includes("already exists")) {
-          errorMessage = "A payment with similar details already exists. Please check and modify the payment details.";
-        } else {
-          // For other errors, show the actual error message if it's not too technical
-          const cleanMessage = error.message.replace(/^Error: /, '').replace(/^ConvexError: /, '');
-          if (cleanMessage.length < 100 && !cleanMessage.includes('internal') && !cleanMessage.includes('server')) {
-            errorMessage = `Error: ${cleanMessage}`;
-          }
-        }
-      }
-      
-      alert(errorMessage);
+      displayError(error, 'alert');
     } finally {
       setIsSubmitting(false);
     }
@@ -185,28 +160,9 @@ export default function RecordPaymentModal({
     }));
   };
 
-  const formatCurrency = (amount: number, currency?: string) => {
+  const getCurrencyForDisplay = (currency?: string): SupportedCurrency => {
     const invoice = unpaidInvoices?.find(inv => inv._id === selectedInvoiceId);
-    const currencyToUse = currency || invoice?.currency || (selectedClient?.type === 'local' ? 'PKR' : 'USD');
-    
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currencyToUse === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount || 0)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currencyToUse === 'USD' ? 'en-US' : 
-                   currencyToUse === 'PKR' ? 'en-PK' : 
-                   currencyToUse === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currencyToUse,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount || 0);
+    return (currency || invoice?.currency || getCurrencyForClientType(selectedClient?.type as 'local' | 'international', 'USD')) as SupportedCurrency;
   };
   
   const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
@@ -289,8 +245,8 @@ export default function RecordPaymentModal({
                           // Only show outstanding for shipped/delivered orders
                           const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
                           const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
-                          return formatCurrency(outstandingAmount, invoice.currency);
-                        })()} outstanding
+                          return formatCurrency(outstandingAmount, invoice.currency as SupportedCurrency);
+                        })()} receivables
                       </option>
                     ))}
                   </select>
@@ -314,22 +270,22 @@ export default function RecordPaymentModal({
                     return (
                       <div className="mt-1 space-y-1">
                         <p className="text-sm">
-                          <span className="font-medium">Total Amount:</span> {formatCurrency(invoice.amount, invoice.currency)}
+                          <span className="font-medium">Total Amount:</span> {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
                         </p>
                         <p className="text-sm">
-                          <span className="font-medium">Paid:</span> {formatCurrency(invoice.totalPaid, invoice.currency)}
+                          <span className="font-medium">Paid:</span> {formatCurrency(invoice.totalPaid, invoice.currency as SupportedCurrency)}
                           {invoice.advancePaid > 0 && (
                             <span className="text-blue-600">
-                              {" "}({formatCurrency(invoice.advancePaid, invoice.currency)} advance)
+                              {" "}({formatCurrency(invoice.advancePaid, invoice.currency as SupportedCurrency)} advance)
                             </span>
                           )}
                         </p>
                         <p className="text-sm font-medium text-primary">
-                          Outstanding: {(() => {
+                          Receivables: {(() => {
                             // Only show outstanding for shipped/delivered orders
                             const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
                             const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
-                            return formatCurrency(outstandingAmount, invoice.currency);
+                            return formatCurrency(outstandingAmount, invoice.currency as SupportedCurrency);
                           })()}
                         </p>
                       </div>
@@ -407,7 +363,7 @@ export default function RecordPaymentModal({
                         const newOutstanding = Math.max(0, currentOutstanding - gross);
                         return (
                           <div className="col-span-2">
-                            <div className="text-gray-600">Outstanding after this payment</div>
+                            <div className="text-gray-600">Receivables after this payment</div>
                             <div className="font-semibold text-primary">{formatCurrency(newOutstanding)}</div>
                           </div>
                         );

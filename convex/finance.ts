@@ -37,6 +37,11 @@ export const getDashboardStats = query({
     totalPaymentsReceived: v.number(),
     averagePaymentAmount: v.number(),
     paymentCount: v.number(),
+    // Pipeline order value by currency (pending + in_production)
+    pendingOrdersValueUSD: v.number(),
+    pendingOrdersValuePKR: v.number(),
+    pendingOrdersValueEUR: v.number(),
+    pendingOrdersValueAED: v.number(),
   }),
   handler: async (ctx, args) => {
     const year = args.year || new Date().getFullYear();
@@ -145,6 +150,17 @@ export const getDashboardStats = query({
     const advancePaymentsPKR = advancePaymentsByCurrency["PKR"] || 0;
     const advancePaymentsEUR = advancePaymentsByCurrency["EUR"] || 0;
     const advancePaymentsAED = advancePaymentsByCurrency["AED"] || 0;
+
+    // Pipeline order value by currency (pending + in_production)
+    const pipelineOrders = yearOrders.filter(o => ["pending", "in_production"].includes(o.status));
+    const pipelineByCurrency: Record<string, number> = {};
+    pipelineOrders.forEach(order => {
+      pipelineByCurrency[order.currency] = (pipelineByCurrency[order.currency] || 0) + order.totalAmount;
+    });
+    const pendingOrdersValueUSD = pipelineByCurrency["USD"] || 0;
+    const pendingOrdersValuePKR = pipelineByCurrency["PKR"] || 0;
+    const pendingOrdersValueEUR = pipelineByCurrency["EUR"] || 0;
+    const pendingOrdersValueAED = pipelineByCurrency["AED"] || 0;
     
     // Calculate outstanding by currency (only for shipped/delivered orders)
     const outstandingByCurrency: Record<string, number> = {};
@@ -174,7 +190,7 @@ export const getDashboardStats = query({
       year: year,
       numberOfOrders: yearOrders.length,
       activeOrders: yearOrders.filter(o => 
-        ["pending", "confirmed", "in_production", "shipped"].includes(o.status)
+        ["pending", "in_production", "shipped"].includes(o.status)
       ).length,
       totalQuantityKg: Math.round(totalQuantity),
       totalRevenue,
@@ -204,6 +220,10 @@ export const getDashboardStats = query({
       totalPaymentsReceived,
       averagePaymentAmount,
       paymentCount: yearPayments.length,
+      pendingOrdersValueUSD,
+      pendingOrdersValuePKR,
+      pendingOrdersValueEUR,
+      pendingOrdersValueAED,
     };
   },
 });

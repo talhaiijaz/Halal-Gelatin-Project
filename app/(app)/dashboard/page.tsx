@@ -22,6 +22,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
+import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 
 export default function DashboardPage() {
   console.log("DashboardPage rendering...");
@@ -174,26 +175,9 @@ export default function DashboardPage() {
   const monthsData = getNext3MonthsShipmentData();
   const hasLimitExceeded = monthsData.some(month => month.exceedsLimit);
 
-  // Format currency
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  // Helper function to get client currency
+  const getClientCurrency = (clientType: string): SupportedCurrency => {
+    return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');
   };
 
   // Create stats array with real data - simplified since we now have separate financial sections
@@ -285,7 +269,7 @@ export default function DashboardPage() {
           
           {/* Key Metrics Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Total Order Value */}
+            {/* Current Pending Orders Value */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-blue-200 rounded-lg">
@@ -296,9 +280,9 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-blue-700 mb-1">Total Order Value</p>
+                <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
                 <p className="text-2xl font-bold text-blue-900">
-                  {localStats ? formatCurrency(localStats.totalOrderValue || 0, 'PKR') : <Skeleton width={100} height={32} />}
+                  {localStats ? formatCurrency((localStats as any).currentPendingOrdersValue || localStats.totalOrderValue || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
               </div>
@@ -342,7 +326,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Outstanding */}
+            {/* Receivables */}
             <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-red-200 rounded-lg">
@@ -353,7 +337,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
+                <p className="text-sm font-medium text-red-700 mb-1">Receivables</p>
                 <p className="text-2xl font-bold text-red-900">
                   {localStats ? formatCurrency(localStats.outstandingAmount || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
@@ -372,7 +356,7 @@ export default function DashboardPage() {
           
           {/* Key Metrics Row */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Total Order Value */}
+            {/* Current Pending Orders Value */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-blue-200 rounded-lg">
@@ -383,14 +367,14 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-blue-700 mb-1">Total Order Value</p>
+                <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
                 <div className="text-2xl font-bold text-blue-900 space-y-1">
                   {internationalStats ? (
                     <>
-                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
-                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.PKR || 0, 'PKR')}</div>
-                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
-                      <div className="text-lg">{formatCurrency(internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.PKR) || internationalStats.orderValueByCurrency?.PKR || 0, 'PKR')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
@@ -450,7 +434,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Outstanding */}
+            {/* Receivables */}
             <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-red-200 rounded-lg">
@@ -461,7 +445,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <div>
-                <p className="text-sm font-medium text-red-700 mb-1">Outstanding</p>
+                <p className="text-sm font-medium text-red-700 mb-1">Receivables</p>
                 <div className="text-2xl font-bold text-red-900 space-y-1">
                   {internationalStats ? (
                     <>

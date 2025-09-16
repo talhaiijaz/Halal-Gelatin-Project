@@ -5,6 +5,9 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { X } from "lucide-react";
+import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { displayError } from "@/app/utils/errorHandling";
+import { type Payment } from "@/app/types";
 
 export type EditablePayment = {
   _id: Id<"payments">;
@@ -58,26 +61,7 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
 
   if (!isOpen || !payment) return null;
 
-  const formatCurrency = (amount?: number, currency?: string) => {
-    // For EUR, use custom formatting to ensure symbol appears before number
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      }).format(amount || 0)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, { 
-      style: "currency", 
-      currency: currency || "USD", 
-      minimumFractionDigits: 0, 
-      maximumFractionDigits: 0 
-    }).format(amount || 0);
-  };
+  // Note: formatCurrency is now imported from utils/currencyFormat
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -99,13 +83,13 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                   <div className="font-medium">Advance Payment</div>
                   {client && (
                     <div>
-                      <span className="text-gray-600">Client Outstanding:</span>
-                      <span className="ml-1 font-semibold">{formatCurrency((client as any).outstandingAmount, (client as any).type === 'local' ? 'PKR' : 'USD')}</span>
+                      <span className="text-gray-600">Client Receivables:</span>
+                      <span className="ml-1 font-semibold">{formatCurrency((client as any).outstandingAmount, (client as any).type === 'local' ? 'PKR' : 'USD' as SupportedCurrency)}</span>
                     </div>
                   )}
                   <div>
                     <span className="text-gray-600">This Payment:</span>
-                    <span className="ml-1 font-semibold">{formatCurrency(Number(form.amount), (client as any)?.type === 'local' ? 'PKR' : 'USD')}</span>
+                    <span className="ml-1 font-semibold">{formatCurrency(Number(form.amount), (client as any)?.type === 'local' ? 'PKR' : 'USD' as SupportedCurrency)}</span>
                   </div>
                   <div className="text-xs text-gray-500">You are editing an advance payment.</div>
                 </div>
@@ -113,25 +97,25 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <div className="text-gray-600">Invoice Total</div>
-                    <div className="font-semibold">{formatCurrency((invoice as any).amount, (invoice as any).currency)}</div>
+                    <div className="font-semibold">{formatCurrency((invoice as any).amount, (invoice as any).currency as SupportedCurrency)}</div>
                   </div>
                   <div>
                     <div className="text-gray-600">Paid</div>
-                    <div className="font-semibold">{formatCurrency((invoice as any).totalPaid, (invoice as any).currency)}</div>
+                    <div className="font-semibold">{formatCurrency((invoice as any).totalPaid, (invoice as any).currency as SupportedCurrency)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-600">Outstanding</div>
-                    <div className="font-semibold text-primary">{formatCurrency((invoice as any).outstandingBalance, (invoice as any).currency)}</div>
+                    <div className="text-gray-600">Receivables</div>
+                    <div className="font-semibold text-primary">{formatCurrency((invoice as any).outstandingBalance, (invoice as any).currency as SupportedCurrency)}</div>
                   </div>
                   <div>
                     <div className="text-gray-600">Advance Payments</div>
                     <div className="font-semibold">
-                      {formatCurrency(((invoice as any).payments || []).filter((p: any) => p.type === "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0), (invoice as any).currency)}
+                      {formatCurrency(((invoice as any).payments || []).filter((p: Payment) => p.type === "advance").reduce((s: number, p: Payment) => s + (p.amount || 0), 0), (invoice as any).currency as SupportedCurrency)}
                     </div>
                   </div>
                   <div className="col-span-2">
                     <div className="text-gray-600">This Payment</div>
-                    <div className="font-semibold">{formatCurrency(Number(form.amount), (invoice as any).currency)}</div>
+                    <div className="font-semibold">{formatCurrency(Number(form.amount), (invoice as any).currency as SupportedCurrency)}</div>
                   </div>
                 </div>
               ) : null}
@@ -211,8 +195,8 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                     bankAccountId: form.bankAccountId ? (form.bankAccountId as unknown as Id<"bankAccounts">) : undefined,
                   });
                   onClose();
-                } catch (e: any) {
-                  alert(e.message || "Failed to update payment");
+                } catch (e: unknown) {
+                  displayError(e, 'alert');
                 } finally {
                   setIsSaving(false);
                 }
