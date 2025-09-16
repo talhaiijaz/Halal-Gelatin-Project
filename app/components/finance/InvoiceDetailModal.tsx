@@ -38,8 +38,8 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
 
   const payments = invoice?.payments || [];
   // Use the calculated values from the query if available, otherwise calculate locally
-  const advanceTotal = invoice?.advancePaid ?? payments.filter((p: Payment) => p.type === "advance").reduce((s: number, p: Payment) => s + (p.amount || 0), 0);
-  const invoicePaymentTotal = invoice?.invoicePaid ?? payments.filter((p: Payment) => p.type !== "advance").reduce((s: number, p: Payment) => s + (p.amount || 0), 0);
+  const advanceTotal = invoice?.advancePaid ?? payments.filter((p: any) => p.type === "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  const invoicePaymentTotal = invoice?.invoicePaid ?? payments.filter((p: any) => p.type !== "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -143,10 +143,10 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                         <tbody className="divide-y">
                           {(invoice as any).orderItems.map((it: OrderItem, idx: number) => (
                             <tr key={idx}>
-                              <td className="px-3 py-2">{it.product}</td>
-                              <td className="px-3 py-2 text-right">{it.quantityKg}</td>
+                              <td className="px-3 py-2">{(it as any).product}</td>
+                              <td className="px-3 py-2 text-right">{(it as any).quantityKg || it.quantity}</td>
                               <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice, invoice.currency as SupportedCurrency)}/kg</td>
-                              <td className="px-3 py-2 text-right">{formatCurrency(it.inclusiveTotal || it.totalPrice, invoice.currency as SupportedCurrency)}</td>
+                              <td className="px-3 py-2 text-right">{formatCurrency((it as any).inclusiveTotal || it.totalPrice, invoice.currency as SupportedCurrency)}</td>
                             </tr>
                           ))}
                         </tbody>

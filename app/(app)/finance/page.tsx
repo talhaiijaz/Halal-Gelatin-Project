@@ -593,13 +593,13 @@ export default function FinancePage() {
                         </td>
                         <td className="px-4 py-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(invoice.amount, invoice.currency)}
+                            {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
                           </div>
                           <div className="text-xs text-gray-500">
-                            Paid: {formatCurrency(invoice.totalPaid, invoice.currency)}
+                            Paid: {formatCurrency(invoice.totalPaid, invoice.currency as SupportedCurrency)}
                             {invoice.advancePaid > 0 && (
                               <span className="text-blue-600">
-                                {" "}({formatCurrency(invoice.advancePaid, invoice.currency)} advance)
+                                {" "}({formatCurrency(invoice.advancePaid, invoice.currency as SupportedCurrency)} advance)
                               </span>
                             )}
                           </div>
@@ -610,7 +610,7 @@ export default function FinancePage() {
                             
                             return outstandingAmount > 0 && (
                               <div className="text-xs text-red-600 font-medium">
-                                Receivables: {formatCurrency(outstandingAmount, invoice.currency)}
+                                Receivables: {formatCurrency(outstandingAmount, invoice.currency as SupportedCurrency)}
                               </div>
                             );
                           })()}
@@ -761,7 +761,7 @@ export default function FinancePage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="font-medium text-green-600">{formatCurrency(payment.amount, payment.currency)}</div>
+                        <div className="font-medium text-green-600">{formatCurrency(payment.amount, payment.currency as SupportedCurrency)}</div>
                         {/* Show conversion info for international payments */}
                         {payment.convertedAmountUSD && payment.convertedAmountUSD !== payment.amount && (
                           <div className="text-xs text-gray-500">
@@ -771,7 +771,7 @@ export default function FinancePage() {
                         {/* Show withholding info for local payments */}
                         {(payment as any).withheldTaxAmount && (payment as any).withheldTaxAmount > 0 && (
                           <div className="text-xs text-orange-600">
-                            -{formatCurrency((payment as any).withheldTaxAmount, payment.currency)} withheld
+                            -{formatCurrency((payment as any).withheldTaxAmount, payment.currency as SupportedCurrency)} withheld
                           </div>
                         )}
                       </td>
@@ -870,7 +870,7 @@ export default function FinancePage() {
                       <p className="text-sm text-gray-500 mb-2">#{account.accountNumber}</p>
                       <p className="text-lg font-semibold text-gray-900">
                         {account.currentBalance !== undefined 
-                          ? formatCurrency(account.currentBalance, account.currency)
+                          ? formatCurrency(account.currentBalance, account.currency as SupportedCurrency)
                           : "-"
                         }
                       </p>
@@ -1028,7 +1028,7 @@ export default function FinancePage() {
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">
                             {account.currentBalance !== undefined 
-                              ? formatCurrency(account.currentBalance, account.currency)
+                              ? formatCurrency(account.currentBalance, account.currency as SupportedCurrency)
                               : "-"
                             }
                           </div>
