@@ -8,6 +8,8 @@ interface OrderData {
   totalAmount: number;
   currency: string;
   expectedDeliveryDate: number;
+  factoryDepartureDate?: number;
+  orderCreationDate?: number;
   notes?: string;
   createdAt: number;
   updatedAt: number;

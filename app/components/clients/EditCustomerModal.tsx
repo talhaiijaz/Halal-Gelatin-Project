@@ -9,14 +9,14 @@ import toast from "react-hot-toast";
 
 interface Client {
   _id: Id<"clients">;
-  name: string;
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: string;
-  city: string;
-  country: string;
-  taxId: string;
+  name?: string;
+  contactPerson?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  taxId?: string;
   type: "local" | "international";
   status: "active" | "inactive";
   profilePictureId?: Id<"_storage">;
