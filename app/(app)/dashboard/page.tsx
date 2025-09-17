@@ -62,6 +62,16 @@ export default function DashboardPage() {
       window.removeEventListener('focus', onFocus);
     };
   }, []);
+
+  // Close modal on Escape
+  useEffect(() => {
+    if (!expandedMetric) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpandedMetric(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expandedMetric]);
   
   useEffect(() => {
     const saved = localStorage.getItem('dashboardOrderLimit');
@@ -538,171 +548,175 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Detail Panel */}
+        {/* Modal for Details */}
         {expandedMetric && (
-          <div className="card p-6 mt-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
-                {expandedMetric.metric === 'advance' && 'Advance Payments'}
-                {expandedMetric.metric === 'receivables' && 'Receivables'}
-                {expandedMetric.metric === 'revenue' && 'Total Revenue'}
-                {` — ${expandedMetric.audience === 'local' ? 'Local' : 'International'} (${formatFiscalYear(selectedFiscalYear)})`}
-              </h3>
-              <button
-                onClick={() => setExpandedMetric(null)}
-                className="text-sm text-gray-600 hover:text-gray-900 border px-3 py-1 rounded"
-              >Close</button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setExpandedMetric(null)} />
+            <div className="relative bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden">
+              <div className="flex items-center justify-between p-4 border-b">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
+                  {expandedMetric.metric === 'advance' && 'Advance Payments'}
+                  {expandedMetric.metric === 'receivables' && 'Receivables'}
+                  {expandedMetric.metric === 'revenue' && 'Total Revenue'}
+                  {` — ${expandedMetric.audience === 'local' ? 'Local' : 'International'} (${formatFiscalYear(selectedFiscalYear)})`}
+                </h3>
+                <button
+                  onClick={() => setExpandedMetric(null)}
+                  className="text-gray-600 hover:text-gray-900 rounded px-2 py-1"
+                  aria-label="Close"
+                >✕</button>
+              </div>
+              <div className="p-4 overflow-auto">
+                {expandedMetric.metric === 'pending' && (
+                  <div className="overflow-x-auto">
+                    {!pendingOrdersDetails ? (
+                      <Skeleton count={5} height={24} />
+                    ) : pendingOrdersDetails.length === 0 ? (
+                      <p className="text-sm text-gray-600">No pending orders found.</p>
+                    ) : (
+                      <table className="min-w-full text-sm">
+                        <thead className="text-left text-gray-600">
+                          <tr>
+                            <th className="py-2 pr-4">Order No</th>
+                            <th className="py-2 pr-4">Client</th>
+                            <th className="py-2 pr-4">Status</th>
+                            <th className="py-2 pr-4">Qty (kg)</th>
+                            <th className="py-2 pr-4">Amount</th>
+                            <th className="py-2 pr-4">Currency</th>
+                            <th className="py-2 pr-4">Fac. Dep. Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pendingOrdersDetails.map((row) => (
+                            <tr key={String(row.orderId)} className="border-t">
+                              <td className="py-2 pr-4">{row.orderNumber}</td>
+                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                              <td className="py-2 pr-4">{row.status}</td>
+                              <td className="py-2 pr-4">{row.totalQuantity.toLocaleString()}</td>
+                              <td className="py-2 pr-4">{formatCurrency(row.totalAmount, row.currency as any)}</td>
+                              <td className="py-2 pr-4">{row.currency}</td>
+                              <td className="py-2 pr-4">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {expandedMetric.metric === 'advance' && (
+                  <div className="overflow-x-auto">
+                    {!advanceDetails ? (
+                      <Skeleton count={5} height={24} />
+                    ) : advanceDetails.length === 0 ? (
+                      <p className="text-sm text-gray-600">No advance payments found.</p>
+                    ) : (
+                      <table className="min-w-full text-sm">
+                        <thead className="text-left text-gray-600">
+                          <tr>
+                            <th className="py-2 pr-4">Invoice No</th>
+                            <th className="py-2 pr-4">Client</th>
+                            <th className="py-2 pr-4">Order No</th>
+                            <th className="py-2 pr-4">Advance Paid</th>
+                            <th className="py-2 pr-4">Currency</th>
+                            <th className="py-2 pr-4">Issue Date</th>
+                            <th className="py-2 pr-4">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {advanceDetails.map((row) => (
+                            <tr key={String(row.invoiceId)} className="border-t">
+                              <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
+                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                              <td className="py-2 pr-4">{row.orderNumber}</td>
+                              <td className="py-2 pr-4">{formatCurrency(row.advancePaid, row.currency as any)}</td>
+                              <td className="py-2 pr-4">{row.currency}</td>
+                              <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
+                              <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {expandedMetric.metric === 'receivables' && (
+                  <div className="overflow-x-auto">
+                    {!receivablesDetails ? (
+                      <Skeleton count={5} height={24} />
+                    ) : receivablesDetails.length === 0 ? (
+                      <p className="text-sm text-gray-600">No receivables found.</p>
+                    ) : (
+                      <table className="min-w-full text-sm">
+                        <thead className="text-left text-gray-600">
+                          <tr>
+                            <th className="py-2 pr-4">Invoice No</th>
+                            <th className="py-2 pr-4">Client</th>
+                            <th className="py-2 pr-4">Order No</th>
+                            <th className="py-2 pr-4">Outstanding</th>
+                            <th className="py-2 pr-4">Currency</th>
+                            <th className="py-2 pr-4">Issue Date</th>
+                            <th className="py-2 pr-4">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {receivablesDetails.map((row) => (
+                            <tr key={String(row.invoiceId)} className="border-t">
+                              <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
+                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                              <td className="py-2 pr-4">{row.orderNumber}</td>
+                              <td className="py-2 pr-4">{formatCurrency(row.outstandingBalance, row.currency as any)}</td>
+                              <td className="py-2 pr-4">{row.currency}</td>
+                              <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
+                              <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+
+                {expandedMetric.metric === 'revenue' && (
+                  <div className="overflow-x-auto">
+                    {!revenueDetails ? (
+                      <Skeleton count={5} height={24} />
+                    ) : revenueDetails.length === 0 ? (
+                      <p className="text-sm text-gray-600">No revenue payments found.</p>
+                    ) : (
+                      <table className="min-w-full text-sm">
+                        <thead className="text-left text-gray-600">
+                          <tr>
+                            <th className="py-2 pr-4">Date</th>
+                            <th className="py-2 pr-4">Client</th>
+                            <th className="py-2 pr-4">Invoice No</th>
+                            <th className="py-2 pr-4">Amount</th>
+                            <th className="py-2 pr-4">Currency</th>
+                            <th className="py-2 pr-4">Method</th>
+                            <th className="py-2 pr-4">Reference</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {revenueDetails.map((row) => (
+                            <tr key={String(row.paymentId)} className="border-t">
+                              <td className="py-2 pr-4">{new Date(row.paymentDate).toLocaleDateString()}</td>
+                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                              <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
+                              <td className="py-2 pr-4">{formatCurrency(row.amount, row.currency as any)}</td>
+                              <td className="py-2 pr-4">{row.currency}</td>
+                              <td className="py-2 pr-4">{row.method}</td>
+                              <td className="py-2 pr-4">{row.reference}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* Tables by metric */}
-            {expandedMetric.metric === 'pending' && (
-              <div className="overflow-x-auto">
-                {!pendingOrdersDetails ? (
-                  <Skeleton count={5} height={24} />
-                ) : pendingOrdersDetails.length === 0 ? (
-                  <p className="text-sm text-gray-600">No pending orders found.</p>
-                ) : (
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-gray-600">
-                      <tr>
-                        <th className="py-2 pr-4">Order No</th>
-                        <th className="py-2 pr-4">Client</th>
-                        <th className="py-2 pr-4">Status</th>
-                        <th className="py-2 pr-4">Qty (kg)</th>
-                        <th className="py-2 pr-4">Amount</th>
-                        <th className="py-2 pr-4">Currency</th>
-                        <th className="py-2 pr-4">Fac. Dep. Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pendingOrdersDetails.map((row) => (
-                        <tr key={String(row.orderId)} className="border-t">
-                          <td className="py-2 pr-4">{row.orderNumber}</td>
-                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                          <td className="py-2 pr-4">{row.status}</td>
-                          <td className="py-2 pr-4">{row.totalQuantity.toLocaleString()}</td>
-                          <td className="py-2 pr-4">{formatCurrency(row.totalAmount, row.currency as any)}</td>
-                          <td className="py-2 pr-4">{row.currency}</td>
-                          <td className="py-2 pr-4">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {expandedMetric.metric === 'advance' && (
-              <div className="overflow-x-auto">
-                {!advanceDetails ? (
-                  <Skeleton count={5} height={24} />
-                ) : advanceDetails.length === 0 ? (
-                  <p className="text-sm text-gray-600">No advance payments found.</p>
-                ) : (
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-gray-600">
-                      <tr>
-                        <th className="py-2 pr-4">Invoice No</th>
-                        <th className="py-2 pr-4">Client</th>
-                        <th className="py-2 pr-4">Order No</th>
-                        <th className="py-2 pr-4">Advance Paid</th>
-                        <th className="py-2 pr-4">Currency</th>
-                        <th className="py-2 pr-4">Issue Date</th>
-                        <th className="py-2 pr-4">Due Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {advanceDetails.map((row) => (
-                        <tr key={String(row.invoiceId)} className="border-t">
-                          <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
-                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                          <td className="py-2 pr-4">{row.orderNumber}</td>
-                          <td className="py-2 pr-4">{formatCurrency(row.advancePaid, row.currency as any)}</td>
-                          <td className="py-2 pr-4">{row.currency}</td>
-                          <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
-                          <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {expandedMetric.metric === 'receivables' && (
-              <div className="overflow-x-auto">
-                {!receivablesDetails ? (
-                  <Skeleton count={5} height={24} />
-                ) : receivablesDetails.length === 0 ? (
-                  <p className="text-sm text-gray-600">No receivables found.</p>
-                ) : (
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-gray-600">
-                      <tr>
-                        <th className="py-2 pr-4">Invoice No</th>
-                        <th className="py-2 pr-4">Client</th>
-                        <th className="py-2 pr-4">Order No</th>
-                        <th className="py-2 pr-4">Outstanding</th>
-                        <th className="py-2 pr-4">Currency</th>
-                        <th className="py-2 pr-4">Issue Date</th>
-                        <th className="py-2 pr-4">Due Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {receivablesDetails.map((row) => (
-                        <tr key={String(row.invoiceId)} className="border-t">
-                          <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
-                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                          <td className="py-2 pr-4">{row.orderNumber}</td>
-                          <td className="py-2 pr-4">{formatCurrency(row.outstandingBalance, row.currency as any)}</td>
-                          <td className="py-2 pr-4">{row.currency}</td>
-                          <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
-                          <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {expandedMetric.metric === 'revenue' && (
-              <div className="overflow-x-auto">
-                {!revenueDetails ? (
-                  <Skeleton count={5} height={24} />
-                ) : revenueDetails.length === 0 ? (
-                  <p className="text-sm text-gray-600">No revenue payments found.</p>
-                ) : (
-                  <table className="min-w-full text-sm">
-                    <thead className="text-left text-gray-600">
-                      <tr>
-                        <th className="py-2 pr-4">Date</th>
-                        <th className="py-2 pr-4">Client</th>
-                        <th className="py-2 pr-4">Invoice No</th>
-                        <th className="py-2 pr-4">Amount</th>
-                        <th className="py-2 pr-4">Currency</th>
-                        <th className="py-2 pr-4">Method</th>
-                        <th className="py-2 pr-4">Reference</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {revenueDetails.map((row) => (
-                        <tr key={String(row.paymentId)} className="border-t">
-                          <td className="py-2 pr-4">{new Date(row.paymentDate).toLocaleDateString()}</td>
-                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                          <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
-                          <td className="py-2 pr-4">{formatCurrency(row.amount, row.currency as any)}</td>
-                          <td className="py-2 pr-4">{row.currency}</td>
-                          <td className="py-2 pr-4">{row.method}</td>
-                          <td className="py-2 pr-4">{row.reference}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
           </div>
         )}
 
