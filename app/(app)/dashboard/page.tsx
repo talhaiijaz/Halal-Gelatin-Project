@@ -22,6 +22,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
+import { getUsdRates, toUSD, type UsdRates } from "@/app/utils/fx";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 
 export default function DashboardPage() {
@@ -45,6 +46,12 @@ export default function DashboardPage() {
   // Fetch client-specific stats for accurate local/international breakdown
   const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: selectedFiscalYear });
   const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: selectedFiscalYear });
+  const [usdRates, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
+  useEffect(() => {
+    const ac = new AbortController();
+    getUsdRates(ac.signal).then(setUsdRates).catch(() => {});
+    return () => ac.abort();
+  }, []);
   
   useEffect(() => {
     const saved = localStorage.getItem('dashboardOrderLimit');
@@ -374,6 +381,7 @@ export default function DashboardPage() {
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.USD || 0, 'USD')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.AED || 0, 'AED')}</div>
+                      <div className="text-sm text-green-700 pt-2 border-t border-green-200">USD Total: {formatCurrency((toUSD(internationalStats.revenueByCurrency?.USD || 0,'USD',usdRates)+toUSD(internationalStats.revenueByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(internationalStats.revenueByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</div>
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
@@ -399,6 +407,7 @@ export default function DashboardPage() {
                       <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
                       <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
+                      <div className="text-sm text-blue-700 pt-2 border-t border-blue-200">USD Total: {formatCurrency((toUSD(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0,'USD',usdRates)+toUSD(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</div>
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
@@ -422,9 +431,10 @@ export default function DashboardPage() {
                   {internationalStats ? (
                     <>
                       <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.USD || 0, 'USD')}</div>
-                      <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.PKR || 0, 'PKR')}</div>
+                  
                       <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.AED || 0, 'AED')}</div>
+                      <div className="text-sm text-purple-700 pt-2 border-t border-purple-200">USD Total: {formatCurrency((toUSD(internationalStats.advancePaymentsByCurrency?.USD || 0,'USD',usdRates)+toUSD(internationalStats.advancePaymentsByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(internationalStats.advancePaymentsByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</div>
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
@@ -448,9 +458,9 @@ export default function DashboardPage() {
                   {internationalStats ? (
                     <>
                       <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.USD || 0, 'USD')}</div>
-                      <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.PKR || 0, 'PKR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.AED || 0, 'AED')}</div>
+                      <div className="text-sm text-red-700 pt-2 border-t border-red-200">USD Total: {formatCurrency((toUSD(internationalStats.outstandingByCurrency?.USD || 0,'USD',usdRates)+toUSD(internationalStats.outstandingByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(internationalStats.outstandingByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</div>
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
