@@ -22,7 +22,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
-import { getUsdRates, toUSD, type UsdRates } from "@/app/utils/fx";
+import { getUsdRates, type UsdRates } from "@/app/utils/fx";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 
 export default function DashboardPage() {
@@ -47,14 +47,19 @@ export default function DashboardPage() {
   const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: selectedFiscalYear });
   const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: selectedFiscalYear });
   const [usdRates, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
-  const [showIntlRevenueInfo, setShowIntlRevenueInfo] = useState(false);
-  const [showIntlPendingInfo, setShowIntlPendingInfo] = useState(false);
-  const [showIntlAdvanceInfo, setShowIntlAdvanceInfo] = useState(false);
-  const [showIntlReceivablesInfo, setShowIntlReceivablesInfo] = useState(false);
+  // USD total and info toggles removed per request
   useEffect(() => {
     const ac = new AbortController();
-    getUsdRates(ac.signal).then(setUsdRates).catch(() => {});
-    return () => ac.abort();
+    const fetchRates = () => getUsdRates(ac.signal).then(setUsdRates).catch(() => {});
+    fetchRates();
+    const intervalId = setInterval(fetchRates, 1000 * 60 * 60 * 6); // refresh every 6 hours
+    const onFocus = () => fetchRates();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      ac.abort();
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
   }, []);
   
   useEffect(() => {
@@ -385,26 +390,7 @@ export default function DashboardPage() {
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.USD || 0, 'USD')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.AED || 0, 'AED')}</div>
-                      <div className="text-sm text-green-700 pt-2 border-t border-green-200 flex items-center gap-2">
-                        <span>USD Total: {formatCurrency((toUSD(internationalStats.revenueByCurrency?.USD || 0,'USD',usdRates)+toUSD(internationalStats.revenueByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(internationalStats.revenueByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</span>
-                        <button
-                          onClick={() => setShowIntlRevenueInfo(v => !v)}
-                          className="text-green-700 hover:text-green-900 rounded-full border border-green-300 px-1.5 leading-none"
-                          aria-expanded={showIntlRevenueInfo}
-                          aria-label="Show USD total calculation"
-                        >i</button>
-                      </div>
-                      {showIntlRevenueInfo && (
-                        <div className="text-xs text-green-700 mt-2 space-y-1 bg-green-50 border border-green-200 rounded p-2">
-                          <div>Rates: 1 EUR = {formatCurrency(1/usdRates.EUR, 'USD')}, 1 AED = {formatCurrency(usdRates.AED, 'USD')}</div>
-                          <div>Calc: USD + (EUR × rate) + (AED × rate)</div>
-                          <div>
-                            = {formatCurrency(internationalStats.revenueByCurrency?.USD || 0, 'USD')} +
-                              ({formatCurrency(internationalStats.revenueByCurrency?.EUR || 0, 'EUR')} × {(usdRates.EUR).toFixed(4)}) +
-                              ({formatCurrency(internationalStats.revenueByCurrency?.AED || 0, 'AED')} × {(usdRates.AED).toFixed(4)})
-                          </div>
-                        </div>
-                      )}
+                      {/* USD Total removed per request */}
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
@@ -430,26 +416,7 @@ export default function DashboardPage() {
                       <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
                       <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
-                      <div className="text-sm text-blue-700 pt-2 border-t border-blue-200 flex items-center gap-2">
-                        <span>USD Total: {formatCurrency((toUSD(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0,'USD',usdRates)+toUSD(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</span>
-                        <button
-                          onClick={() => setShowIntlPendingInfo(v => !v)}
-                          className="text-blue-700 hover:text-blue-900 rounded-full border border-blue-300 px-1.5 leading-none"
-                          aria-expanded={showIntlPendingInfo}
-                          aria-label="Show USD total calculation"
-                        >i</button>
-                      </div>
-                      {showIntlPendingInfo && (
-                        <div className="text-xs text-blue-700 mt-2 space-y-1 bg-blue-50 border border-blue-200 rounded p-2">
-                          <div>Rates: 1 EUR = {formatCurrency(1/usdRates.EUR, 'USD')}, 1 AED = {formatCurrency(usdRates.AED, 'USD')}</div>
-                          <div>Calc: USD + (EUR × rate) + (AED × rate)</div>
-                          <div>
-                            = {formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0, 'USD')} +
-                              ({formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')} × {(usdRates.EUR).toFixed(4)}) +
-                              ({formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0, 'AED')} × {(usdRates.AED).toFixed(4)})
-                          </div>
-                        </div>
-                      )}
+                      {/* USD Total removed per request */}
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
@@ -476,26 +443,7 @@ export default function DashboardPage() {
                   
                       <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.advancePaymentsByCurrency?.AED || 0, 'AED')}</div>
-                      <div className="text-sm text-purple-700 pt-2 border-t border-purple-200 flex items-center gap-2">
-                        <span>USD Total: {formatCurrency((toUSD(internationalStats.advancePaymentsByCurrency?.USD || 0,'USD',usdRates)+toUSD(internationalStats.advancePaymentsByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(internationalStats.advancePaymentsByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</span>
-                        <button
-                          onClick={() => setShowIntlAdvanceInfo(v => !v)}
-                          className="text-purple-700 hover:text-purple-900 rounded-full border border-purple-300 px-1.5 leading-none"
-                          aria-expanded={showIntlAdvanceInfo}
-                          aria-label="Show USD total calculation"
-                        >i</button>
-                      </div>
-                      {showIntlAdvanceInfo && (
-                        <div className="text-xs text-purple-700 mt-2 space-y-1 bg-purple-50 border border-purple-200 rounded p-2">
-                          <div>Rates: 1 EUR = {formatCurrency(1/usdRates.EUR, 'USD')}, 1 AED = {formatCurrency(usdRates.AED, 'USD')}</div>
-                          <div>Calc: USD + (EUR × rate) + (AED × rate)</div>
-                          <div>
-                            = {formatCurrency(internationalStats.advancePaymentsByCurrency?.USD || 0, 'USD')} +
-                              ({formatCurrency(internationalStats.advancePaymentsByCurrency?.EUR || 0, 'EUR')} × {(usdRates.EUR).toFixed(4)}) +
-                              ({formatCurrency(internationalStats.advancePaymentsByCurrency?.AED || 0, 'AED')} × {(usdRates.AED).toFixed(4)})
-                          </div>
-                        </div>
-                      )}
+                      {/* USD Total removed per request */}
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
@@ -521,26 +469,7 @@ export default function DashboardPage() {
                       <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.USD || 0, 'USD')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.outstandingByCurrency?.AED || 0, 'AED')}</div>
-                      <div className="text-sm text-red-700 pt-2 border-t border-red-200 flex items-center gap-2">
-                        <span>USD Total: {formatCurrency((toUSD(internationalStats.outstandingByCurrency?.USD || 0,'USD',usdRates)+toUSD(internationalStats.outstandingByCurrency?.EUR || 0,'EUR',usdRates)+toUSD(internationalStats.outstandingByCurrency?.AED || 0,'AED',usdRates)) || 0, 'USD')}</span>
-                        <button
-                          onClick={() => setShowIntlReceivablesInfo(v => !v)}
-                          className="text-red-700 hover:text-red-900 rounded-full border border-red-300 px-1.5 leading-none"
-                          aria-expanded={showIntlReceivablesInfo}
-                          aria-label="Show USD total calculation"
-                        >i</button>
-                      </div>
-                      {showIntlReceivablesInfo && (
-                        <div className="text-xs text-red-700 mt-2 space-y-1 bg-red-50 border border-red-200 rounded p-2">
-                          <div>Rates: 1 EUR = {formatCurrency(1/usdRates.EUR, 'USD')}, 1 AED = {formatCurrency(usdRates.AED, 'USD')}</div>
-                          <div>Calc: USD + (EUR × rate) + (AED × rate)</div>
-                          <div>
-                            = {formatCurrency(internationalStats.outstandingByCurrency?.USD || 0, 'USD')} +
-                              ({formatCurrency(internationalStats.outstandingByCurrency?.EUR || 0, 'EUR')} × {(usdRates.EUR).toFixed(4)}) +
-                              ({formatCurrency(internationalStats.outstandingByCurrency?.AED || 0, 'AED')} × {(usdRates.AED).toFixed(4)})
-                          </div>
-                        </div>
-                      )}
+                      {/* USD Total removed per request */}
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
