@@ -189,7 +189,6 @@ export default function InternationalClientsPage() {
     
     // Use appropriate locale based on currency for other currencies
     const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
                    currency === 'AED' ? 'en-AE' : 'en-US';
     return new Intl.NumberFormat(locale, {
       style: 'currency',
@@ -558,7 +557,7 @@ export default function InternationalClientsPage() {
                           <div className="text-sm font-medium text-gray-900">
                             {client.outstandingByCurrency ? 
                               Object.entries(client.outstandingByCurrency)
-                                .filter(([currency, amount]) => (amount as number) > 0)
+                                .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                                 .map(([currency, amount]) => (
                                   <div key={currency} className="mb-1">
                                     {formatCurrency(amount as number, currency)}
