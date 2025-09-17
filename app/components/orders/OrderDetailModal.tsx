@@ -27,7 +27,7 @@ import ActivityLog from "../ActivityLog";
 import DatePickerModal from "../DatePickerModal";
 import { useQuery as useConvexQuery } from "convex/react";
 import { api as convexApi } from "@/convex/_generated/api";
-import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { displayError } from "@/app/utils/errorHandling";
 import { type OrderStatus, type Payment } from "@/app/types";
 
@@ -321,7 +321,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                               </tr>
                               <tr>
                                 <td className="px-3 py-2 text-xs text-gray-600">Unit Price</td>
-                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrency(item.unitPrice, order.currency as SupportedCurrency)}/kg</td>
+                                <td className="px-3 py-2 text-xs text-right font-medium">{formatCurrencyPrecise(item.unitPrice, order.currency as SupportedCurrency)}/kg</td>
                               </tr>
                               <tr className="bg-gray-100">
                                 <td className="px-3 py-2 text-xs font-medium text-gray-700">Exclusive Value (Before GST)</td>
@@ -375,12 +375,12 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                             <>
                               <div className="flex justify-between items-center text-sm text-gray-600">
                                 <span>Product Total:</span>
-                                <span>{formatCurrency(productTotal, order.currency as SupportedCurrency)}</span>
+                                <span>{formatCurrencyPrecise(productTotal, order.currency as SupportedCurrency)}</span>
                               </div>
                               {order.freightCost && order.freightCost > 0 && (
                                 <div className="flex justify-between items-center text-sm text-gray-600">
                                   <span>Freight Cost:</span>
-                                  <span>{formatCurrency(order.freightCost, order.currency as SupportedCurrency)}</span>
+                                  <span>{formatCurrencyPrecise(order.freightCost, order.currency as SupportedCurrency)}</span>
                                 </div>
                               )}
                             </>
@@ -389,7 +389,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                         <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                           <p className="text-lg font-bold text-gray-900">Order Total</p>
                           <p className="text-xl font-bold text-primary">
-                            {formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}
+                            {formatCurrencyPrecise(order.totalAmount, order.currency as SupportedCurrency)}
                           </p>
                         </div>
                       </div>
@@ -612,7 +612,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                                 <p className="text-xs text-gray-500">Receivables</p>
                                 <p className="mt-1 text-lg font-semibold text-orange-600">
                                   {outstanding > 0 ? formatCurrency(outstanding, order.currency as SupportedCurrency) : 
-                                   order.status === "shipped" || order.status === "delivered" ? "$0" : 
+                                   order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as SupportedCurrency) : 
                                    "Not yet due"}
                                 </p>
                                 {(order.status !== "shipped" && order.status !== "delivered") && (

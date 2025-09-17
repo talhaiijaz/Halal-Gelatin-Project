@@ -63,6 +63,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 

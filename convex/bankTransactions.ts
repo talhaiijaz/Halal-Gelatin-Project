@@ -9,6 +9,7 @@ function formatCurrency(amount: number, currency: string) {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 

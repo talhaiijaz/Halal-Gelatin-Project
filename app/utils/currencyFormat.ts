@@ -24,14 +24,14 @@ export function formatCurrency(
   options: CurrencyFormatOptions = {}
 ): string {
   const {
-    minimumFractionDigits = 0,
-    maximumFractionDigits = 0,
+    minimumFractionDigits = 2,
+    maximumFractionDigits = 2,
     showSymbol = true
   } = options;
 
-  // Handle EUR specially to ensure symbol appears before number
+  // Handle EUR specially to ensure symbol appears before number and uses comma for thousands separator
   if (currency === 'EUR') {
-    const formatted = new Intl.NumberFormat('en-DE', {
+    const formatted = new Intl.NumberFormat('en-US', {
       minimumFractionDigits,
       maximumFractionDigits,
     }).format(amount);

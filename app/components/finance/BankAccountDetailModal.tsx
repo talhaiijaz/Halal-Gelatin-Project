@@ -40,6 +40,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
       style: 'currency',
       currency: currency,
       minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 

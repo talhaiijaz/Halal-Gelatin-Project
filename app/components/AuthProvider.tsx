@@ -30,9 +30,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const warningTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
+  const isPageVisibleRef = useRef<boolean>(true);
 
   // Function to reset the idle timer
   const resetIdleTimer = () => {
+    // Only reset if page is visible
+    if (!isPageVisibleRef.current) {
+      return;
+    }
+    
     lastActivityRef.current = Date.now();
     
     // Clear existing timers
@@ -77,6 +83,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resetIdleTimer();
   };
 
+  // Function to handle page visibility changes
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      // Page is hidden (laptop closed, tab minimized, etc.)
+      isPageVisibleRef.current = false;
+      // Don't reset timers when page becomes hidden
+    } else {
+      // Page is visible again
+      isPageVisibleRef.current = true;
+      // Check if enough time has passed since last activity
+      const timeSinceLastActivity = Date.now() - lastActivityRef.current;
+      if (timeSinceLastActivity >= IDLE_TIMEOUT) {
+        // User has been away for more than 15 minutes, logout immediately
+        handleIdleLogout();
+      } else {
+        // Reset the timer with remaining time
+        resetIdleTimer();
+      }
+    }
+  };
+
   useEffect(() => {
     // Check if user is authenticated on mount
     const authStatus = localStorage.getItem("halal-gelatin-auth");
@@ -92,11 +119,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resetIdleTimer();
 
       // Add event listeners for user activity
-      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'keydown'];
       
       events.forEach(event => {
         document.addEventListener(event, trackActivity, true);
       });
+
+      // Add window focus/blur listeners
+      const handleBlur = () => {
+        // When window loses focus, don't reset timer but track the time
+        lastActivityRef.current = Date.now();
+      };
+      
+      window.addEventListener('focus', trackActivity);
+      window.addEventListener('blur', handleBlur);
+
+      // Add page visibility change listener
+      document.addEventListener('visibilitychange', handleVisibilityChange);
 
       // Cleanup function
       return () => {
@@ -104,8 +143,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           document.removeEventListener(event, trackActivity, true);
         });
         
+        window.removeEventListener('focus', trackActivity);
+        window.removeEventListener('blur', handleBlur);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        
         if (idleTimerRef.current) {
           clearTimeout(idleTimerRef.current);
+        }
+        if (warningTimerRef.current) {
+          clearTimeout(warningTimerRef.current);
         }
       };
     }

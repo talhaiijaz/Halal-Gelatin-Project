@@ -9,6 +9,7 @@ import DocumentUpload from "./DocumentUpload";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, isDateInFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
+import { formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import toast from "react-hot-toast";
 
 interface OrderItem {
@@ -42,7 +43,7 @@ export default function EditOrderModal({
   onSuccess,
   orderId,
 }: EditOrderModalProps) {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(2);
   const [selectedClientId, setSelectedClientId] = useState<Id<"clients"> | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([{
     product: "",
@@ -276,31 +277,69 @@ export default function EditOrderModal({
   const handleNext = async () => {
     if (isUpdating) return; // Prevent multiple calls while updating
     
-    if (currentStep === 1 && !selectedClientId) {
-      alert("Please select a client");
-      return;
-    }
-    
     if (currentStep === 2) {
       // Validate all order items
       for (let i = 0; i < orderItems.length; i++) {
         const item = orderItems[i];
-        if (!item.product || item.quantityKg <= 0 || item.unitPrice <= 0) {
-          alert(`Please fill in all details for product ${i + 1} with valid values`);
+        
+        // Check for missing product name
+        if (!item.product || !item.product.trim()) {
+          toast.error(`Product ${i + 1}: Please enter a product name.`);
           return;
         }
+        
+        // Check for invalid quantity
+        if (!item.quantityKg || item.quantityKg <= 0) {
+          toast.error(`Product ${i + 1}: Please enter a valid quantity (must be greater than 0).`);
+          return;
+        }
+        
+        // Check for invalid unit price
+        if (!item.unitPrice || item.unitPrice <= 0) {
+          toast.error(`Product ${i + 1}: Please enter a valid unit price (must be greater than 0).`);
+          return;
+        }
+        
+        // Check for negative GST rate
         if (item.gstRate < 0) {
-          alert(`GST rate cannot be negative for product ${i + 1}`);
+          toast.error(`Product ${i + 1}: GST rate cannot be negative. Please enter a value between 0 and 100.`);
           return;
         }
+        
+        // Check for GST rate over 100%
         if (item.gstRate > 100) {
-          alert(`GST rate cannot be more than 100% for product ${i + 1}`);
+          toast.error(`Product ${i + 1}: GST rate cannot exceed 100%. Please enter a value between 0 and 100.`);
           return;
         }
       }
+      
+      // Validate freight cost
+      if (freightCost < 0) {
+        toast.error("Freight cost cannot be negative. Please enter a valid amount.");
+        return;
+      }
     }
     if (currentStep === 3) {
-      // Timeline step - no validation needed
+      // Validate timeline dates if provided
+      if (factoryDepartureDate && estimatedDepartureDate) {
+        const factoryDate = new Date(factoryDepartureDate);
+        const estimatedDate = new Date(estimatedDepartureDate);
+        
+        if (factoryDate > estimatedDate) {
+          toast.error("Factory departure date cannot be later than estimated departure date.");
+          return;
+        }
+      }
+      
+      if (estimatedDepartureDate && estimatedArrivalDate) {
+        const departureDate = new Date(estimatedDepartureDate);
+        const arrivalDate = new Date(estimatedArrivalDate);
+        
+        if (departureDate > arrivalDate) {
+          toast.error("Estimated departure date cannot be later than estimated arrival date.");
+          return;
+        }
+      }
     }
     
     if (currentStep < 4) {
@@ -311,11 +350,13 @@ export default function EditOrderModal({
   };
 
   const handleBack = () => {
-    setCurrentStep(currentStep - 1);
+    if (currentStep > 2) {
+      setCurrentStep(currentStep - 1);
+    }
   };
 
   const resetForm = () => {
-    setCurrentStep(1);
+    setCurrentStep(2);
     setSelectedClientId(null);
     setOrderItems([{
       product: "",
@@ -453,7 +494,7 @@ export default function EditOrderModal({
         }
       }
       
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsUpdating(false);
     }
@@ -486,7 +527,7 @@ export default function EditOrderModal({
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Edit Order</h2>
                               <p className="mt-1 text-sm text-gray-600">
-                  Step {currentStep} of 4
+                  Step {currentStep - 1} of 3
                 </p>
             </div>
             <button
@@ -500,17 +541,16 @@ export default function EditOrderModal({
           {/* Progress Bar */}
           <div className="px-6 py-3 border-b">
             <div className="flex items-center justify-between">
-              {[1, 2, 3, 4].map((step) => (
+              {[1, 2, 3].map((step) => (
                 <div
                   key={step}
                   className={`flex-1 h-2 mx-1 rounded ${
-                    step <= currentStep ? "bg-primary" : "bg-gray-200"
+                    step <= (currentStep - 1) ? "bg-primary" : "bg-gray-200"
                   }`}
                 />
               ))}
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-2">
-              <span>Client</span>
               <span>Order Details</span>
               <span>Timeline</span>
               <span>Review</span>
@@ -663,7 +703,7 @@ export default function EditOrderModal({
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Rate ($ per kg)
+                            Rate ({order?.currency || 'USD'} per kg)
                           </label>
                           <input
                             type="number"
@@ -684,7 +724,7 @@ export default function EditOrderModal({
                             Ex. Value (Before GST)
                           </label>
                           <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                            ${item.exclusiveValue.toFixed(2)}
+                            {formatCurrencyPrecise(item.exclusiveValue, order?.currency as SupportedCurrency)}
                           </div>
                         </div>
                         <div>
@@ -724,7 +764,7 @@ export default function EditOrderModal({
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {item.discountType === "amount" ? "Discount Amount ($)" : 
+                              {item.discountType === "amount" ? `Discount Amount (${order?.currency || 'USD'})` : 
                                item.discountType === "percentage" ? "Discount Percentage (%)" : 
                                "Discount Value"}
                             </label>
@@ -748,13 +788,13 @@ export default function EditOrderModal({
                               Total Before Discount
                             </label>
                             <div className="px-3 py-2 bg-blue-50 border border-blue-200 rounded-md text-sm font-medium text-blue-700">
-                              ${(item.exclusiveValue + item.gstAmount).toFixed(2)}
+                              {formatCurrencyPrecise(item.exclusiveValue + item.gstAmount, order?.currency as SupportedCurrency)}
                             </div>
                             <label className="block text-sm font-medium text-gray-700 mb-1 mt-2">
                               Calculated Discount Amount
                             </label>
                             <div className="px-3 py-2 bg-green-50 border border-green-200 rounded-md text-sm font-medium text-green-700">
-                              ${item.discountAmount?.toFixed(2) || "0.00"}
+                              {formatCurrencyPrecise(item.discountAmount || 0, order?.currency as SupportedCurrency)}
                             </div>
                           </div>
                         )}
@@ -767,7 +807,7 @@ export default function EditOrderModal({
                             GST Amount
                           </label>
                           <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                            ${item.gstAmount.toFixed(2)}
+                            {formatCurrencyPrecise(item.gstAmount, order?.currency as SupportedCurrency)}
                           </div>
                         </div>
                         <div>
@@ -775,7 +815,7 @@ export default function EditOrderModal({
                             Product Total
                           </label>
                           <div className="px-3 py-2 bg-primary/5 border border-primary/20 rounded-md text-sm font-bold text-primary">
-                            ${item.inclusiveTotal.toFixed(2)}
+                            {formatCurrencyPrecise(item.inclusiveTotal, order?.currency as SupportedCurrency)}
                           </div>
                         </div>
                       </div>
@@ -789,7 +829,7 @@ export default function EditOrderModal({
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Freight Cost ($)
+                        Freight Cost ({order?.currency || 'USD'})
                       </label>
                       <input
                         type="number"
@@ -806,7 +846,7 @@ export default function EditOrderModal({
                         Product Total
                       </label>
                       <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm font-medium text-gray-900">
-                        ${orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0).toFixed(2)}
+                        {formatCurrencyPrecise(orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0), order?.currency as SupportedCurrency)}
                       </div>
                     </div>
                   </div>
@@ -816,15 +856,15 @@ export default function EditOrderModal({
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Product Total:</span>
-                      <span>${orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0).toFixed(2)}</span>
+                      <span>{formatCurrencyPrecise(orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0), order?.currency as SupportedCurrency)}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <span>Freight Cost:</span>
-                      <span>${freightCost.toFixed(2)}</span>
+                      <span>{formatCurrencyPrecise(freightCost, order?.currency as SupportedCurrency)}</span>
                     </div>
                     <div className="flex items-center justify-between text-lg font-medium border-t pt-2">
                       <span>Order Total:</span>
-                      <span className="text-primary">${orderTotal.toFixed(2)}</span>
+                      <span className="text-primary">{formatCurrencyPrecise(orderTotal, order?.currency as SupportedCurrency)}</span>
                     </div>
                   </div>
                 </div>
@@ -1053,16 +1093,16 @@ export default function EditOrderModal({
                             <tr key={index}>
                               <td className="px-2 py-2 text-xs">{item.product}</td>
                               <td className="px-2 py-2 text-xs text-right">{item.quantityKg} kg</td>
-                              <td className="px-2 py-2 text-xs text-right">${item.unitPrice.toFixed(2)}</td>
-                              <td className="px-2 py-2 text-xs text-right">${item.exclusiveValue.toFixed(2)}</td>
+                              <td className="px-2 py-2 text-xs text-right">{formatCurrencyPrecise(item.unitPrice, order?.currency as SupportedCurrency)}</td>
+                              <td className="px-2 py-2 text-xs text-right">{formatCurrencyPrecise(item.exclusiveValue, order?.currency as SupportedCurrency)}</td>
                               <td className="px-2 py-2 text-xs text-right">{item.gstRate}%</td>
-                              <td className="px-2 py-2 text-xs text-right">${item.gstAmount.toFixed(2)}</td>
-                              <td className="px-2 py-2 text-xs text-right font-medium">${item.inclusiveTotal.toFixed(2)}</td>
+                              <td className="px-2 py-2 text-xs text-right">{formatCurrencyPrecise(item.gstAmount, order?.currency as SupportedCurrency)}</td>
+                              <td className="px-2 py-2 text-xs text-right font-medium">{formatCurrencyPrecise(item.inclusiveTotal, order?.currency as SupportedCurrency)}</td>
                             </tr>
                           ))}
                           <tr className="bg-gray-100 font-medium">
                             <td colSpan={6} className="px-2 py-2 text-xs text-right">Grand Total:</td>
-                            <td className="px-2 py-2 text-xs text-right text-primary font-bold">${orderTotal.toFixed(2)}</td>
+                            <td className="px-2 py-2 text-xs text-right text-primary font-bold">{formatCurrencyPrecise(orderTotal, order?.currency as SupportedCurrency)}</td>
                           </tr>
                         </tbody>
                       </table>
@@ -1160,11 +1200,11 @@ export default function EditOrderModal({
           {/* Footer */}
           <div className="flex items-center justify-between p-6 border-t bg-gray-50">
             <button
-              onClick={currentStep === 1 ? onClose : handleBack}
+              onClick={currentStep === 2 ? onClose : handleBack}
               className="flex items-center px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
             >
               <ChevronLeft className="h-4 w-4 mr-1" />
-              {currentStep === 1 ? "Cancel" : "Back"}
+              {currentStep === 2 ? "Cancel" : "Back"}
             </button>
 
             {currentStep < 4 ? (

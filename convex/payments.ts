@@ -31,8 +31,8 @@ function formatCurrency(amount: number, currency: string = "USD"): string {
   return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
     style: "currency",
     currency: currency,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 
@@ -79,15 +79,15 @@ export const recordPayment = mutation({
   handler: async (ctx, args) => {
     // Validate required fields
     if (!args.amount || args.amount <= 0) {
-      throw new Error("Payment amount must be greater than 0");
+      throw new Error("Payment validation failed: Payment amount must be greater than 0. Please enter a valid amount.");
     }
     
     if (!args.reference || args.reference.trim() === "") {
-      throw new Error("Reference number is required");
+      throw new Error("Payment validation failed: Reference number is required. Please provide a payment reference (e.g., check number, transaction ID).");
     }
     
     if (!args.method) {
-      throw new Error("Payment method is required");
+      throw new Error("Payment validation failed: Payment method is required. Please select how the payment was made (bank transfer, cash, etc.).");
     }
 
     let currency = "USD";
@@ -96,11 +96,14 @@ export const recordPayment = mutation({
 
     if (args.invoiceId) {
       const invoice = await ctx.db.get(args.invoiceId);
-      if (!invoice) throw new Error("Invoice not found");
+      if (!invoice) throw new Error("Payment validation failed: Invoice not found. Please select a valid invoice to record the payment against.");
 
-      // Validate against outstanding balance for invoice payments
-      if (args.amount > invoice.outstandingBalance) {
-        throw new Error(`Payment amount (${args.amount}) exceeds outstanding balance (${invoice.outstandingBalance})`);
+      // Calculate the remaining amount to be paid
+      const remainingAmount = invoice.amount - invoice.totalPaid;
+      
+      // Validate against remaining amount for invoice payments
+      if (args.amount > remainingAmount) {
+        throw new Error(`Payment amount (${formatCurrency(args.amount, invoice.currency)}) exceeds remaining amount to be paid (${formatCurrency(remainingAmount, invoice.currency)}). Total invoice amount: ${formatCurrency(invoice.amount, invoice.currency)}, already paid: ${formatCurrency(invoice.totalPaid, invoice.currency)}`);
       }
 
       currency = invoice.currency;
@@ -120,13 +123,13 @@ export const recordPayment = mutation({
           // For local payments, bank account should match invoice currency (PKR)
           if (clientOfInvoice?.type === "local") {
             if (bank.currency !== currency) {
-              throw new Error(`Bank account currency (${bank.currency}) must match invoice currency (${currency}) for local payments`);
+              throw new Error(`Payment validation failed: Bank account currency (${bank.currency}) must match invoice currency (${currency}) for local payments. Please select a bank account with the correct currency.`);
             }
           } else {
-            // For international payments, allow any supported currency bank accounts
+            // For international payments, allow any supported currency bank accounts including PKR
             // Conversion will be handled if currencies don't match
-            if (!['USD', 'EUR', 'AED'].includes(bank.currency)) {
-              throw new Error(`Bank account currency (${bank.currency}) must be USD, EUR, or AED for international payments`);
+            if (!['USD', 'EUR', 'AED', 'PKR'].includes(bank.currency)) {
+              throw new Error(`Payment validation failed: Bank account currency (${bank.currency}) must be USD, EUR, AED, or PKR for international payments. Please select a bank account with a supported currency.`);
             }
           }
         }
@@ -275,10 +278,10 @@ export const recordPayment = mutation({
 
     // Advance payment path
     if (!args.clientId) {
-      throw new Error("For advance payments, clientId is required");
+      throw new Error("Payment validation failed: Client selection is required for advance payments. Please select a client to record the advance payment against.");
     }
     const client = await ctx.db.get(args.clientId);
-    if (!client) throw new Error("Client not found");
+    if (!client) throw new Error("Payment validation failed: Client not found. Please select a valid client to record the advance payment against.");
 
     // For advance payments, currency should be provided or default based on client type
     // Note: Advance payments will use the currency provided or default to client type currency
@@ -296,7 +299,7 @@ export const recordPayment = mutation({
     
     if (client.type === "international" && currency !== "USD") {
       if (!args.conversionRateToUSD) {
-        throw new Error(`Conversion rate to USD is required for international advance payments in ${currency}`);
+        throw new Error(`Payment validation failed: Conversion rate to USD is required for international advance payments in ${currency}. Please provide the exchange rate to convert ${currency} to USD.`);
       }
       conversionRateToUSD = args.conversionRateToUSD;
       convertedAmountUSD = args.amount * conversionRateToUSD;
@@ -306,11 +309,21 @@ export const recordPayment = mutation({
       convertedAmountUSD = undefined;
     }
 
-    // Validate bank account currency for advances too (must match derived currency)
+    // Validate bank account currency for advances
     if (args.bankAccountId) {
       const bank = await ctx.db.get(args.bankAccountId);
-      if (bank && bank.currency !== currency) {
-        throw new Error(`Bank account currency (${bank.currency}) must match client currency (${currency})`);
+      if (bank) {
+        if (client.type === "local") {
+          // Local clients must use PKR bank accounts
+          if (bank.currency !== "PKR") {
+            throw new Error(`Bank account currency (${bank.currency}) must be PKR for local clients`);
+          }
+        } else {
+          // International clients can use USD, EUR, AED, or PKR bank accounts
+          if (!['USD', 'EUR', 'AED', 'PKR'].includes(bank.currency)) {
+            throw new Error(`Bank account currency (${bank.currency}) must be USD, EUR, AED, or PKR for international clients`);
+          }
+        }
       }
     }
 

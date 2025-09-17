@@ -9,6 +9,7 @@ import DocumentUpload from "./DocumentUpload";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, isDateInFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 import { dateStringToTimestamp } from "@/app/utils/dateUtils";
+import { formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import toast from "react-hot-toast";
 
 interface OrderItem {
@@ -136,9 +137,9 @@ export default function CreateOrderModal({
     }
   };
   const formatCurrency = (amount: number) => {
-    // For EUR, use custom formatting to ensure symbol appears before number
+    // For EUR, use custom formatting to ensure symbol appears before number and uses comma for thousands separator
     if (currentCurrency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
+      return `€${new Intl.NumberFormat('en-US', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(amount || 0)}`;
@@ -263,33 +264,83 @@ export default function CreateOrderModal({
     if (isCreating) return; // Prevent multiple calls while creating
     
     if (currentStep === 1 && !selectedClientId) {
-      alert("Please select a client");
+      toast.error("Please select a client to continue with the order creation.");
       return;
     }
     if (currentStep === 2) {
       if (!invoiceNumber.trim()) {
-        alert("Please enter an invoice number");
+        toast.error("Invoice number is required. Please enter a valid invoice number.");
+        return;
+      }
+      
+      // Validate invoice number format
+      const invoiceRegex = /^[A-Z0-9][A-Z0-9-]{2,19}$/;
+      if (!invoiceRegex.test(invoiceNumber.trim())) {
+        toast.error("Invoice number must be 3-20 characters long, start with a letter or number, and contain only letters, numbers, and hyphens.");
         return;
       }
       // Validate all order items
       for (let i = 0; i < orderItems.length; i++) {
         const item = orderItems[i];
-        if (!item.product || item.quantityKg <= 0 || item.unitPrice <= 0) {
-          alert(`Please fill in all details for product ${i + 1} with valid values`);
+        
+        // Check for missing product name
+        if (!item.product || !item.product.trim()) {
+          toast.error(`Product ${i + 1}: Please enter a product name.`);
           return;
         }
+        
+        // Check for invalid quantity
+        if (!item.quantityKg || item.quantityKg <= 0) {
+          toast.error(`Product ${i + 1}: Please enter a valid quantity (must be greater than 0).`);
+          return;
+        }
+        
+        // Check for invalid unit price
+        if (!item.unitPrice || item.unitPrice <= 0) {
+          toast.error(`Product ${i + 1}: Please enter a valid unit price (must be greater than 0).`);
+          return;
+        }
+        
+        // Check for negative GST rate
         if (item.gstRate < 0) {
-          alert(`GST rate cannot be negative for product ${i + 1}`);
+          toast.error(`Product ${i + 1}: GST rate cannot be negative. Please enter a value between 0 and 100.`);
           return;
         }
+        
+        // Check for GST rate over 100%
         if (item.gstRate > 100) {
-          alert(`GST rate cannot be more than 100% for product ${i + 1}`);
+          toast.error(`Product ${i + 1}: GST rate cannot exceed 100%. Please enter a value between 0 and 100.`);
           return;
         }
       }
+      
+      // Validate freight cost
+      if (freightCost < 0) {
+        toast.error("Freight cost cannot be negative. Please enter a valid amount.");
+        return;
+      }
     }
     if (currentStep === 3) {
-      // Timeline step - no validation needed
+      // Validate timeline dates if provided
+      if (factoryDepartureDate && estimatedDepartureDate) {
+        const factoryDate = new Date(factoryDepartureDate);
+        const estimatedDate = new Date(estimatedDepartureDate);
+        
+        if (factoryDate > estimatedDate) {
+          toast.error("Factory departure date cannot be later than estimated departure date.");
+          return;
+        }
+      }
+      
+      if (estimatedDepartureDate && estimatedArrivalDate) {
+        const departureDate = new Date(estimatedDepartureDate);
+        const arrivalDate = new Date(estimatedArrivalDate);
+        
+        if (departureDate > arrivalDate) {
+          toast.error("Estimated departure date cannot be later than estimated arrival date.");
+          return;
+        }
+      }
     }
     if (currentStep === 4) {
       // Review step - create the order
@@ -482,7 +533,7 @@ export default function CreateOrderModal({
         }
       }
       
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsCreating(false);
     }
@@ -1197,16 +1248,16 @@ export default function CreateOrderModal({
                             <tr key={index}>
                               <td className="px-2 py-2 text-xs">{item.product}</td>
                               <td className="px-2 py-2 text-xs text-right">{item.quantityKg} kg</td>
-                              <td className="px-2 py-2 text-xs text-right">{formatCurrency(item.unitPrice)}</td>
-                              <td className="px-2 py-2 text-xs text-right">{formatCurrency(item.exclusiveValue)}</td>
+                              <td className="px-2 py-2 text-xs text-right">{formatCurrencyPrecise(item.unitPrice, currentCurrency as SupportedCurrency)}</td>
+                              <td className="px-2 py-2 text-xs text-right">{formatCurrencyPrecise(item.exclusiveValue, currentCurrency as SupportedCurrency)}</td>
                               <td className="px-2 py-2 text-xs text-right">{item.gstRate}%</td>
-                              <td className="px-2 py-2 text-xs text-right">{formatCurrency(item.gstAmount)}</td>
-                              <td className="px-2 py-2 text-xs text-right font-medium">{formatCurrency(item.inclusiveTotal)}</td>
+                              <td className="px-2 py-2 text-xs text-right">{formatCurrencyPrecise(item.gstAmount, currentCurrency as SupportedCurrency)}</td>
+                              <td className="px-2 py-2 text-xs text-right font-medium">{formatCurrencyPrecise(item.inclusiveTotal, currentCurrency as SupportedCurrency)}</td>
                             </tr>
                           ))}
                           <tr className="bg-gray-100 font-medium">
                             <td colSpan={6} className="px-2 py-2 text-xs text-right">Grand Total:</td>
-                            <td className="px-2 py-2 text-xs text-right text-primary font-bold">{formatCurrency(orderTotal)}</td>
+                            <td className="px-2 py-2 text-xs text-right text-primary font-bold">{formatCurrencyPrecise(orderTotal, currentCurrency as SupportedCurrency)}</td>
                           </tr>
                         </tbody>
                       </table>

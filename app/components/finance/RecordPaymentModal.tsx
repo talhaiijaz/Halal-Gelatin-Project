@@ -405,15 +405,15 @@ export default function RecordPaymentModal({
                       Required when paying {invoice.currency} invoice with {selectedBank.currency} bank account.
                     </p>
                     
-                    {/* USD Conversion Display */}
+                    {/* Conversion Display */}
                     {formData.conversionRateToUSD && formData.amount && (
                       <div className="mt-2 bg-blue-50 rounded-md p-3 text-sm">
-                        <div className="text-gray-600">USD Conversion Preview:</div>
+                        <div className="text-gray-600">{selectedBank.currency} Conversion Preview:</div>
                         <div className="font-semibold text-blue-800">
-                          {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), 'USD')}
+                          {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), selectedBank.currency as SupportedCurrency)}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
-                          {formData.amount} {invoice.currency} × {formData.conversionRateToUSD} = {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), 'USD')}
+                          {formData.amount} {invoice.currency} × {formData.conversionRateToUSD} = {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), selectedBank.currency as SupportedCurrency)}
                         </div>
                       </div>
                     )}
@@ -435,11 +435,11 @@ export default function RecordPaymentModal({
                   <option value="">Select a bank account</option>
                   {bankAccounts?.filter(account => {
                     // For local payments, use PKR bank accounts
-                    // For international payments, allow USD, EUR, and AED bank accounts
+                    // For international payments, allow USD, EUR, AED, and PKR bank accounts
                     if (selectedClient?.type === 'local') {
                       return account.status === 'active' && account.currency === 'PKR';
                     } else {
-                      return account.status === 'active' && ['USD', 'EUR', 'AED'].includes(account.currency);
+                      return account.status === 'active' && ['USD', 'EUR', 'AED', 'PKR'].includes(account.currency);
                     }
                   }).map(account => (
                     <option key={account._id} value={account._id}>

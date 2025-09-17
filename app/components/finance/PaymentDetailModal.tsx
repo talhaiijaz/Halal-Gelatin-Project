@@ -35,11 +35,11 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
   if (!isOpen || !paymentId) return null;
 
   const formatCurrency = (amount: number, currency?: string) => {
-    // For EUR, use custom formatting to ensure symbol appears before number
+    // For EUR, use custom formatting to ensure symbol appears before number and uses comma for thousands separator
     if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-DE', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
+      return `€${new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
       }).format(amount || 0)}`;
     }
     
@@ -50,8 +50,8 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
     return new Intl.NumberFormat(locale, { 
       style: "currency", 
       currency: currency || "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount || 0);
   };
 

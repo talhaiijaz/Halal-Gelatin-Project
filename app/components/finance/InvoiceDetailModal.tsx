@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { X, FileText, User, Package, DollarSign, Calendar } from "lucide-react";
-import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { type Payment, type OrderItem } from "@/app/types";
 
 
@@ -145,7 +145,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                             <tr key={idx}>
                               <td className="px-3 py-2">{(it as any).product}</td>
                               <td className="px-3 py-2 text-right">{(it as any).quantityKg || it.quantity}</td>
-                              <td className="px-3 py-2 text-right">{formatCurrency(it.unitPrice, invoice.currency as SupportedCurrency)}/kg</td>
+                              <td className="px-3 py-2 text-right">{formatCurrencyPrecise(it.unitPrice, invoice.currency as SupportedCurrency)}/kg</td>
                               <td className="px-3 py-2 text-right">{formatCurrency((it as any).inclusiveTotal || it.totalPrice, invoice.currency as SupportedCurrency)}</td>
                             </tr>
                           ))}

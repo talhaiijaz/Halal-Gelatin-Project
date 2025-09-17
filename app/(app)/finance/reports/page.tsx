@@ -18,6 +18,7 @@ import {
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { formatCurrency } from "@/app/utils/currencyFormat";
 import { getCurrentFiscalYear, getFiscalYearRange, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 
 export default function ReportsPage() {
@@ -106,16 +107,16 @@ export default function ReportsPage() {
           ["Revenue Report - " + date],
           [""],
           ["Metric", "Value"],
-          ["Total Revenue", "$" + metrics.totalRevenue.toFixed(2)],
+          ["Total Revenue", formatCurrency(metrics.totalRevenue, 'USD')],
           ["Revenue Growth", metrics.revenueGrowth.toFixed(1) + "%"],
           ["Total Orders", metrics.totalOrders],
-          ["Receivables Amount", "$" + metrics.outstandingAmount.toFixed(2)],
+          ["Receivables Amount", formatCurrency(metrics.outstandingAmount, 'USD')],
           [""],
           ["Payment Methods", "Amount"],
-          ["Bank Transfer", "$" + (metrics.paymentMethods.bank_transfer?.amount || 0).toFixed(2)],
-          ["Credit Card", "$" + (metrics.paymentMethods.credit_card?.amount || 0).toFixed(2)],
-          ["Cash", "$" + (metrics.paymentMethods.cash?.amount || 0).toFixed(2)],
-          ["Check", "$" + (metrics.paymentMethods.check?.amount || 0).toFixed(2)],
+          ["Bank Transfer", formatCurrency(metrics.paymentMethods.bank_transfer?.amount || 0, 'USD')],
+          ["Credit Card", formatCurrency(metrics.paymentMethods.credit_card?.amount || 0, 'USD')],
+          ["Cash", formatCurrency(metrics.paymentMethods.cash?.amount || 0, 'USD')],
+          ["Check", formatCurrency(metrics.paymentMethods.check?.amount || 0, 'USD')],
         ].map(row => row.join(",")).join("\n");
         break;
 
@@ -137,7 +138,7 @@ export default function ReportsPage() {
           [""],
           ["Metric", "Value"],
           ["Total Orders", metrics.totalOrders],
-          ["Total Revenue", "$" + metrics.totalRevenue.toFixed(2)],
+          ["Total Revenue", formatCurrency(metrics.totalRevenue, 'USD')],
         ].map(row => row.join(",")).join("\n");
         break;
 
@@ -146,8 +147,8 @@ export default function ReportsPage() {
           ["Payments Report - " + date],
           [""],
           ["Metric", "Value"],
-          ["Total Collected", "$" + metrics.totalRevenue.toFixed(2)],
-          ["Receivables", "$" + metrics.outstandingAmount.toFixed(2)],
+          ["Total Collected", formatCurrency(metrics.totalRevenue, 'USD')],
+          ["Receivables", formatCurrency(metrics.outstandingAmount, 'USD')],
           ["Paid Invoices", metrics.paidInvoices],
           ["Unpaid Invoices", metrics.unpaidInvoices],
         ].map(row => row.join(",")).join("\n");
@@ -247,7 +248,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                   <p className="mt-2 text-3xl font-bold text-gray-900">
-                    {metrics ? `$${metrics.totalRevenue.toFixed(2)}` : <Skeleton width={120} />}
+                    {metrics ? formatCurrency(metrics.totalRevenue, 'USD') : <Skeleton width={120} />}
                   </p>
                   {metrics && (
                     <p className={`text-sm mt-1 flex items-center ${metrics.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"}`}>
@@ -282,7 +283,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Receivables</p>
                   <p className="mt-2 text-3xl font-bold text-gray-900">
-                    {metrics ? `$${metrics.outstandingAmount.toFixed(2)}` : <Skeleton width={120} />}
+                    {metrics ? formatCurrency(metrics.outstandingAmount, 'USD') : <Skeleton width={120} />}
                   </p>
                 </div>
                 <div className="p-3 bg-orange-100 rounded-full">
@@ -307,7 +308,7 @@ export default function ReportsPage() {
                         ({data.count} transactions)
                       </span>
                     </div>
-                    <span className="text-sm font-medium">${data.amount.toFixed(2)}</span>
+                    <span className="text-sm font-medium">{formatCurrency(data.amount, 'USD')}</span>
                   </div>
                 ))
               ) : (
@@ -382,7 +383,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                   <p className="mt-2 text-3xl font-bold text-gray-900">
-                    {metrics ? `$${metrics.totalRevenue.toFixed(2)}` : <Skeleton width={120} />}
+                    {metrics ? formatCurrency(metrics.totalRevenue, 'USD') : <Skeleton width={120} />}
                   </p>
                 </div>
               </div>
@@ -399,7 +400,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Collected</p>
                   <p className="mt-2 text-3xl font-bold text-gray-900">
-                    {metrics ? `$${metrics.totalRevenue.toFixed(2)}` : <Skeleton width={120} />}
+                    {metrics ? formatCurrency(metrics.totalRevenue, 'USD') : <Skeleton width={120} />}
                   </p>
                 </div>
               </div>
@@ -410,7 +411,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Receivables</p>
                   <p className="mt-2 text-3xl font-bold text-gray-900">
-                    {metrics ? `$${metrics.outstandingAmount.toFixed(2)}` : <Skeleton width={120} />}
+                    {metrics ? formatCurrency(metrics.outstandingAmount, 'USD') : <Skeleton width={120} />}
                   </p>
                 </div>
               </div>
