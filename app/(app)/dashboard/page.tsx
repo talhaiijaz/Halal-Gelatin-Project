@@ -63,14 +63,22 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Close modal on Escape
+  // Close modal on Escape and prevent body scroll
   useEffect(() => {
     if (!expandedMetric) return;
+    
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = 'hidden';
+    
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setExpandedMetric(null);
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+      window.removeEventListener('keydown', onKey);
+    };
   }, [expandedMetric]);
   
   useEffect(() => {
@@ -550,9 +558,9 @@ export default function DashboardPage() {
 
         {/* Modal for Details */}
         {expandedMetric && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full h-full overflow-hidden border border-gray-200">
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden border border-gray-200">
               {/* Header */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
                 <div className="flex items-center justify-between">
@@ -580,7 +588,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Content */}
-              <div className="p-6 overflow-auto h-[calc(100%-80px)] bg-gray-50">
+              <div className="p-6 overflow-auto h-[calc(90vh-80px)] bg-gray-50">
                 {expandedMetric.metric === 'pending' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {!pendingOrdersDetails ? (
