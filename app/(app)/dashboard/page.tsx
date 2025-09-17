@@ -552,7 +552,7 @@ export default function DashboardPage() {
         {expandedMetric && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/50" onClick={() => setExpandedMetric(null)} />
-            <div className="relative bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[85vh] overflow-hidden">
+            <div className="relative bg-white rounded-none shadow-xl w-full h-full overflow-hidden">
               <div className="flex items-center justify-between p-4 border-b">
                 <h3 className="text-lg font-semibold text-gray-900">
                   {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
@@ -567,7 +567,7 @@ export default function DashboardPage() {
                   aria-label="Close"
                 >✕</button>
               </div>
-              <div className="p-4 overflow-auto">
+              <div className="p-4 overflow-auto h-[calc(100%-56px)]">
                 {expandedMetric.metric === 'pending' && (
                   <div className="overflow-x-auto">
                     {!pendingOrdersDetails ? (
