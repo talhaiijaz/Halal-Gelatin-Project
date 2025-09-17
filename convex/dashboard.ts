@@ -620,3 +620,256 @@ export const getOrdersByStatus = query({
     };
   },
 });
+
+// Detailed receivables: outstanding invoices for shipped/delivered orders
+export const getReceivablesDetails = query({
+  args: {
+    fiscalYear: v.optional(v.number()),
+    type: v.optional(v.union(v.literal("local"), v.literal("international"))),
+  },
+  returns: v.array(
+    v.object({
+      invoiceId: v.id("invoices"),
+      invoiceNumber: v.union(v.string(), v.null()),
+      clientId: v.id("clients"),
+      clientName: v.union(v.string(), v.null()),
+      orderId: v.id("orders"),
+      orderNumber: v.string(),
+      currency: v.string(),
+      outstandingBalance: v.number(),
+      issueDate: v.number(),
+      dueDate: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const clients = await ctx.db.query("clients").collect();
+    const orders = await ctx.db.query("orders").collect();
+    let invoices = await ctx.db.query("invoices").collect();
+
+    if (args.fiscalYear) {
+      invoices = invoices.filter((inv) => {
+        const order = orders.find((o) => o._id === inv.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
+    // Only shipped/delivered orders and positive outstanding
+    const result = [] as Array<{
+      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; outstandingBalance: number; issueDate: number; dueDate: number;
+    }>;
+
+    for (const inv of invoices) {
+      const order = orders.find((o) => o._id === inv.orderId);
+      if (!order) continue;
+      if (!(order.status === "shipped" || order.status === "delivered")) continue;
+      if (inv.outstandingBalance <= 0) continue;
+      const client = clients.find((c) => c._id === inv.clientId);
+      if (args.type && client?.type !== args.type) continue;
+      result.push({
+        invoiceId: inv._id,
+        invoiceNumber: inv.invoiceNumber || null,
+        clientId: inv.clientId,
+        clientName: (client as any)?.name || null,
+        orderId: inv.orderId,
+        orderNumber: (order as any).orderNumber,
+        currency: inv.currency,
+        outstandingBalance: inv.outstandingBalance,
+        issueDate: inv.issueDate,
+        dueDate: inv.dueDate,
+      });
+    }
+    // Sort by due date descending (most overdue first)
+    return result.sort((a, b) => b.dueDate - a.dueDate);
+  },
+});
+
+// Detailed advance payments: invoices in pending/in_production with totalPaid > 0
+export const getAdvancePaymentsDetails = query({
+  args: {
+    fiscalYear: v.optional(v.number()),
+    type: v.optional(v.union(v.literal("local"), v.literal("international"))),
+  },
+  returns: v.array(
+    v.object({
+      invoiceId: v.id("invoices"),
+      invoiceNumber: v.union(v.string(), v.null()),
+      clientId: v.id("clients"),
+      clientName: v.union(v.string(), v.null()),
+      orderId: v.id("orders"),
+      orderNumber: v.string(),
+      currency: v.string(),
+      advancePaid: v.number(),
+      issueDate: v.number(),
+      dueDate: v.number(),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const clients = await ctx.db.query("clients").collect();
+    const orders = await ctx.db.query("orders").collect();
+    let invoices = await ctx.db.query("invoices").collect();
+
+    if (args.fiscalYear) {
+      invoices = invoices.filter((inv) => {
+        const order = orders.find((o) => o._id === inv.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
+    const result = [] as Array<{
+      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; advancePaid: number; issueDate: number; dueDate: number;
+    }>;
+    for (const inv of invoices) {
+      const order = orders.find((o) => o._id === inv.orderId);
+      if (!order) continue;
+      if (!(order.status === "pending" || order.status === "in_production")) continue;
+      if (inv.totalPaid <= 0) continue;
+      const client = clients.find((c) => c._id === inv.clientId);
+      if (args.type && client?.type !== args.type) continue;
+      result.push({
+        invoiceId: inv._id,
+        invoiceNumber: inv.invoiceNumber || null,
+        clientId: inv.clientId,
+        clientName: (client as any)?.name || null,
+        orderId: inv.orderId,
+        orderNumber: (order as any).orderNumber,
+        currency: inv.currency,
+        advancePaid: inv.totalPaid,
+        issueDate: inv.issueDate,
+        dueDate: inv.dueDate,
+      });
+    }
+    // Sort by issue date desc (latest first)
+    return result.sort((a, b) => b.issueDate - a.issueDate);
+  },
+});
+
+// Detailed revenue: payments filtered by type and fiscal year
+export const getRevenueDetails = query({
+  args: {
+    fiscalYear: v.optional(v.number()),
+    type: v.optional(v.union(v.literal("local"), v.literal("international"))),
+  },
+  returns: v.array(
+    v.object({
+      paymentId: v.id("payments"),
+      clientId: v.id("clients"),
+      clientName: v.union(v.string(), v.null()),
+      amount: v.number(),
+      currency: v.string(),
+      paymentDate: v.number(),
+      method: v.string(),
+      reference: v.string(),
+      invoiceId: v.union(v.id("invoices"), v.null()),
+      invoiceNumber: v.union(v.string(), v.null()),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const clients = await ctx.db.query("clients").collect();
+    const orders = await ctx.db.query("orders").collect();
+    const invoices = await ctx.db.query("invoices").collect();
+    let payments = await ctx.db.query("payments").order("desc").collect();
+
+    if (args.type) {
+      payments = payments.filter((p) => {
+        const client = clients.find((c) => c._id === p.clientId);
+        return client?.type === args.type;
+      });
+    }
+
+    if (args.fiscalYear) {
+      payments = payments.filter((p) => {
+        if (!p.invoiceId) return false; // only count invoice-linked payments for revenue breakdown
+        const inv = invoices.find((i) => i._id === p.invoiceId);
+        if (!inv) return false;
+        const order = orders.find((o) => o._id === inv.orderId);
+        return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
+    const result = payments.map((p) => {
+      const client = clients.find((c) => c._id === p.clientId);
+      const invoice = p.invoiceId ? invoices.find((i) => i._id === p.invoiceId) : null;
+      return {
+        paymentId: p._id,
+        clientId: p.clientId,
+        clientName: (client as any)?.name || null,
+        amount: p.amount,
+        currency: p.currency,
+        paymentDate: p.paymentDate,
+        method: p.method,
+        reference: p.reference,
+        invoiceId: (invoice && invoice._id) || null,
+        invoiceNumber: (invoice && invoice.invoiceNumber) || null,
+      };
+    });
+    return result;
+  },
+});
+
+// Detailed pending orders: pending and in_production
+export const getPendingOrdersDetails = query({
+  args: {
+    fiscalYear: v.optional(v.number()),
+    type: v.optional(v.union(v.literal("local"), v.literal("international"))),
+  },
+  returns: v.array(
+    v.object({
+      orderId: v.id("orders"),
+      orderNumber: v.string(),
+      clientId: v.id("clients"),
+      clientName: v.union(v.string(), v.null()),
+      status: v.string(),
+      totalAmount: v.number(),
+      currency: v.string(),
+      totalQuantity: v.number(),
+      factoryDepartureDate: v.union(v.number(), v.null()),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const clients = await ctx.db.query("clients").collect();
+    let orders = await ctx.db
+      .query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .collect();
+    const inProd = await ctx.db
+      .query("orders")
+      .withIndex("by_status", (q) => q.eq("status", "in_production"))
+      .collect();
+    orders = orders.concat(inProd);
+
+    if (args.type) {
+      orders = orders.filter((o) => {
+        const client = clients.find((c) => c._id === o.clientId);
+        return client?.type === args.type;
+      });
+    }
+    if (args.fiscalYear) {
+      orders = orders.filter((o) => o.fiscalYear === args.fiscalYear);
+    }
+
+    const result = [] as Array<{ orderId: any; orderNumber: string; clientId: any; clientName: string | null; status: string; totalAmount: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
+
+    for (const order of orders) {
+      const client = clients.find((c) => c._id === order.clientId);
+      const items = await ctx.db
+        .query("orderItems")
+        .withIndex("by_order", (q) => q.eq("orderId", order._id))
+        .collect();
+      const totalQuantity = items.reduce((sum, it) => sum + it.quantityKg, 0);
+      result.push({
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        clientId: order.clientId,
+        clientName: (client as any)?.name || null,
+        status: order.status,
+        totalAmount: order.totalAmount,
+        currency: order.currency,
+        totalQuantity,
+        factoryDepartureDate: order.factoryDepartureDate || null,
+      });
+    }
+
+    // Sort by nearest factory departure date
+    return result.sort((a, b) => (a.factoryDepartureDate || 0) - (b.factoryDepartureDate || 0));
+  },
+});

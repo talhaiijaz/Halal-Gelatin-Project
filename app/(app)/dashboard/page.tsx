@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [clientType, setClientType] = useState<"local" | "international">("local");
   const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
+  const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables'; audience: 'local' | 'international' }>(null);
 
   // Get dashboard order limit from localStorage
   const [dashboardOrderLimit, setDashboardOrderLimit] = useState<number>(5);
@@ -94,6 +95,32 @@ export default function DashboardPage() {
 
   // Fetch orders by status
   const ordersData = useQuery(api.dashboard.getOrdersByStatus, { limit: dashboardOrderLimit, fiscalYear: selectedFiscalYear });
+
+  // Detail queries (lazy-loaded when a metric is expanded)
+  const receivablesDetails = useQuery(
+    api.dashboard.getReceivablesDetails,
+    expandedMetric && expandedMetric.metric === 'receivables'
+      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
+  const advanceDetails = useQuery(
+    api.dashboard.getAdvancePaymentsDetails,
+    expandedMetric && expandedMetric.metric === 'advance'
+      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
+  const revenueDetails = useQuery(
+    api.dashboard.getRevenueDetails,
+    expandedMetric && expandedMetric.metric === 'revenue'
+      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
+  const pendingOrdersDetails = useQuery(
+    api.dashboard.getPendingOrdersDetails,
+    expandedMetric && expandedMetric.metric === 'pending'
+      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
 
   // Load monthly limit from database or localStorage
   useEffect(() => {
@@ -286,7 +313,11 @@ export default function DashboardPage() {
           {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Total Revenue */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'revenue', audience: 'local' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-green-200 rounded-lg">
                   <DollarSign className="h-6 w-6 text-green-700" />
@@ -305,7 +336,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Current Pending Orders Value */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'pending', audience: 'local' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-blue-200 rounded-lg">
                   <Package className="h-6 w-6 text-blue-700" />
@@ -324,7 +359,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Advance Payments */}
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'advance', audience: 'local' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-purple-200 rounded-lg">
                   <TrendingUp className="h-6 w-6 text-purple-700" />
@@ -343,7 +382,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Receivables */}
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'receivables', audience: 'local' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-red-200 rounded-lg">
                   <AlertCircle className="h-6 w-6 text-red-700" />
@@ -373,7 +416,11 @@ export default function DashboardPage() {
           {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Total Revenue (USD/EUR/AED only) */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'revenue', audience: 'international' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-green-200 rounded-lg">
                   <DollarSign className="h-6 w-6 text-green-700" />
@@ -399,7 +446,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Current Pending Orders Value (USD/EUR/AED only) */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'pending', audience: 'international' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-blue-200 rounded-lg">
                   <Package className="h-6 w-6 text-blue-700" />
@@ -425,7 +476,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Advance Payments */}
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'advance', audience: 'international' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-purple-200 rounded-lg">
                   <TrendingUp className="h-6 w-6 text-purple-700" />
@@ -452,7 +507,11 @@ export default function DashboardPage() {
             </div>
 
             {/* Receivables */}
-            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+            <div
+              className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm cursor-pointer hover:shadow-md transition"
+              role="button"
+              onClick={() => setExpandedMetric({ metric: 'receivables', audience: 'international' })}
+            >
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-red-200 rounded-lg">
                   <AlertCircle className="h-6 w-6 text-red-700" />
@@ -478,6 +537,174 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Detail Panel */}
+        {expandedMetric && (
+          <div className="card p-6 mt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
+                {expandedMetric.metric === 'advance' && 'Advance Payments'}
+                {expandedMetric.metric === 'receivables' && 'Receivables'}
+                {expandedMetric.metric === 'revenue' && 'Total Revenue'}
+                {` — ${expandedMetric.audience === 'local' ? 'Local' : 'International'} (${formatFiscalYear(selectedFiscalYear)})`}
+              </h3>
+              <button
+                onClick={() => setExpandedMetric(null)}
+                className="text-sm text-gray-600 hover:text-gray-900 border px-3 py-1 rounded"
+              >Close</button>
+            </div>
+
+            {/* Tables by metric */}
+            {expandedMetric.metric === 'pending' && (
+              <div className="overflow-x-auto">
+                {!pendingOrdersDetails ? (
+                  <Skeleton count={5} height={24} />
+                ) : pendingOrdersDetails.length === 0 ? (
+                  <p className="text-sm text-gray-600">No pending orders found.</p>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-gray-600">
+                      <tr>
+                        <th className="py-2 pr-4">Order No</th>
+                        <th className="py-2 pr-4">Client</th>
+                        <th className="py-2 pr-4">Status</th>
+                        <th className="py-2 pr-4">Qty (kg)</th>
+                        <th className="py-2 pr-4">Amount</th>
+                        <th className="py-2 pr-4">Currency</th>
+                        <th className="py-2 pr-4">Fac. Dep. Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingOrdersDetails.map((row) => (
+                        <tr key={String(row.orderId)} className="border-t">
+                          <td className="py-2 pr-4">{row.orderNumber}</td>
+                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                          <td className="py-2 pr-4">{row.status}</td>
+                          <td className="py-2 pr-4">{row.totalQuantity.toLocaleString()}</td>
+                          <td className="py-2 pr-4">{formatCurrency(row.totalAmount, row.currency as any)}</td>
+                          <td className="py-2 pr-4">{row.currency}</td>
+                          <td className="py-2 pr-4">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {expandedMetric.metric === 'advance' && (
+              <div className="overflow-x-auto">
+                {!advanceDetails ? (
+                  <Skeleton count={5} height={24} />
+                ) : advanceDetails.length === 0 ? (
+                  <p className="text-sm text-gray-600">No advance payments found.</p>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-gray-600">
+                      <tr>
+                        <th className="py-2 pr-4">Invoice No</th>
+                        <th className="py-2 pr-4">Client</th>
+                        <th className="py-2 pr-4">Order No</th>
+                        <th className="py-2 pr-4">Advance Paid</th>
+                        <th className="py-2 pr-4">Currency</th>
+                        <th className="py-2 pr-4">Issue Date</th>
+                        <th className="py-2 pr-4">Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {advanceDetails.map((row) => (
+                        <tr key={String(row.invoiceId)} className="border-t">
+                          <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
+                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                          <td className="py-2 pr-4">{row.orderNumber}</td>
+                          <td className="py-2 pr-4">{formatCurrency(row.advancePaid, row.currency as any)}</td>
+                          <td className="py-2 pr-4">{row.currency}</td>
+                          <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
+                          <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {expandedMetric.metric === 'receivables' && (
+              <div className="overflow-x-auto">
+                {!receivablesDetails ? (
+                  <Skeleton count={5} height={24} />
+                ) : receivablesDetails.length === 0 ? (
+                  <p className="text-sm text-gray-600">No receivables found.</p>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-gray-600">
+                      <tr>
+                        <th className="py-2 pr-4">Invoice No</th>
+                        <th className="py-2 pr-4">Client</th>
+                        <th className="py-2 pr-4">Order No</th>
+                        <th className="py-2 pr-4">Outstanding</th>
+                        <th className="py-2 pr-4">Currency</th>
+                        <th className="py-2 pr-4">Issue Date</th>
+                        <th className="py-2 pr-4">Due Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {receivablesDetails.map((row) => (
+                        <tr key={String(row.invoiceId)} className="border-t">
+                          <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
+                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                          <td className="py-2 pr-4">{row.orderNumber}</td>
+                          <td className="py-2 pr-4">{formatCurrency(row.outstandingBalance, row.currency as any)}</td>
+                          <td className="py-2 pr-4">{row.currency}</td>
+                          <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
+                          <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {expandedMetric.metric === 'revenue' && (
+              <div className="overflow-x-auto">
+                {!revenueDetails ? (
+                  <Skeleton count={5} height={24} />
+                ) : revenueDetails.length === 0 ? (
+                  <p className="text-sm text-gray-600">No revenue payments found.</p>
+                ) : (
+                  <table className="min-w-full text-sm">
+                    <thead className="text-left text-gray-600">
+                      <tr>
+                        <th className="py-2 pr-4">Date</th>
+                        <th className="py-2 pr-4">Client</th>
+                        <th className="py-2 pr-4">Invoice No</th>
+                        <th className="py-2 pr-4">Amount</th>
+                        <th className="py-2 pr-4">Currency</th>
+                        <th className="py-2 pr-4">Method</th>
+                        <th className="py-2 pr-4">Reference</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {revenueDetails.map((row) => (
+                        <tr key={String(row.paymentId)} className="border-t">
+                          <td className="py-2 pr-4">{new Date(row.paymentDate).toLocaleDateString()}</td>
+                          <td className="py-2 pr-4">{row.clientName || '—'}</td>
+                          <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
+                          <td className="py-2 pr-4">{formatCurrency(row.amount, row.currency as any)}</td>
+                          <td className="py-2 pr-4">{row.currency}</td>
+                          <td className="py-2 pr-4">{row.method}</td>
+                          <td className="py-2 pr-4">{row.reference}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
 
