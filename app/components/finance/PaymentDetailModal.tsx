@@ -170,27 +170,37 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                     </div>
 
                     {/* Conversion Details for International Payments */}
-                    {payment.conversionRateToUSD && payment.convertedAmountUSD && payment.currency !== 'USD' && (
-                      <div className="col-span-2">
-                        <div className="bg-blue-50 rounded-md p-3 mt-2">
-                          <h4 className="text-sm font-medium text-gray-700 mb-2">Currency Conversion</h4>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">Original Amount:</span>
-                              <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">Conversion Rate:</span>
-                              <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">Converted to USD:</span>
-                              <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                    {(() => {
+                      // Only show conversion details if there's an actual currency mismatch between payment and bank account
+                      const bankAccount = (payment as any).bankAccount;
+                      const hasConversionFields = payment.conversionRateToUSD && payment.convertedAmountUSD;
+                      const currencyMismatch = bankAccount && bankAccount.currency !== payment.currency;
+                      
+                      if (hasConversionFields && currencyMismatch) {
+                        return (
+                          <div className="col-span-2">
+                            <div className="bg-blue-50 rounded-md p-3 mt-2">
+                              <h4 className="text-sm font-medium text-gray-700 mb-2">Currency Conversion</h4>
+                              <div className="space-y-1 text-sm">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Original Amount:</span>
+                                  <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Conversion Rate:</span>
+                                  <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Converted to USD:</span>
+                                  <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </div>
-                    )}
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   {payment.notes && (

@@ -183,11 +183,21 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                               </td>
                               <td className="px-3 py-2 text-right text-green-700 font-medium">
                                 {formatCurrency(p.amount, invoice.currency as SupportedCurrency)}
-                                {p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD' && (
-                                  <div className="text-xs text-blue-600 mt-1">
-                                    = {formatCurrency(p.convertedAmountUSD, 'USD' as SupportedCurrency)}
-                                  </div>
-                                )}
+                                {(() => {
+                                  // Only show conversion if there's an actual currency mismatch
+                                  const bankAccount = p.bankAccount;
+                                  const hasConversionFields = p.conversionRateToUSD && p.convertedAmountUSD;
+                                  const currencyMismatch = bankAccount && bankAccount.currency !== p.currency;
+                                  
+                                  if (hasConversionFields && currencyMismatch) {
+                                    return (
+                                      <div className="text-xs text-blue-600 mt-1">
+                                        = {formatCurrency(p.convertedAmountUSD, 'USD' as SupportedCurrency)}
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </td>
                               <td className="px-3 py-2">{p.reference}</td>
                               <td className="px-3 py-2">{p.bankAccountId ? (p.bankAccount?.accountName || p.bankAccount?.bankName || "Bank Transfer") : "-"}</td>
@@ -201,9 +211,13 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
 
                 {/* Conversion Details for International Payments */}
                 {(() => {
-                  const internationalPayments = payments.filter((p: any) => 
-                    p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD'
-                  );
+                  // Only show conversion details if there's an actual currency mismatch between payment and bank account
+                  const internationalPayments = payments.filter((p: any) => {
+                    const hasConversionFields = p.conversionRateToUSD && p.convertedAmountUSD;
+                    const bankAccount = p.bankAccount;
+                    const currencyMismatch = bankAccount && bankAccount.currency !== p.currency;
+                    return hasConversionFields && currencyMismatch;
+                  });
                   
                   if (internationalPayments.length === 0) return null;
                   

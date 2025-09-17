@@ -762,12 +762,21 @@ export default function FinancePage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <div className="font-medium text-green-600">{formatCurrency(payment.amount, payment.currency as SupportedCurrency)}</div>
-                        {/* Show conversion info for international payments */}
-                        {payment.convertedAmountUSD && payment.convertedAmountUSD !== payment.amount && (
-                          <div className="text-xs text-gray-500">
-                            ≈ {formatCurrency(payment.convertedAmountUSD, 'USD')}
-                          </div>
-                        )}
+                        {/* Show conversion info only for actual currency mismatches */}
+                        {(() => {
+                          const bankAccount = (payment as any).bankAccount;
+                          const hasConversionFields = payment.convertedAmountUSD && payment.convertedAmountUSD !== payment.amount;
+                          const currencyMismatch = bankAccount && bankAccount.currency !== payment.currency;
+                          
+                          if (hasConversionFields && currencyMismatch && payment.convertedAmountUSD) {
+                            return (
+                              <div className="text-xs text-gray-500">
+                                ≈ {formatCurrency(payment.convertedAmountUSD, 'USD')}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         {/* Show withholding info for local payments */}
                         {(payment as any).withheldTaxAmount && (payment as any).withheldTaxAmount > 0 && (
                           <div className="text-xs text-orange-600">
