@@ -113,7 +113,6 @@ export const getDashboardStats = query({
     // Calculate revenue by currency using orders (not payments)
     const revenueByCurrency: Record<string, number> = {};
     const paidByCurrency: Record<string, number> = {};
-    const advancePaymentsByCurrency: Record<string, number> = {};
     
     // Revenue comes from orders
     activeYearOrders.forEach(order => {
@@ -127,11 +126,6 @@ export const getDashboardStats = query({
       const amount = payment.amount;
       
       paidByCurrency[currency] = (paidByCurrency[currency] || 0) + amount;
-      
-      // Track advance payments separately
-      if (payment.type === "advance") {
-        advancePaymentsByCurrency[currency] = (advancePaymentsByCurrency[currency] || 0) + amount;
-      }
     });
     
     // For backward compatibility, extract individual currency totals
@@ -145,11 +139,19 @@ export const getDashboardStats = query({
     const totalPaidEUR = paidByCurrency["EUR"] || 0;
     const totalPaidAED = paidByCurrency["AED"] || 0;
     
-    // Extract advance payment totals
-    const advancePaymentsUSD = advancePaymentsByCurrency["USD"] || 0;
-    const advancePaymentsPKR = advancePaymentsByCurrency["PKR"] || 0;
-    const advancePaymentsEUR = advancePaymentsByCurrency["EUR"] || 0;
-    const advancePaymentsAED = advancePaymentsByCurrency["AED"] || 0;
+    // Compute advance payments as payments recorded against invoices whose orders are pending/in_production
+    const preShipmentInvoices = yearInvoices.filter(inv => {
+      const order = allOrders.find(o => o._id === inv.orderId);
+      return order && (order.status === "pending" || order.status === "in_production");
+    });
+    const advanceByCurrency: Record<string, number> = {};
+    preShipmentInvoices.forEach(inv => {
+      advanceByCurrency[inv.currency] = (advanceByCurrency[inv.currency] || 0) + inv.totalPaid;
+    });
+    const advancePaymentsUSD = advanceByCurrency["USD"] || 0;
+    const advancePaymentsPKR = advanceByCurrency["PKR"] || 0;
+    const advancePaymentsEUR = advanceByCurrency["EUR"] || 0;
+    const advancePaymentsAED = advanceByCurrency["AED"] || 0;
 
     // Pipeline order value by currency (pending + in_production)
     const pipelineOrders = yearOrders.filter(o => ["pending", "in_production"].includes(o.status));

@@ -438,17 +438,18 @@ export const getStats = query({
       currentPendingValueByCurrency[currency] = (currentPendingValueByCurrency[currency] || 0) + order.totalAmount;
     });
 
-    // Calculate advance payments from actual advance payments in payments table
-    const advancePaymentsFromPayments = clientPayments.filter(p => p.type === "advance");
-    const advancePayments = advancePaymentsFromPayments.reduce((sum, payment) => {
-      return sum + payment.amount; // Always use original amount, not converted
-    }, 0);
+    // Calculate advance payments as amounts paid on invoices whose orders are not yet shipped/delivered
+    const preShipmentInvoices = clientInvoices.filter(inv => {
+      const order = clientOrders.find(o => o._id === inv.orderId);
+      return order && (order.status === "pending" || order.status === "in_production");
+    });
+    const advancePayments = preShipmentInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
 
-    // Calculate advance payments by currency (show actual currencies received)
+    // Advance payments by currency (based on pre-shipment invoices)
     const advancePaymentsByCurrency: Record<string, number> = {};
-    advancePaymentsFromPayments.forEach(payment => {
-      const currency = payment.currency;
-      advancePaymentsByCurrency[currency] = (advancePaymentsByCurrency[currency] || 0) + payment.amount;
+    preShipmentInvoices.forEach(inv => {
+      const currency = inv.currency;
+      advancePaymentsByCurrency[currency] = (advancePaymentsByCurrency[currency] || 0) + inv.totalPaid;
     });
 
     // Calculate revenue by currency from payments (show actual currencies received)

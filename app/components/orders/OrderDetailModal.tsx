@@ -602,10 +602,12 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                                 <p className="text-xs text-gray-500">Total Paid</p>
                                 <p className="mt-1 text-lg font-semibold text-green-600">{formatCurrency(totalPaid, order.currency as SupportedCurrency)}</p>
                               </div>
-                              <div className="rounded-lg border border-gray-200 bg-white p-3">
-                                <p className="text-xs text-gray-500">Advance Payments</p>
-                                <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(advancePaid, order.currency as SupportedCurrency)}</p>
-                              </div>
+                              {(order.status !== "shipped" && order.status !== "delivered") && (
+                                <div className="rounded-lg border border-gray-200 bg-white p-3">
+                                  <p className="text-xs text-gray-500">Advance Payments</p>
+                                  <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(advancePaid, order.currency as SupportedCurrency)}</p>
+                                </div>
+                              )}
                               <div className="rounded-lg border border-gray-200 bg-white p-3">
                                 <p className="text-xs text-gray-500">Receivables</p>
                                 <p className="mt-1 text-lg font-semibold text-orange-600">
@@ -620,11 +622,11 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                             </div>
                             
                             {/* Payment breakdown */}
-                            {(advancePaid > 0 || invoicePaid > 0) && (
-                              <div className="bg-gray-50 rounded-lg p-3">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Breakdown</h4>
-                                <div className="space-y-1 text-sm">
-                                  {advancePaid > 0 && (
+                              {(advancePaid > 0 || invoicePaid > 0) && (
+                                <div className="bg-gray-50 rounded-lg p-3">
+                                  <h4 className="text-sm font-medium text-gray-700 mb-2">Payment Breakdown</h4>
+                                  <div className="space-y-1 text-sm">
+                                  {(advancePaid > 0 && (order.status !== "shipped" && order.status !== "delivered")) && (
                                     <div className="flex justify-between">
                                       <span className="text-gray-600">Advance Payments:</span>
                                       <span className="font-medium text-blue-600">{formatCurrency(advancePaid, order.currency as SupportedCurrency)}</span>
