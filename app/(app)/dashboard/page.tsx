@@ -558,8 +558,8 @@ export default function DashboardPage() {
 
         {/* Modal for Details */}
         {expandedMetric && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
+          <div className="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center" style={{ width: '100vw', height: '100vh' }}>
+            <div className="absolute top-0 left-0 right-0 bottom-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} style={{ width: '100vw', height: '100vh' }} />
             <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] mx-4 overflow-hidden border border-gray-200">
               {/* Header */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
