@@ -551,167 +551,214 @@ export default function DashboardPage() {
         {/* Modal for Details */}
         {expandedMetric && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/50" onClick={() => setExpandedMetric(null)} />
-            <div className="relative bg-white rounded-none shadow-xl w-full h-full overflow-hidden">
-              <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
-                  {expandedMetric.metric === 'advance' && 'Advance Payments'}
-                  {expandedMetric.metric === 'receivables' && 'Receivables'}
-                  {expandedMetric.metric === 'revenue' && 'Total Revenue'}
-                  {` — ${expandedMetric.audience === 'local' ? 'Local' : 'International'} (${formatFiscalYear(selectedFiscalYear)})`}
-                </h3>
-                <button
-                  onClick={() => setExpandedMetric(null)}
-                  className="text-gray-600 hover:text-gray-900 rounded px-2 py-1"
-                  aria-label="Close"
-                >✕</button>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full h-full overflow-hidden border border-gray-200">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">
+                      {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
+                      {expandedMetric.metric === 'advance' && 'Advance Payments'}
+                      {expandedMetric.metric === 'receivables' && 'Receivables'}
+                      {expandedMetric.metric === 'revenue' && 'Total Revenue'}
+                    </h2>
+                    <p className="text-sm text-gray-600">
+                      {expandedMetric.audience === 'local' ? 'Local' : 'International'} Clients • {formatFiscalYear(selectedFiscalYear)} Fiscal Year
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setExpandedMetric(null)}
+                    className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                    aria-label="Close"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <div className="p-4 overflow-auto h-[calc(100%-56px)]">
+
+              {/* Content */}
+              <div className="p-6 overflow-auto h-[calc(100%-80px)] bg-gray-50">
                 {expandedMetric.metric === 'pending' && (
-                  <div className="overflow-x-auto">
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {!pendingOrdersDetails ? (
-                      <Skeleton count={5} height={24} />
+                      <div className="p-8">
+                        <Skeleton count={5} height={48} />
+                      </div>
                     ) : pendingOrdersDetails.length === 0 ? (
-                      <p className="text-sm text-gray-600">No pending orders found.</p>
+                      <div className="p-8 text-center">
+                        <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-gray-600">No pending orders found.</p>
+                      </div>
                     ) : (
-                      <table className="min-w-full text-sm">
-                        <thead className="text-left text-gray-600">
-                          <tr>
-                            <th className="py-2 pr-4">Order No</th>
-                            <th className="py-2 pr-4">Client</th>
-                            <th className="py-2 pr-4">Status</th>
-                            <th className="py-2 pr-4">Qty (kg)</th>
-                            <th className="py-2 pr-4">Amount</th>
-                            <th className="py-2 pr-4">Currency</th>
-                            <th className="py-2 pr-4">Fac. Dep. Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pendingOrdersDetails.map((row) => (
-                            <tr key={String(row.orderId)} className="border-t">
-                              <td className="py-2 pr-4">{row.orderNumber}</td>
-                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                              <td className="py-2 pr-4">{row.status}</td>
-                              <td className="py-2 pr-4">{row.totalQuantity.toLocaleString()}</td>
-                              <td className="py-2 pr-4">{formatCurrency(row.totalAmount, row.currency as any)}</td>
-                              <td className="py-2 pr-4">{row.currency}</td>
-                              <td className="py-2 pr-4">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {pendingOrdersDetails.map((row) => (
+                              <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.orderNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                    row.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                                  }`}>
+                                    {row.status}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(row.totalAmount, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 )}
 
                 {expandedMetric.metric === 'advance' && (
-                  <div className="overflow-x-auto">
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {!advanceDetails ? (
-                      <Skeleton count={5} height={24} />
+                      <div className="p-8">
+                        <Skeleton count={5} height={48} />
+                      </div>
                     ) : advanceDetails.length === 0 ? (
-                      <p className="text-sm text-gray-600">No advance payments found.</p>
+                      <div className="p-8 text-center">
+                        <TrendingUp className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-gray-600">No advance payments found.</p>
+                      </div>
                     ) : (
-                      <table className="min-w-full text-sm">
-                        <thead className="text-left text-gray-600">
-                          <tr>
-                            <th className="py-2 pr-4">Invoice No</th>
-                            <th className="py-2 pr-4">Client</th>
-                            <th className="py-2 pr-4">Order No</th>
-                            <th className="py-2 pr-4">Advance Paid</th>
-                            <th className="py-2 pr-4">Currency</th>
-                            <th className="py-2 pr-4">Issue Date</th>
-                            <th className="py-2 pr-4">Due Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {advanceDetails.map((row) => (
-                            <tr key={String(row.invoiceId)} className="border-t">
-                              <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
-                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                              <td className="py-2 pr-4">{row.orderNumber}</td>
-                              <td className="py-2 pr-4">{formatCurrency(row.advancePaid, row.currency as any)}</td>
-                              <td className="py-2 pr-4">{row.currency}</td>
-                              <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
-                              <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advance Paid</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {advanceDetails.map((row) => (
+                              <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.orderNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 )}
 
                 {expandedMetric.metric === 'receivables' && (
-                  <div className="overflow-x-auto">
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {!receivablesDetails ? (
-                      <Skeleton count={5} height={24} />
+                      <div className="p-8">
+                        <Skeleton count={5} height={48} />
+                      </div>
                     ) : receivablesDetails.length === 0 ? (
-                      <p className="text-sm text-gray-600">No receivables found.</p>
+                      <div className="p-8 text-center">
+                        <AlertCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-gray-600">No receivables found.</p>
+                      </div>
                     ) : (
-                      <table className="min-w-full text-sm">
-                        <thead className="text-left text-gray-600">
-                          <tr>
-                            <th className="py-2 pr-4">Invoice No</th>
-                            <th className="py-2 pr-4">Client</th>
-                            <th className="py-2 pr-4">Order No</th>
-                            <th className="py-2 pr-4">Outstanding</th>
-                            <th className="py-2 pr-4">Currency</th>
-                            <th className="py-2 pr-4">Issue Date</th>
-                            <th className="py-2 pr-4">Due Date</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {receivablesDetails.map((row) => (
-                            <tr key={String(row.invoiceId)} className="border-t">
-                              <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
-                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                              <td className="py-2 pr-4">{row.orderNumber}</td>
-                              <td className="py-2 pr-4">{formatCurrency(row.outstandingBalance, row.currency as any)}</td>
-                              <td className="py-2 pr-4">{row.currency}</td>
-                              <td className="py-2 pr-4">{new Date(row.issueDate).toLocaleDateString()}</td>
-                              <td className="py-2 pr-4">{new Date(row.dueDate).toLocaleDateString()}</td>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {receivablesDetails.map((row) => (
+                              <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.orderNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 )}
 
                 {expandedMetric.metric === 'revenue' && (
-                  <div className="overflow-x-auto">
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {!revenueDetails ? (
-                      <Skeleton count={5} height={24} />
+                      <div className="p-8">
+                        <Skeleton count={5} height={48} />
+                      </div>
                     ) : revenueDetails.length === 0 ? (
-                      <p className="text-sm text-gray-600">No revenue payments found.</p>
+                      <div className="p-8 text-center">
+                        <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                        <p className="text-gray-600">No revenue payments found.</p>
+                      </div>
                     ) : (
-                      <table className="min-w-full text-sm">
-                        <thead className="text-left text-gray-600">
-                          <tr>
-                            <th className="py-2 pr-4">Date</th>
-                            <th className="py-2 pr-4">Client</th>
-                            <th className="py-2 pr-4">Invoice No</th>
-                            <th className="py-2 pr-4">Amount</th>
-                            <th className="py-2 pr-4">Currency</th>
-                            <th className="py-2 pr-4">Method</th>
-                            <th className="py-2 pr-4">Reference</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {revenueDetails.map((row) => (
-                            <tr key={String(row.paymentId)} className="border-t">
-                              <td className="py-2 pr-4">{new Date(row.paymentDate).toLocaleDateString()}</td>
-                              <td className="py-2 pr-4">{row.clientName || '—'}</td>
-                              <td className="py-2 pr-4">{row.invoiceNumber || '—'}</td>
-                              <td className="py-2 pr-4">{formatCurrency(row.amount, row.currency as any)}</td>
-                              <td className="py-2 pr-4">{row.currency}</td>
-                              <td className="py-2 pr-4">{row.method}</td>
-                              <td className="py-2 pr-4">{row.reference}</td>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {revenueDetails.map((row) => (
+                              <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.amount, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.method}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 )}
