@@ -349,9 +349,34 @@ export default function InternationalClientsPage() {
               </div>
             </div>
             
-            {/* Key Metrics Row */}
+            {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Current Pending Orders Value */}
+              {/* Total Revenue (USD/EUR/AED only) */}
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-green-200 rounded-lg">
+                    <DollarSign className="h-6 w-6 text-green-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Received</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
+                  <div className="text-2xl font-bold text-green-900 space-y-1">
+                    {stats ? (
+                      <>
+                        <div className="text-lg">{formatCurrency(stats.revenueByCurrency?.USD || 0, 'USD')}</div>
+                        <div className="text-lg">{formatCurrency(stats.revenueByCurrency?.EUR || 0, 'EUR')}</div>
+                        <div className="text-lg">{formatCurrency(stats.revenueByCurrency?.AED || 0, 'AED')}</div>
+                      </>
+                    ) : <Skeleton width={100} height={32} />}
+                  </div>
+                  <p className="text-xs text-green-600 mt-1">International payments received</p>
+                </div>
+              </div>
+
+              {/* Current Pending Orders Value (USD/EUR/AED only) */}
               <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-blue-200 rounded-lg">
@@ -367,7 +392,7 @@ export default function InternationalClientsPage() {
                     {stats ? (
                       ((stats as any).currentPendingValueByCurrency || stats.orderValueByCurrency) ? 
                         Object.entries(((stats as any).currentPendingValueByCurrency || stats.orderValueByCurrency) as Record<string, number>)
-                          .filter(([currency, amount]) => (amount as number) > 0)
+                          .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                           .map(([currency, amount]) => (
                             <div key={currency} className="text-lg">
                               {formatCurrency(amount as number, currency)}
@@ -380,34 +405,6 @@ export default function InternationalClientsPage() {
                 </div>
               </div>
 
-              {/* Revenue */}
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-green-200 rounded-lg">
-                    <DollarSign className="h-6 w-6 text-green-700" />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Received</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
-                  <p className="text-2xl font-bold text-green-900">
-                    {stats ? (
-                      stats.revenueByCurrency ? 
-                        Object.entries(stats.revenueByCurrency)
-                          .filter(([currency, amount]) => (amount as number) > 0)
-                          .map(([currency, amount]) => (
-                            <div key={currency} className="text-lg">
-                              {formatCurrency(amount as number, currency)}
-                            </div>
-                          ))
-                        : formatCurrency(stats.totalRevenue || 0, 'USD')
-                    ) : <Skeleton width={100} height={32} />}
-                  </p>
-                  <p className="text-xs text-green-600 mt-1">International payments received</p>
-                </div>
-              </div>
 
               {/* Advance Payments */}
               <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">

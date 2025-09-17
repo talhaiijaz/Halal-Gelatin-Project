@@ -267,8 +267,27 @@ export default function DashboardPage() {
             <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(selectedFiscalYear)} Fiscal Year{selectedFiscalYear !== getCurrentFiscalYear() ? ' (Custom)' : ''}</div>
           </div>
           
-          {/* Key Metrics Row */}
+          {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Revenue */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-green-200 rounded-lg">
+                  <DollarSign className="h-6 w-6 text-green-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Received</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
+                <p className="text-2xl font-bold text-green-900">
+                  {localStats ? formatCurrency(localStats.totalRevenue || 0, 'PKR') : <Skeleton width={100} height={32} />}
+                </p>
+                <p className="text-xs text-green-600 mt-1">Local payments received</p>
+              </div>
+            </div>
+
             {/* Current Pending Orders Value */}
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
@@ -285,25 +304,6 @@ export default function DashboardPage() {
                   {localStats ? formatCurrency((localStats as any).currentPendingOrdersValue || localStats.totalOrderValue || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
-              </div>
-            </div>
-
-            {/* Revenue */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-green-200 rounded-lg">
-                  <DollarSign className="h-6 w-6 text-green-700" />
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Received</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-green-700 mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold text-green-900">
-                  {localStats ? formatCurrency(localStats.totalRevenue || 0, 'PKR') : <Skeleton width={100} height={32} />}
-                </p>
-                <p className="text-xs text-green-600 mt-1">Local payments received</p>
               </div>
             </div>
 
@@ -354,35 +354,9 @@ export default function DashboardPage() {
             <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(selectedFiscalYear)} Fiscal Year{selectedFiscalYear !== getCurrentFiscalYear() ? ' (Custom)' : ''}</div>
           </div>
           
-          {/* Key Metrics Row */}
+          {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Current Pending Orders Value */}
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="p-2 bg-blue-200 rounded-lg">
-                  <Package className="h-6 w-6 text-blue-700" />
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Pipeline</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
-                <div className="text-2xl font-bold text-blue-900 space-y-1">
-                  {internationalStats ? (
-                    <>
-                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
-                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.PKR) || internationalStats.orderValueByCurrency?.PKR || 0, 'PKR')}</div>
-                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
-                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
-                    </>
-                  ) : <Skeleton width={100} height={32} />}
-                </div>
-                <p className="text-xs text-blue-600 mt-1">International orders in pipeline</p>
-              </div>
-            </div>
-
-            {/* Revenue */}
+            {/* Total Revenue (USD/EUR/AED only) */}
             <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="p-2 bg-green-200 rounded-lg">
@@ -398,13 +372,37 @@ export default function DashboardPage() {
                   {internationalStats ? (
                     <>
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.USD || 0, 'USD')}</div>
-                      <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.PKR || 0, 'PKR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.EUR || 0, 'EUR')}</div>
                       <div className="text-lg">{formatCurrency(internationalStats.revenueByCurrency?.AED || 0, 'AED')}</div>
                     </>
                   ) : <Skeleton width={100} height={32} />}
                 </div>
                 <p className="text-xs text-green-600 mt-1">International payments received</p>
+              </div>
+            </div>
+
+            {/* Current Pending Orders Value (USD/EUR/AED only) */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-2 bg-blue-200 rounded-lg">
+                  <Package className="h-6 w-6 text-blue-700" />
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Pipeline</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
+                <div className="text-2xl font-bold text-blue-900 space-y-1">
+                  {internationalStats ? (
+                    <>
+                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
+                    </>
+                  ) : <Skeleton width={100} height={32} />}
+                </div>
+                <p className="text-xs text-blue-600 mt-1">International orders in pipeline</p>
               </div>
             </div>
 
