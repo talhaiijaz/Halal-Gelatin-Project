@@ -192,7 +192,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-gray-600">Converted to USD:</span>
-                                  <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD')}</span>
+                                  <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD || 0, 'USD')}</span>
                                 </div>
                               </div>
                             </div>
