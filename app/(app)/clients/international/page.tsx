@@ -422,7 +422,7 @@ export default function InternationalClientsPage() {
                     {stats ? (
                       stats.advancePaymentsByCurrency ? 
                         Object.entries(stats.advancePaymentsByCurrency)
-                          .filter(([currency, amount]) => (amount as number) > 0)
+                          .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                           .map(([currency, amount]) => (
                             <div key={currency} className="text-lg">
                               {formatCurrency(amount as number, currency)}
@@ -451,7 +451,7 @@ export default function InternationalClientsPage() {
                     {stats ? (
                       stats.outstandingByCurrency ? 
                         Object.entries(stats.outstandingByCurrency)
-                          .filter(([currency, amount]) => (amount as number) > 0)
+                          .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                           .map(([currency, amount]) => (
                             <div key={currency} className="text-lg">
                               {formatCurrency(amount as number, currency)}
