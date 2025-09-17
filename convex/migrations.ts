@@ -175,6 +175,26 @@ export const fixInvoiceStatusesAndBalances = mutation({
   },
 });
 
+// Cleanup migration: clear conversion fields where no conversion should exist
+export const cleanupPaymentConversionFields = mutation({
+  args: {},
+  returns: v.object({ updated: v.number() }),
+  handler: async (ctx) => {
+    const payments = await ctx.db.query("payments").collect();
+    let updated = 0;
+    for (const p of payments) {
+      const bank = p.bankAccountId ? await ctx.db.get(p.bankAccountId) : null;
+      const needsConversion = bank && bank.currency !== p.currency;
+      const hasFields = (p as any).conversionRateToUSD !== undefined || (p as any).convertedAmountUSD !== undefined;
+      if (!needsConversion && hasFields) {
+        await ctx.db.patch(p._id, { conversionRateToUSD: undefined, convertedAmountUSD: undefined });
+        updated++;
+      }
+    }
+    return { updated };
+  },
+});
+
 // Initialize default application settings
 export const initializeSettings = mutation({
   args: {},
@@ -379,5 +399,4 @@ export const migrateConfirmedOrders = mutation({
     };
   },
 });
-
 

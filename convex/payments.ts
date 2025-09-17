@@ -143,8 +143,8 @@ export const recordPayment = mutation({
         bankCurrency = bank?.currency;
       }
       
-      // Only require conversion rate if currencies don't match
-      const needsConversion = bankCurrency && bankCurrency !== currency;
+      // Only require conversion when bank account currency differs from payment/invoice currency
+      const needsConversion = !!bankCurrency && bankCurrency !== currency;
       
       if (needsConversion && clientOfInvoice?.type === "international") {
         if (!args.conversionRateToUSD) {
@@ -152,15 +152,19 @@ export const recordPayment = mutation({
         }
         conversionRateToUSD = args.conversionRateToUSD;
         convertedAmountUSD = args.amount * conversionRateToUSD;
-      } else if (currency === "USD" || !needsConversion) {
-        // No conversion needed for same currency or USD payments
+      } else if (!needsConversion) {
+        // No conversion needed when bank account currency matches payment currency
+        conversionRateToUSD = undefined;
+        convertedAmountUSD = undefined;
+      } else if (currency === "USD") {
+        // Edge: invoice/payment currency is USD but bank account differs
         convertedAmountUSD = args.amount;
       }
       
-      // Ensure conversion rate is always set for international clients
-      if (clientOfInvoice?.type === "international" && !conversionRateToUSD) {
-        conversionRateToUSD = 1.0; // Default to 1:1 if not provided
-        convertedAmountUSD = args.amount;
+      // Ensure we don't set stale conversion fields when not applicable
+      if (!needsConversion) {
+        conversionRateToUSD = undefined;
+        convertedAmountUSD = undefined;
       }
 
       // Create payment record (respect requested type; default to 'invoice')
@@ -296,8 +300,10 @@ export const recordPayment = mutation({
       }
       conversionRateToUSD = args.conversionRateToUSD;
       convertedAmountUSD = args.amount * conversionRateToUSD;
-    } else if (currency === "USD") {
-      convertedAmountUSD = args.amount;
+    } else {
+      // Same-currency or USD: no conversion fields
+      conversionRateToUSD = undefined;
+      convertedAmountUSD = undefined;
     }
 
     // Validate bank account currency for advances too (must match derived currency)

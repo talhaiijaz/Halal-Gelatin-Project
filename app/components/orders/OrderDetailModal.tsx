@@ -652,17 +652,19 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                       {/* Conversion Details for International Payments */}
                       {(() => {
                         const payments = (order as any).payments || [];
-                        const internationalPayments = payments.filter((p: Payment) => 
-                          p.conversionRateToUSD && p.convertedAmountUSD && p.currency !== 'USD'
-                        );
-                        
+                        // Only show when an actual conversion happened: conversion fields present AND bank account currency differs
+                        const internationalPayments = payments.filter((p: any) => {
+                          const hasConversion = !!p?.conversionRateToUSD && !!p?.convertedAmountUSD;
+                          const bank = p?.bankAccount;
+                          const currencyMismatch = bank ? bank.currency !== p.currency : false;
+                          return hasConversion && currencyMismatch;
+                        });
                         if (internationalPayments.length === 0) return null;
-                        
                         return (
                           <div className="mt-4">
                             <h4 className="text-sm font-medium text-gray-700 mb-2">Currency Conversion Details</h4>
                             <div className="space-y-2">
-                              {internationalPayments.map((payment: Payment, index: number) => (
+                              {internationalPayments.map((payment: any, index: number) => (
                                 <div key={index} className="bg-blue-50 rounded-md p-3 text-sm">
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-600">Original Payment:</span>
