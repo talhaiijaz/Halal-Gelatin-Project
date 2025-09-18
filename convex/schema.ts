@@ -175,6 +175,10 @@ export default defineSchema({
     withheldTaxAmount: v.optional(v.number()), // Calculated from cashReceived * rate / 100
     recordedBy: v.optional(v.id("users")),
     approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
+    // Reversal support
+    isReversed: v.optional(v.boolean()),
+    reversalReason: v.optional(v.string()),
+    reversedAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_invoice", ["invoiceId"])
@@ -264,6 +268,7 @@ export default defineSchema({
     isReversed: v.optional(v.boolean()), // If this transaction has been reversed
     reversalReason: v.optional(v.string()), // Reason for reversal
     reversedAt: v.optional(v.number()), // When the transaction was reversed
+    linkedTransactionId: v.optional(v.id("bankTransactions")), // For linking transfer_in/out pairs or reversal link
     createdAt: v.number(),
   })
     .index("by_bank_account", ["bankAccountId"])

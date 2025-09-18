@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Calendar, Package, Truck, Ship, Plane, Train, Car, Search, Filter, Eye, Plus } from "lucide-react";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, getFiscalYearForDate } from "@/app/utils/fiscalYear";
+import { timestampToDateString } from "@/app/utils/dateUtils";
 
 // Shipment data structure
 interface ShipmentEntry {
@@ -98,8 +99,8 @@ export default function ShipmentsPage() {
       // Debug: Log order details
       console.log(`Processing order: ${order.invoiceNumber}`);
       console.log(`  Stored fiscalYear: ${order.fiscalYear}`);
-      console.log(`  Factory departure date: ${order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toISOString().split('T')[0] : 'Not set'}`);
-      console.log(`  Order creation date: ${order.orderCreationDate ? new Date(order.orderCreationDate).toISOString().split('T')[0] : 'Not set'}`);
+      console.log(`  Factory departure date: ${order.factoryDepartureDate ? timestampToDateString(order.factoryDepartureDate) : 'Not set'}`);
+      console.log(`  Order creation date: ${order.orderCreationDate ? timestampToDateString(order.orderCreationDate) : 'Not set'}`);
       
       // Get fiscal year and month from order data
       let fiscalYear: number;

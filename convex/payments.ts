@@ -725,8 +725,8 @@ export const deletePayment = mutation({
         .first();
 
       if (bankTransaction) {
-        // Delete the bank transaction
-        await ctx.db.delete(bankTransaction._id);
+        // Soft cancel the bank transaction instead of deleting
+        await ctx.db.patch(bankTransaction._id, { status: "cancelled" });
 
         // Update bank account balance
         await updateBankAccountBalance(ctx, payment.bankAccountId);
@@ -794,6 +794,73 @@ export const deletePayment = mutation({
         bankAccountId: payment.bankAccountId,
         invoiceId: payment.invoiceId,
       },
+    });
+
+    return { success: true };
+  },
+});
+
+// Reverse a payment: mark payment as reversed and mark bank tx as reversed (no new entry)
+export const reversePayment = mutation({
+  args: {
+    paymentId: v.id("payments"),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({
+    success: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const payment = await ctx.db.get(args.paymentId);
+    if (!payment) throw new Error("Payment not found");
+    if ((payment as any).isReversed) throw new Error("Payment already reversed");
+
+    const now = Date.now();
+
+    // If linked bank transaction exists, mark it as reversed (no new entry)
+    if (payment.bankAccountId) {
+      const bankTransaction = await ctx.db
+        .query("bankTransactions")
+        .filter(q => q.eq(q.field("paymentId"), args.paymentId))
+        .first();
+      if (bankTransaction) {
+        await ctx.db.patch(bankTransaction._id, {
+          isReversed: true,
+          reversedAt: now,
+          reversalReason: args.reason || "Payment reversed",
+        });
+
+        await updateBankAccountBalance(ctx as any, bankTransaction.bankAccountId as any);
+      }
+    }
+
+    // Update invoice aggregates
+    if (payment.invoiceId) {
+      const invoice = await ctx.db.get(payment.invoiceId);
+      if (invoice) {
+        const newTotalPaid = Math.max(0, invoice.totalPaid - payment.amount);
+        const newOutstandingBalance = Math.max(0, invoice.amount - newTotalPaid);
+        await ctx.db.patch(payment.invoiceId, {
+          totalPaid: newTotalPaid,
+          outstandingBalance: newOutstandingBalance,
+          status: newOutstandingBalance === 0 ? "paid" : newTotalPaid === 0 ? "unpaid" : "partially_paid",
+          updatedAt: now,
+        });
+      }
+    }
+
+    // Mark payment reversed
+    await ctx.db.patch(args.paymentId, {
+      isReversed: true as any,
+      reversedAt: now as any,
+      reversalReason: (args.reason || "Manual reversal") as any,
+    });
+
+    await logEvent(ctx, {
+      entityTable: "payments",
+      entityId: String(args.paymentId),
+      action: "update",
+      message: `Payment reversed: ${payment.reference}${args.reason ? ` - ${args.reason}` : ""}`,
+      metadata: { paymentId: args.paymentId, reason: args.reason },
     });
 
     return { success: true };

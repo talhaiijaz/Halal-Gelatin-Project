@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, DollarSign, Calendar, User, Building, FileText, Edit, Trash2, Eye } from "lucide-react";
+import { X, DollarSign, Calendar, User, Building, FileText, Edit, Trash2, Eye, RotateCcw } from "lucide-react";
 import ActivityLog from "../ActivityLog";
 import EditPaymentModal from "./EditPaymentModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
@@ -18,6 +18,7 @@ interface PaymentDetailModalProps {
 
 export default function PaymentDetailModal({ paymentId, isOpen, onClose }: PaymentDetailModalProps) {
   const payment = useQuery(api.payments.get, paymentId ? { id: paymentId } : "skip");
+  const reversePayment = useMutation(api.payments.reversePayment);
   const deletePayment = useMutation(api.payments.deletePayment);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -116,7 +117,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                 <div className="grid grid-cols-2 gap-4">
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Amount</p>
-                    <p className="text-xl font-bold text-gray-900">{formatCurrency(payment.amount, payment.currency)}</p>
+                    <p className={`text-xl font-bold ${((payment as any).isReversed ? 'line-through opacity-60' : 'text-gray-900')}`}>{formatCurrency(payment.amount, payment.currency)}</p>
                   </div>
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Payment Date</p>
@@ -161,6 +162,19 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                       <label className="text-xs font-medium text-gray-500">Currency</label>
                       <p className="mt-1 text-sm text-gray-900">{payment.currency}</p>
                     </div>
+                    {(payment as any).isReversed && (
+                      <div className="col-span-2">
+                        <div className="p-3 bg-gray-50 border border-gray-200 rounded">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">Reversed</span>
+                          </div>
+                          <div className="text-sm text-gray-900">
+                            <div><strong>Reversed:</strong> {formatDate((payment as any).reversedAt)}</div>
+                            <div><strong>Reason:</strong> {(payment as any).reversalReason || 'No reason provided'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Conversion Details for International Payments */}
                     {(() => {
@@ -305,6 +319,20 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                 Created: <span className="font-semibold">{formatDate(payment.createdAt)}</span>
               </div>
               <div className="flex items-center space-x-3">
+                {!((payment as any).isReversed) && (
+                  <button
+                    onClick={() => {
+                      const reason = prompt("Enter reversal reason (optional):");
+                      if (reason !== null) { // User didn't cancel
+                        reversePayment({ paymentId: payment._id as any, reason: reason || undefined });
+                      }
+                    }}
+                    className="flex items-center px-3 py-2 text-sm font-medium text-yellow-700 bg-white border border-yellow-300 rounded-md hover:bg-yellow-50"
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Reverse
+                  </button>
+                )}
                 <button
                   onClick={() => setShowEditModal(true)}
                   className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"

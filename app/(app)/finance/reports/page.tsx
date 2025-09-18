@@ -20,6 +20,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { formatCurrency } from "@/app/utils/currencyFormat";
 import { getCurrentFiscalYear, getFiscalYearRange, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { timestampToDateString } from "@/app/utils/dateUtils";
 
 export default function ReportsPage() {
   const [reportType, setReportType] = useState<"revenue" | "clients" | "orders" | "payments">("revenue");
@@ -159,7 +160,7 @@ export default function ReportsPage() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${reportType}-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `${reportType}-report-${timestampToDateString(Date.now())}.csv`;
     a.click();
     toast.success("Report exported successfully");
   };

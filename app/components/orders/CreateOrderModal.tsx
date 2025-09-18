@@ -7,8 +7,8 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import DocumentUpload from "./DocumentUpload";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, isDateInFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
+import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
-import { dateStringToTimestamp } from "@/app/utils/dateUtils";
 import { formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import toast from "react-hot-toast";
 
@@ -67,9 +67,8 @@ export default function CreateOrderModal({
   const [selectedFiscalYear, setSelectedFiscalYear] = useState(getCurrentFiscalYear()); // Default to current fiscal year
   // Timeline fields
   const [orderCreationDate, setOrderCreationDate] = useState(() => {
-    // Set default to today's date in YYYY-MM-DD format
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    // Set default to today's date in Pakistan timezone (YYYY-MM-DD)
+    return timestampToDateString(Date.now());
   });
   const [factoryDepartureDate, setFactoryDepartureDate] = useState("");
   const [factoryDepartureDateError, setFactoryDepartureDateError] = useState("");
@@ -102,8 +101,7 @@ export default function CreateOrderModal({
   // Date validation helper
   const validateOrderCreationDate = (date: string, fiscalYear: number): boolean => {
     if (!date) return true; // Empty date is valid (will use current date)
-    
-    const dateTimestamp = new Date(date).getTime();
+    const dateTimestamp = dateStringToTimestamp(date);
     return isDateInFiscalYear(dateTimestamp, fiscalYear);
   };
 
@@ -114,7 +112,7 @@ export default function CreateOrderModal({
     // If order creation date is set and outside the new fiscal year, reset it
     if (orderCreationDate && !validateOrderCreationDate(orderCreationDate, newFiscalYear)) {
       const fiscalYearRange = getFiscalYearRange(newFiscalYear);
-      const startDate = new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
+      const startDate = timestampToDateString(fiscalYearRange.startDate);
       setOrderCreationDate(startDate);
       setDateValidationError("");
     }
@@ -385,9 +383,8 @@ export default function CreateOrderModal({
     setGstRateInputs(["0"]); // Reset the GST rate input strings
     setSelectedFiscalYear(getCurrentFiscalYear()); // Reset to current fiscal year
     setOrderCreationDate(() => {
-      // Reset to today's date in YYYY-MM-DD format
-      const today = new Date();
-      return today.toISOString().split('T')[0];
+      // Reset to today's date in Pakistan timezone (YYYY-MM-DD)
+      return timestampToDateString(Date.now());
     });
     setDateValidationError(""); // Reset date validation error
     setFactoryDepartureDate("");
@@ -1045,11 +1042,11 @@ export default function CreateOrderModal({
                       onChange={(e) => handleOrderCreationDateChange(e.target.value)}
                       min={(() => {
                         const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
-                        return new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
+                        return timestampToDateString(fiscalYearRange.startDate);
                       })()}
                       max={(() => {
                         const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
-                        return new Date(fiscalYearRange.endDate).toISOString().split('T')[0];
+                        return timestampToDateString(fiscalYearRange.endDate);
                       })()}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
                         dateValidationError ? 'border-red-500' : 'border-gray-300'

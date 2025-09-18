@@ -16,6 +16,7 @@ import {
   MapPin
 } from "lucide-react";
 import Skeleton from "react-loading-skeleton";
+import { timestampToDateString } from "@/app/utils/dateUtils";
 import "react-loading-skeleton/dist/skeleton.css";
 
 export default function LogsPage() {
@@ -125,7 +126,7 @@ export default function LogsPage() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `system-logs-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `system-logs-${timestampToDateString(Date.now())}.csv`;
     a.click();
   };
 

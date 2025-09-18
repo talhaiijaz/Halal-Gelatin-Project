@@ -13,6 +13,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { useSearchParams } from "next/navigation";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { timestampToDateString } from "@/app/utils/dateUtils";
 
 function OrdersPageContent() {
   const searchParams = useSearchParams();
@@ -149,7 +150,7 @@ function OrdersPageContent() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `orders-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `orders-${timestampToDateString(Date.now())}.csv`;
     a.click();
     toast.success("Orders exported successfully");
   };

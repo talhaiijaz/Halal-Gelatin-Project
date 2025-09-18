@@ -92,8 +92,7 @@ export default function EditOrderModal({
   // Date validation helper
   const validateOrderCreationDate = (date: string, fiscalYear: number): boolean => {
     if (!date) return true; // Empty date is valid (will use current date)
-    
-    const dateTimestamp = new Date(date).getTime();
+    const dateTimestamp = dateStringToTimestamp(date);
     return isDateInFiscalYear(dateTimestamp, fiscalYear);
   };
 
@@ -104,7 +103,7 @@ export default function EditOrderModal({
     // If order creation date is set and outside the new fiscal year, reset it
     if (orderCreationDate && !validateOrderCreationDate(orderCreationDate, newFiscalYear)) {
       const fiscalYearRange = getFiscalYearRange(newFiscalYear);
-      const startDate = new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
+      const startDate = timestampToDateString(fiscalYearRange.startDate);
       setOrderCreationDate(startDate);
       setDateValidationError("");
     }
@@ -895,11 +894,11 @@ export default function EditOrderModal({
                       onChange={(e) => handleOrderCreationDateChange(e.target.value)}
                       min={(() => {
                         const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
-                        return new Date(fiscalYearRange.startDate).toISOString().split('T')[0];
+                        return timestampToDateString(fiscalYearRange.startDate);
                       })()}
                       max={(() => {
                         const fiscalYearRange = getFiscalYearRange(selectedFiscalYear);
-                        return new Date(fiscalYearRange.endDate).toISOString().split('T')[0];
+                        return timestampToDateString(fiscalYearRange.endDate);
                       })()}
                       className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
                         dateValidationError ? 'border-red-500' : 'border-gray-300'

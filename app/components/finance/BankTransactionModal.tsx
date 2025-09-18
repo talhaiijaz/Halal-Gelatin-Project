@@ -14,7 +14,7 @@ import {
   getSuggestedExchangeRate,
   getExchangeRateDescription 
 } from "@/app/utils/currencyConversion";
-import { dateStringToTimestamp } from "@/app/utils/dateUtils";
+import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
 
 interface BankTransactionModalProps {
   isOpen: boolean;
@@ -37,7 +37,7 @@ export default function BankTransactionModal({
     reference: "",
     notes: "",
     toBankAccountId: "",
-    transactionDate: new Date().toISOString().split('T')[0],
+    transactionDate: timestampToDateString(Date.now()),
     // Currency conversion fields
     exchangeRate: "",
     originalAmount: "",
@@ -60,7 +60,7 @@ export default function BankTransactionModal({
         reference: "",
         notes: "",
         toBankAccountId: "",
-        transactionDate: new Date().toISOString().split('T')[0],
+        transactionDate: timestampToDateString(Date.now()),
         exchangeRate: "",
         originalAmount: "",
       });

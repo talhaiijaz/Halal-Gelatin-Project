@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Calendar } from "lucide-react";
+import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
 
 interface DatePickerModalProps {
   isOpen: boolean;
@@ -52,24 +53,25 @@ export default function DatePickerModal({
       return;
     }
 
-    const date = new Date(selectedDate);
-    
-    // Validate date is not in the future
-    const today = new Date();
-    today.setHours(23, 59, 59, 999); // End of today
-    
-    if (date > today) {
+    // Parse selected date in Pakistan timezone (normalized to noon PKT)
+    const selectedTs = dateStringToTimestamp(selectedDate);
+    const date = new Date(selectedTs);
+
+    // Validate date is not in the future (use PK today)
+    const todayString = timestampToDateString(Date.now());
+    const todayTs = dateStringToTimestamp(todayString);
+    if (selectedTs > todayTs) {
       setError("Date cannot be in the future");
       return;
     }
 
     // Validate against min/max dates if provided
-    if (minDate && date < minDate) {
+    if (minDate && selectedTs < minDate.getTime()) {
       setError(`Date cannot be before ${minDate.toLocaleDateString()}`);
       return;
     }
 
-    if (maxDate && date > maxDate) {
+    if (maxDate && selectedTs > maxDate.getTime()) {
       setError(`Date cannot be after ${maxDate.toLocaleDateString()}`);
       return;
     }
@@ -85,8 +87,8 @@ export default function DatePickerModal({
     onClose();
   };
 
-  // Set max date to today for delivery dates
-  const today = new Date().toISOString().split('T')[0];
+  // Set max date to today in Pakistan timezone for delivery dates
+  const today = timestampToDateString(Date.now());
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

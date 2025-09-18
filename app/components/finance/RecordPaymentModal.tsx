@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { dateStringToTimestamp } from "@/app/utils/dateUtils";
+import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { parseError, displayError, validateRequiredFields, formatValidationError } from "@/app/utils/errorHandling";
 import Modal from "@/app/components/ui/Modal";
@@ -41,7 +41,7 @@ export default function RecordPaymentModal({
     amount: "",
     method: "bank_transfer" as const,
     reference: "",
-    paymentDate: new Date().toISOString().split('T')[0],
+    paymentDate: timestampToDateString(Date.now()),
     notes: "",
     applyWithholding: false,
     withholdingRate: "",
@@ -135,7 +135,7 @@ export default function RecordPaymentModal({
         amount: "",
         method: "bank_transfer",
         reference: "",
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: timestampToDateString(Date.now()),
         notes: "",
         applyWithholding: false,
         withholdingRate: "",

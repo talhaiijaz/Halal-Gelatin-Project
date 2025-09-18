@@ -130,7 +130,9 @@ async function updateBankAccountBalance(ctx: any, bankAccountId: Id<"bankAccount
 
   // Calculate current balance: opening balance + sum of all transactions
   const openingBalance = bankAccount.openingBalance || 0;
-  const totalTransactions = transactions.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
+  const totalTransactions = transactions
+    .filter((t: any) => t.status !== "cancelled" && !t.isReversed)
+    .reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
   const currentBalance = openingBalance + totalTransactions;
 
   // Update the bank account
@@ -231,7 +233,11 @@ export const deleteTransaction = mutation({
       throw new Error("Transaction not found");
     }
 
-    await ctx.db.delete(args.id);
+    // Soft delete: mark as cancelled and keep for audit
+    await ctx.db.patch(args.id, {
+      status: "cancelled",
+      notes: transaction.notes,
+    });
 
     // Recalculate bank account balance
     await updateBankAccountBalance(ctx, transaction.bankAccountId);
@@ -239,8 +245,45 @@ export const deleteTransaction = mutation({
     await logBankTransactionEvent(ctx, {
       entityId: String(args.id),
       action: "delete",
-      message: `Transaction deleted: ${transaction.description}`,
+      message: `Transaction cancelled: ${transaction.description}`,
       metadata: { transactionId: args.id, transaction },
+    });
+
+    return { success: true };
+  },
+});
+
+// Reverse a transaction (just marks as reversed, no new entry)
+export const reverseTransaction = mutation({
+  args: {
+    id: v.id("bankTransactions"),
+    reason: v.optional(v.string()),
+  },
+  returns: v.object({
+    success: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const original = await ctx.db.get(args.id);
+    if (!original) throw new Error("Transaction not found");
+    if (original.isReversed) throw new Error("Transaction already reversed");
+    if (original.paymentId) throw new Error("Payment-linked transactions can only be reversed from the Payments tab");
+
+    const now = Date.now();
+    
+    await ctx.db.patch(args.id, {
+      isReversed: true,
+      reversedAt: now,
+      reversalReason: args.reason || "Manual reversal",
+    });
+
+    // Update bank account balance (reversed transactions don't contribute to balance)
+    await updateBankAccountBalance(ctx, original.bankAccountId);
+
+    await logBankTransactionEvent(ctx, {
+      entityId: String(args.id),
+      action: "update",
+      message: `Transaction reversed: ${original.description}${args.reason ? ` - ${args.reason}` : ""}`,
+      metadata: { originalId: args.id, reason: args.reason },
     });
 
     return { success: true };
@@ -375,6 +418,10 @@ export const transferBetweenAccounts = mutation({
     }
 
     const transferInId = await ctx.db.insert("bankTransactions", transferInData);
+
+    // Link the pair
+    await ctx.db.patch(transferOutId, { linkedTransactionId: transferInId as any });
+    await ctx.db.patch(transferInId, { linkedTransactionId: transferOutId as any });
 
     // Update both account balances
     await updateBankAccountBalance(ctx, args.fromBankAccountId);

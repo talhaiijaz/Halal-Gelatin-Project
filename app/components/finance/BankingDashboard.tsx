@@ -20,6 +20,7 @@ import {
   Info
 } from "lucide-react";
 import BankTransactionModal from "./BankTransactionModal";
+import BankTransactionDetailModal from "@/app/components/finance/BankTransactionDetailModal";
 import { formatCurrencyAmount } from "@/app/utils/currencyConversion";
 
 interface BankingDashboardProps {
@@ -31,6 +32,8 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
   const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("all");
+  const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
+  const [isTxDetailOpen, setIsTxDetailOpen] = useState(false);
 
   const bankAccount = useQuery(api.bankTransactions.getAccountWithTransactions, 
     bankAccountId ? { bankAccountId, transactionLimit: 50 } : "skip"
@@ -304,7 +307,15 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                 </tr>
               ) : (
                 filteredTransactions.map((transaction) => (
-                  <tr key={transaction._id} className="hover:bg-gray-50">
+                  <tr 
+                    key={transaction._id} 
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => {
+                      setSelectedTxId(transaction._id as unknown as string);
+                      setIsTxDetailOpen(true);
+                    }}
+                    title="Click to view details"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         {getTransactionIcon(transaction.transactionType)}
@@ -314,7 +325,15 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">{transaction.description}</div>
+                      <div className="text-sm text-gray-900 flex items-center gap-2">
+                        <span>{transaction.description}</span>
+                        {transaction.status === "cancelled" && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700">Cancelled</span>
+                        )}
+                        {transaction.isReversed && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-700">Reversed</span>
+                        )}
+                      </div>
                       {transaction.notes && (
                         <div className="text-xs text-gray-500 mt-1">{transaction.notes}</div>
                       )}
@@ -342,7 +361,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                       {transaction.reference || "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <span className={transaction.amount >= 0 ? "text-green-600" : "text-red-600"}>
+                      <span className={`${transaction.amount >= 0 ? "text-green-600" : "text-red-600"} ${transaction.status === "cancelled" || transaction.isReversed ? "line-through opacity-60" : ""}`}>
                         {transaction.amount >= 0 ? "+" : ""}{formatCurrencyAmount(Math.abs(transaction.amount), transaction.currency)}
                       </span>
                     </td>
@@ -364,6 +383,13 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
         }}
         bankAccountId={bankAccountId}
         transactionType={selectedTransactionType}
+      />
+
+      {/* Transaction Detail Modal */}
+      <BankTransactionDetailModal
+        isOpen={isTxDetailOpen}
+        onClose={() => setIsTxDetailOpen(false)}
+        transactionId={selectedTxId as any}
       />
 
     </div>

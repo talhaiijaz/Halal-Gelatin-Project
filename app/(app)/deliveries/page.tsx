@@ -20,6 +20,7 @@ import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { Id } from "@/convex/_generated/dataModel";
+import { timestampToDateString } from "@/app/utils/dateUtils";
 
 export default function DeliveriesPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -102,7 +103,7 @@ export default function DeliveriesPage() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `deliveries-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `deliveries-${timestampToDateString(Date.now())}.csv`;
     a.click();
     toast.success("Deliveries exported successfully");
   };
