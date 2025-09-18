@@ -246,16 +246,11 @@ export default function BankTransactionModal({
       maxWidth="md"
       showCloseButton={false}
     >
-      <div className="flex items-center mb-4">
-        {getTransactionIcon()}
-        <span className="ml-2 text-lg font-semibold text-gray-900">{getTransactionTitle()}</span>
-      </div>
-
-      <form onSubmit={handleSubmit} className="p-6">
-        <div className="space-y-4">
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-5">
           {/* Source Account Information */}
           {sourceAccount && (
-            <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+            <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
               <div className="flex items-center text-sm text-gray-800">
                 <Building2 className="h-4 w-4 mr-2" />
                 <span className="font-medium">{sourceAccount.accountName}</span>
@@ -280,7 +275,7 @@ export default function BankTransactionModal({
               <select
                 value={formData.toBankAccountId}
                 onChange={(e) => setFormData({ ...formData, toBankAccountId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
                 required
               >
                 <option value="">Select destination account</option>
@@ -296,7 +291,7 @@ export default function BankTransactionModal({
 
           {/* Currency conversion info */}
           {needsConversion && (
-            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
               <div className="flex items-start text-sm text-yellow-800">
                 <Info className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
                 <div>
@@ -323,7 +318,7 @@ export default function BankTransactionModal({
                   step="0.01"
                   value={formData.originalAmount}
                   onChange={(e) => setFormData({ ...formData, originalAmount: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
                   placeholder="0.00"
                   required
                 />
@@ -339,7 +334,7 @@ export default function BankTransactionModal({
                     step="0.0001"
                     value={formData.exchangeRate}
                     onChange={(e) => setFormData({ ...formData, exchangeRate: e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
                     placeholder={getSuggestedExchangeRate(sourceAccount?.currency || '', destinationAccount?.currency || '')?.toString() || "0.0000"}
                     required
                   />
@@ -371,7 +366,7 @@ export default function BankTransactionModal({
                 step="0.01"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
                 placeholder="0.00"
                 required
               />
@@ -386,7 +381,7 @@ export default function BankTransactionModal({
               type="text"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
               placeholder="Transaction description"
               required
             />
@@ -400,7 +395,7 @@ export default function BankTransactionModal({
               type="text"
               value={formData.reference}
               onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
               placeholder="Reference number or check number"
             />
           </div>
@@ -413,7 +408,7 @@ export default function BankTransactionModal({
               type="date"
               value={formData.transactionDate}
               onChange={(e) => setFormData({ ...formData, transactionDate: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
               required
             />
           </div>
@@ -425,7 +420,7 @@ export default function BankTransactionModal({
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
               rows={3}
               placeholder="Additional notes"
             />
