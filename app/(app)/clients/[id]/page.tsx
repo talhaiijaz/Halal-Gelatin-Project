@@ -339,7 +339,7 @@ export default function ClientDetailPage() {
               <div className="text-center p-3 bg-red-50 rounded-lg">
                 <DollarSign className="h-6 w-6 text-red-600 mx-auto mb-1" />
                 <div className="text-xs text-gray-600">Receivables</div>
-                {client.type === 'international' && client.outstandingByCurrency ? (
+                {client.outstandingByCurrency && Object.keys(client.outstandingByCurrency).length > 0 ? (
                   <div className="mt-1 space-y-1">
                     {Object.entries(client.outstandingByCurrency)
                       .filter(([_, amount]) => (amount as number) > 0)
@@ -351,7 +351,7 @@ export default function ClientDetailPage() {
                   </div>
                 ) : (
                   <div className="text-lg font-semibold text-gray-900 mt-1">
-                    {formatCurrency(client.outstandingAmount || 0, getClientCurrency(client.type))}
+                    {formatCurrency(0, getClientCurrency(client.type))}
                   </div>
                 )}
               </div>
@@ -359,17 +359,48 @@ export default function ClientDetailPage() {
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <DollarSign className="h-6 w-6 text-green-600 mx-auto mb-1" />
                 <div className="text-xs text-gray-600">Total Revenue</div>
-                <div className="text-lg font-semibold text-gray-900 mt-1">
-                  {allOrders ? formatCurrency(
-                    allOrders.reduce((sum, order) => {
-                      if (order.invoice) {
-                        return sum + (order.invoice.totalPaid || 0);
+                {allOrders && allOrders.length > 0 ? (
+                  (() => {
+                    // Group revenue by currency
+                    const revenueByCurrency: Record<string, number> = {};
+                    allOrders.forEach(order => {
+                      if (order.invoice && order.invoice.totalPaid) {
+                        const currency = order.invoice.currency || order.currency;
+                        revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + order.invoice.totalPaid;
                       }
-                      return sum;
-                    }, 0),
-                    getClientCurrency(client.type)
-                  ) : formatCurrency(0, getClientCurrency(client.type))}
-                </div>
+                    });
+                    
+                    const currencies = Object.keys(revenueByCurrency).filter(currency => revenueByCurrency[currency] > 0);
+                    
+                    if (currencies.length === 0) {
+                      return (
+                        <div className="text-lg font-semibold text-gray-900 mt-1">
+                          {formatCurrency(0, getClientCurrency(client.type))}
+                        </div>
+                      );
+                    } else if (currencies.length === 1) {
+                      return (
+                        <div className="text-lg font-semibold text-gray-900 mt-1">
+                          {formatCurrency(revenueByCurrency[currencies[0]], currencies[0] as SupportedCurrency)}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className="mt-1 space-y-1">
+                          {currencies.map(currency => (
+                            <div key={currency} className="text-sm font-semibold text-gray-900">
+                              {formatCurrency(revenueByCurrency[currency], currency as SupportedCurrency)}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                  })()
+                ) : (
+                  <div className="text-lg font-semibold text-gray-900 mt-1">
+                    {formatCurrency(0, getClientCurrency(client.type))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
