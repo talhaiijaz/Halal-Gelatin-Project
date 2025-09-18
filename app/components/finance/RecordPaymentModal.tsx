@@ -329,15 +329,15 @@ export default function RecordPaymentModal({
                     <div className="bg-gray-50 rounded-md p-3 text-sm grid grid-cols-2 gap-2">
                       <div>
                         <div className="text-gray-600">Gross Amount</div>
-                        <div className="font-semibold">{formatCurrency(gross)}</div>
+                        <div className="font-semibold">{formatCurrency(gross, getCurrencyForDisplay())}</div>
                       </div>
                       <div>
                         <div className="text-gray-600">Withheld ({rate || 0}%)</div>
-                        <div className="font-semibold">{formatCurrency(withheld)}</div>
+                        <div className="font-semibold">{formatCurrency(withheld, getCurrencyForDisplay())}</div>
                       </div>
                       <div className="col-span-2">
                         <div className="text-gray-600">Net Cash to Deposit</div>
-                        <div className="font-semibold">{formatCurrency(netCash)}</div>
+                        <div className="font-semibold">{formatCurrency(netCash, getCurrencyForDisplay())}</div>
                       </div>
                       {selectedInvoiceId && unpaidInvoices && (() => {
                         const inv = unpaidInvoices.find(i => i._id === selectedInvoiceId);
@@ -349,7 +349,7 @@ export default function RecordPaymentModal({
                         return (
                           <div className="col-span-2">
                             <div className="text-gray-600">Receivables after this payment</div>
-                            <div className="font-semibold text-primary">{formatCurrency(newOutstanding)}</div>
+                            <div className="font-semibold text-primary">{formatCurrency(newOutstanding, getCurrencyForDisplay())}</div>
                           </div>
                         );
                       })()}

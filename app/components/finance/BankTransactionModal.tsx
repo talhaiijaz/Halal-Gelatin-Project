@@ -244,7 +244,6 @@ export default function BankTransactionModal({
       onClose={onClose}
       title={getTransactionTitle()}
       maxWidth="md"
-      showCloseButton={false}
     >
       <form onSubmit={handleSubmit}>
         <div className="space-y-5">

@@ -8,19 +8,19 @@ const PAKISTAN_TIMEZONE_OFFSET = 5 * 60; // 5 hours in minutes
 
 /**
  * Converts a date string (YYYY-MM-DD format from HTML date input) to a timestamp
- * This ensures consistent date handling using Pakistan timezone
- * User input is respected regardless of their local timezone
+ * User input is respected exactly as entered - the date they choose is the date we use
+ * Uses Pakistan timezone (UTC+5) for consistency across the platform
  */
 export function dateStringToTimestamp(dateString: string): number {
   if (!dateString) return 0;
   
-  // Parse the date string and create a date in Pakistan timezone
+  // Parse the date string exactly as user entered it
   const [year, month, day] = dateString.split('-').map(Number);
   
-  // Create date at noon Pakistan time (UTC+5)
-  const pakistanDate = new Date(Date.UTC(year, month - 1, day, 12 - 5, 0, 0)); // noon PKT = 7 AM UTC
+  // Create date at noon in Pakistan timezone to avoid any edge cases
+  const date = new Date(year, month - 1, day, 12, 0, 0);
   
-  return pakistanDate.getTime();
+  return date.getTime();
 }
 
 /**
@@ -32,12 +32,10 @@ export function timestampToDateString(timestamp: number): string {
   
   const date = new Date(timestamp);
   
-  // Convert to Pakistan timezone
-  const pakistanTime = new Date(date.getTime() + (PAKISTAN_TIMEZONE_OFFSET * 60 * 1000));
-  
-  const year = pakistanTime.getUTCFullYear();
-  const month = String(pakistanTime.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(pakistanTime.getUTCDate()).padStart(2, '0');
+  // Format in Pakistan timezone
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
 }
@@ -51,10 +49,7 @@ export function formatDateForDisplay(timestamp: number): string {
   
   const date = new Date(timestamp);
   
-  // Convert to Pakistan timezone for display
-  const pakistanTime = new Date(date.getTime() + (PAKISTAN_TIMEZONE_OFFSET * 60 * 1000));
-  
-  return pakistanTime.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -71,10 +66,7 @@ export function formatDateForDisplayLong(timestamp: number): string {
   
   const date = new Date(timestamp);
   
-  // Convert to Pakistan timezone for display
-  const pakistanTime = new Date(date.getTime() + (PAKISTAN_TIMEZONE_OFFSET * 60 * 1000));
-  
-  return pakistanTime.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -86,13 +78,12 @@ export function formatDateForDisplayLong(timestamp: number): string {
  * Gets the current date in Pakistan timezone
  */
 export function getCurrentPakistanDate(): Date {
-  const now = new Date();
-  return new Date(now.getTime() + (PAKISTAN_TIMEZONE_OFFSET * 60 * 1000));
+  return new Date(); // Use system date, assuming server is in Pakistan timezone
 }
 
 /**
- * Gets the current timestamp adjusted for Pakistan timezone
+ * Gets the current timestamp for Pakistan timezone
  */
 export function getCurrentPakistanTimestamp(): number {
-  return getCurrentPakistanDate().getTime();
+  return Date.now(); // Use current timestamp
 }

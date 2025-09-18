@@ -4,9 +4,10 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, Edit, RotateCcw, Trash2, Link2, AlertTriangle } from "lucide-react";
+import { X, RotateCcw, Link2, AlertTriangle, Calendar, DollarSign, FileText, ArrowUpDown, ArrowUp, ArrowDown, CreditCard } from "lucide-react";
 import Modal from "@/app/components/ui/Modal";
 import toast from "react-hot-toast";
+import { formatCurrency } from "@/app/utils/currencyFormat";
 
 interface Props {
   transactionId: Id<"bankTransactions"> | null;

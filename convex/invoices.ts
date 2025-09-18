@@ -94,7 +94,7 @@ export const list = query({
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
   },
   handler: async (ctx, args) => {
-    let invoices = await ctx.db.query("invoices").order("desc").collect();
+    let invoices = await ctx.db.query("invoices").collect();
 
     // Apply filters
     if (args.status) {
@@ -177,6 +177,14 @@ export const list = query({
         };
       })
     );
+
+    // Sort by issue date (newest first), then by creation order for same dates
+    invoicesWithDetails.sort((a, b) => {
+      const dateDiff = b.issueDate - a.issueDate;
+      if (dateDiff !== 0) return dateDiff;
+      // Same date: preserve entry order (oldest first)
+      return a.createdAt - b.createdAt;
+    });
 
     return invoicesWithDetails;
   },

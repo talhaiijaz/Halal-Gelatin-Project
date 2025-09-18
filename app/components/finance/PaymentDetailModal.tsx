@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, DollarSign, Calendar, User, Building, FileText, Edit, Trash2, Eye, RotateCcw } from "lucide-react";
+import { X, DollarSign, Calendar, User, Building, FileText, Edit, Trash2, Eye } from "lucide-react";
 import ActivityLog from "../ActivityLog";
 import EditPaymentModal from "./EditPaymentModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { formatCurrency } from "@/app/utils/currencyFormat";
 
 interface PaymentDetailModalProps {
   paymentId: Id<"payments"> | null;
@@ -18,7 +19,6 @@ interface PaymentDetailModalProps {
 
 export default function PaymentDetailModal({ paymentId, isOpen, onClose }: PaymentDetailModalProps) {
   const payment = useQuery(api.payments.get, paymentId ? { id: paymentId } : "skip");
-  const reversePayment = useMutation(api.payments.reversePayment);
   const deletePayment = useMutation(api.payments.deletePayment);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -27,27 +27,6 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
   useModalBodyScrollLock(isOpen);
 
   if (!isOpen || !paymentId) return null;
-
-  const formatCurrency = (amount: number, currency?: string) => {
-    // For EUR, use custom formatting to ensure symbol appears before number and uses comma for thousands separator
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount || 0)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, { 
-      style: "currency", 
-      currency: currency || "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount || 0);
-  };
 
   const formatDate = (ts?: number) => (ts ? new Date(ts).toLocaleDateString() : "-");
 
@@ -117,7 +96,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                 <div className="grid grid-cols-2 gap-4">
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Amount</p>
-                    <p className={`text-xl font-bold ${((payment as any).isReversed ? 'line-through opacity-60' : 'text-gray-900')}`}>{formatCurrency(payment.amount, payment.currency)}</p>
+                    <p className={`text-xl font-bold ${((payment as any).isReversed ? 'line-through opacity-60' : 'text-gray-900')}`}>{formatCurrency(payment.amount, payment.currency as any)}</p>
                   </div>
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Payment Date</p>
@@ -191,7 +170,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                               <div className="space-y-1 text-sm">
                                 <div className="flex justify-between items-center">
                                   <span className="text-gray-600">Original Amount:</span>
-                                  <span className="font-medium">{formatCurrency(payment.amount, payment.currency)}</span>
+                                  <span className="font-medium">{formatCurrency(payment.amount, payment.currency as any)}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-gray-600">Conversion Rate:</span>
@@ -319,20 +298,6 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                 Created: <span className="font-semibold">{formatDate(payment.createdAt)}</span>
               </div>
               <div className="flex items-center space-x-3">
-                {!((payment as any).isReversed) && (
-                  <button
-                    onClick={() => {
-                      const reason = prompt("Enter reversal reason (optional):");
-                      if (reason !== null) { // User didn't cancel
-                        reversePayment({ paymentId: payment._id as any, reason: reason || undefined });
-                      }
-                    }}
-                    className="flex items-center px-3 py-2 text-sm font-medium text-yellow-700 bg-white border border-yellow-300 rounded-md hover:bg-yellow-50"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Reverse
-                  </button>
-                )}
                 <button
                   onClick={() => setShowEditModal(true)}
                   className="flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"

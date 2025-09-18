@@ -1,30 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { updateBankAccountBalance, calculateBankAccountBalance } from "./bankUtils";
 
-// Helper function to update bank account balance based on all transactions
-async function updateBankAccountBalance(ctx: any, bankAccountId: Id<"bankAccounts">) {
-  const bankAccount = await ctx.db.get(bankAccountId);
-  if (!bankAccount) return;
-
-  // Get all transactions for this bank account
-  const transactions = await ctx.db
-    .query("bankTransactions")
-    .filter((q: any) => q.eq(q.field("bankAccountId"), bankAccountId))
-    .collect();
-
-  // Calculate current balance: opening balance + sum of all transactions
-  const openingBalance = bankAccount.openingBalance || 0;
-  const totalTransactions = transactions.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
-  const currentBalance = openingBalance + totalTransactions;
-
-  // Update the bank account
-  await ctx.db.patch(bankAccountId, {
-    currentBalance: currentBalance,
-  });
-
-  return currentBalance;
-}
 
 async function logBankEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
@@ -92,25 +70,10 @@ export const create = mutation({
       createdAt: Date.now(),
     });
 
-    // If opening balance is provided, create an initial deposit transaction
-    if (args.openingBalance && args.openingBalance !== 0) {
-      await ctx.db.insert("bankTransactions", {
-        bankAccountId: bankAccountId,
-        transactionType: "deposit",
-        amount: args.openingBalance,
-        currency: args.currency,
-        description: `Initial opening balance`,
-        reference: "OPENING_BALANCE",
-        transactionDate: Date.now(),
-        status: "completed",
-        notes: `Opening balance set to ${args.openingBalance} ${args.currency}`,
-        recordedBy: undefined as any, // TODO: Get from auth context
-        createdAt: Date.now(),
-      });
-
-      // Update the current balance
-      await updateBankAccountBalance(ctx, bankAccountId);
-    }
+    // Set current balance to opening balance initially (no transaction needed)
+    await ctx.db.patch(bankAccountId, {
+      currentBalance: args.openingBalance || 0,
+    });
 
     await logBankEvent(ctx, { 
       entityId: String(bankAccountId), 
@@ -169,29 +132,9 @@ export const update = mutation({
       status: args.status,
     });
 
-    // If opening balance changed, create an adjustment transaction
+    // If opening balance changed, recalculate current balance (no adjustment transaction needed)
     if (openingBalanceChanged) {
-      const adjustmentAmount = newOpeningBalance - oldOpeningBalance;
-      
-      // Only create transaction if there's an actual change
-      if (adjustmentAmount !== 0) {
-        await ctx.db.insert("bankTransactions", {
-          bankAccountId: args.id,
-          transactionType: "adjustment",
-          amount: adjustmentAmount,
-          currency: args.currency,
-          description: `Opening balance adjustment: ${oldOpeningBalance} → ${newOpeningBalance}`,
-          reference: "BALANCE_ADJUSTMENT",
-          transactionDate: Date.now(),
-          status: "completed",
-          notes: `Opening balance updated from ${oldOpeningBalance} to ${newOpeningBalance}`,
-          recordedBy: undefined as any, // TODO: Get from auth context
-          createdAt: Date.now(),
-        });
-
-        // Update the current balance after the adjustment
-        await updateBankAccountBalance(ctx, args.id);
-      }
+      await updateBankAccountBalance(ctx, args.id);
     }
 
     await logBankEvent(ctx, { 
@@ -215,8 +158,13 @@ export const getPayments = query({
       .filter(q => q.eq(q.field("bankAccountId"), args.bankAccountId))
       .collect();
 
-    // Sort by payment date (most recent first)
-    return payments.sort((a, b) => b.paymentDate - a.paymentDate);
+    // Sort by payment date (most recent first), then by creation time (most recent first)
+    return payments.sort((a, b) => {
+      const dateDiff = b.paymentDate - a.paymentDate;
+      if (dateDiff !== 0) return dateDiff;
+      // Same date: most recent creation time first
+      return b.createdAt - a.createdAt;
+    });
   },
 });
 
@@ -248,10 +196,9 @@ export const getWithBalance = query({
       .filter(q => q.eq(q.field("bankAccountId"), args.id))
       .collect();
 
-    // Calculate current balance
-    const totalTransactions = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+    // Calculate current balance using utility function
     const openingBalance = bankAccount.openingBalance || 0;
-    const currentBalance = openingBalance + totalTransactions;
+    const currentBalance = calculateBankAccountBalance(openingBalance, transactions);
 
     return {
       ...bankAccount,
@@ -292,9 +239,8 @@ export const listWithBalances = query({
           .filter(q => q.eq(q.field("bankAccountId"), account._id))
           .collect();
 
-        const totalTransactions = transactions.reduce((sum, transaction) => sum + transaction.amount, 0);
         const openingBalance = account.openingBalance || 0;
-        const currentBalance = openingBalance + totalTransactions;
+        const currentBalance = calculateBankAccountBalance(openingBalance, transactions);
 
         return {
           ...account,

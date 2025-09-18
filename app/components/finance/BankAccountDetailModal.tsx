@@ -9,6 +9,7 @@ import ActivityLog from "@/app/components/ActivityLog";
 import BankAccountModal from "./BankAccountModal";
 import DeleteBankConfirmModal from "./DeleteBankConfirmModal";
 import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { formatCurrency } from "@/app/utils/currencyFormat";
 
 interface BankAccountDetailModalProps {
   bankAccountId: Id<"bankAccounts"> | null;
@@ -28,14 +29,6 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
   if (!isOpen || !bankAccountId) return null;
 
   const formatDate = (ts?: number) => (ts ? new Date(ts).toLocaleDateString() : "-");
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
@@ -107,7 +100,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                       <div>
                         <label className="text-xs text-gray-500 uppercase tracking-wide">Opening Balance</label>
                         <p className="text-sm font-medium text-gray-900">
-                          {formatCurrency(bankAccount.openingBalance, bankAccount.currency)}
+                          {formatCurrency(bankAccount.openingBalance, bankAccount.currency as any)}
                         </p>
                       </div>
                     )}
@@ -115,7 +108,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                       <div>
                         <label className="text-xs text-gray-500 uppercase tracking-wide">Current Balance</label>
                         <p className="text-sm font-medium text-gray-900">
-                          {formatCurrency(bankAccount.currentBalance, bankAccount.currency)}
+                          {formatCurrency(bankAccount.currentBalance, bankAccount.currency as any)}
                         </p>
                       </div>
                     )}
@@ -136,13 +129,13 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                     </h3>
                     <div className="space-y-1">
                       <div className="text-sm text-gray-600">
-                        Opening: {formatCurrency(bankAccount.openingBalance || 0, bankAccount.currency)}
+                        Opening: {formatCurrency(bankAccount.openingBalance || 0, bankAccount.currency as any)}
                       </div>
                       <div className="text-sm text-gray-600">
-                        Payments: {formatCurrency((bankAccount.currentBalance || 0) - (bankAccount.openingBalance || 0), bankAccount.currency)}
+                        Payments: {formatCurrency((bankAccount.currentBalance || 0) - (bankAccount.openingBalance || 0), bankAccount.currency as any)}
                       </div>
                       <div className="text-sm font-medium text-gray-900 border-t pt-1">
-                        Total: {formatCurrency(bankAccount.currentBalance || 0, bankAccount.currency)}
+                        Total: {formatCurrency(bankAccount.currentBalance || 0, bankAccount.currency as any)}
                       </div>
                     </div>
                   </div>
@@ -172,7 +165,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                                 <span className="text-sm text-gray-600">{formatDate(payment.paymentDate)}</span>
                               </div>
                               <div className="text-sm text-gray-900 font-medium">
-                                {formatCurrency(payment.amount, payment.currency)}
+                                {formatCurrency(payment.amount, payment.currency as any)}
                               </div>
                               <div className="text-xs text-gray-500">
                                 Reference: {payment.reference}
@@ -185,7 +178,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                             </div>
                             <div className="text-right">
                               <div className="text-sm font-medium text-green-600">
-                                {formatCurrency(payment.amount, payment.currency)}
+                                {formatCurrency(payment.amount, payment.currency as any)}
                               </div>
                               {payment.convertedAmountUSD && payment.convertedAmountUSD !== payment.amount && (
                                 <div className="text-xs text-blue-600">

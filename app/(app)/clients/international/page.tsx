@@ -249,25 +249,6 @@ export default function InternationalClientsPage() {
     ? Array.from(new Set(orders.map(order => order.client?.name).filter(Boolean) as string[])).sort()
     : [];
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // For EUR, use custom formatting to ensure symbol appears before number and uses comma for thousands separator
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString();

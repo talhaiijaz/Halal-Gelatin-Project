@@ -1,35 +1,35 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { updateBankAccountBalance } from "./bankUtils";
 
-// Helper function to update bank account balance based on all transactions
-async function updateBankAccountBalance(ctx: any, bankAccountId: Id<"bankAccounts">) {
-  const bankAccount = await ctx.db.get(bankAccountId);
-  if (!bankAccount) return;
 
-  // Get all transactions for this bank account
-  const transactions = await ctx.db
-    .query("bankTransactions")
-    .filter((q: any) => q.eq(q.field("bankAccountId"), bankAccountId))
-    .collect();
-
-  // Calculate current balance: opening balance + sum of all transactions
-  const openingBalance = bankAccount.openingBalance || 0;
-  const totalTransactions = transactions.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
-  const currentBalance = openingBalance + totalTransactions;
-
-  // Update the bank account
-  await ctx.db.patch(bankAccountId, {
-    currentBalance: currentBalance,
-  });
-
-  return currentBalance;
-}
-
-// Helper function to format currency
+// Helper function to format currency with proper locale and symbol support
 function formatCurrency(amount: number, currency: string = "USD"): string {
-  return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'en-PK', {
-    style: "currency",
+  // Currency symbols mapping
+  const currencySymbols: Record<string, string> = {
+    USD: '$',
+    PKR: 'Rs ',
+    EUR: '€',
+    AED: 'د.إ '
+  };
+
+  // Handle EUR specially to ensure symbol appears before number
+  if (currency === 'EUR') {
+    const formatted = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+    return `€${formatted}`;
+  }
+
+  // Use appropriate locale based on currency
+  const locale = currency === 'USD' ? 'en-US' : 
+                 currency === 'PKR' ? 'en-PK' : 
+                 currency === 'AED' ? 'en-AE' : 'en-US';
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -90,7 +90,7 @@ export const recordPayment = mutation({
       throw new Error("Payment validation failed: Payment method is required. Please select how the payment was made (bank transfer, cash, etc.).");
     }
 
-    let currency = "USD";
+    let currency: string;
     let clientId;
     let paymentType: "invoice" | "advance" = (args.type as any) || "invoice";
 
@@ -407,7 +407,7 @@ export const list = query({
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
   },
   handler: async (ctx, args) => {
-    let payments = await ctx.db.query("payments").order("desc").collect();
+    let payments = await ctx.db.query("payments").collect();
 
     // Filter by invoice
     if (args.invoiceId) {
@@ -492,6 +492,14 @@ export const list = query({
         };
       })
     );
+
+    // Sort by payment date (newest first), then by creation time (most recent first)
+    enrichedPayments.sort((a, b) => {
+      const dateDiff = b.paymentDate - a.paymentDate;
+      if (dateDiff !== 0) return dateDiff;
+      // Same date: most recent creation time first
+      return b.createdAt - a.createdAt;
+    });
 
     return enrichedPayments;
   },
@@ -779,7 +787,7 @@ export const deletePayment = mutation({
     await ctx.db.delete(args.paymentId);
     
     // Create detailed log message
-    const paymentDetails = `${formatCurrency(payment.amount, payment.currency || 'USD')} - ${payment.reference}`;
+    const paymentDetails = `${formatCurrency(payment.amount, payment.currency)} - ${payment.reference}`;
     const clientName = client ? ` from ${client.name}` : '';
     const logMessage = `Payment deleted: ${paymentDetails}${clientName}`;
     
@@ -997,7 +1005,7 @@ export const updatePayment = mutation({
       entityTable: "payments",
       entityId: String(args.paymentId),
       action: "update",
-      message: `Payment updated: ${invoiceNumber} - ${formatCurrency(args.amount, existing.currency || 'USD')} (${clientName})`,
+      message: `Payment updated: ${invoiceNumber} - ${formatCurrency(args.amount, existing.currency)} (${clientName})`,
       metadata: { 
         previous: { amount: existing.amount, bankAccountId: existing.bankAccountId }, 
         next: { amount: args.amount, bankAccountId: args.bankAccountId },
@@ -1039,8 +1047,13 @@ export const getClientPaymentHistory = query({
       payments = payments.filter(p => p.paymentDate <= args.endDate!);
     }
 
-    // Sort by payment date (newest first)
-    payments.sort((a, b) => b.paymentDate - a.paymentDate);
+    // Sort by payment date (newest first), then by creation time (most recent first)
+    payments.sort((a, b) => {
+      const dateDiff = b.paymentDate - a.paymentDate;
+      if (dateDiff !== 0) return dateDiff;
+      // Same date: most recent creation time first
+      return b.createdAt - a.createdAt;
+    });
 
     // Enrich with invoice data
     const enrichedPayments = await Promise.all(

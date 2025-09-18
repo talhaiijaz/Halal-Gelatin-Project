@@ -22,6 +22,7 @@ import {
 import BankTransactionModal from "./BankTransactionModal";
 import BankTransactionDetailModal from "@/app/components/finance/BankTransactionDetailModal";
 import { formatCurrencyAmount } from "@/app/utils/currencyConversion";
+import { formatCurrency } from "@/app/utils/currencyFormat";
 
 interface BankingDashboardProps {
   bankAccountId: Id<"bankAccounts"> | null;
@@ -61,14 +62,6 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
     );
   }
 
-  const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString();
@@ -143,7 +136,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
       if (dateDiff !== 0) return dateDiff;
       
       // If transaction dates are the same, sort by creation time (most recent first)
-      // This ensures newly added transactions appear at the top within the same date
+      // This ensures the most recently created transaction appears at the top
       return b.createdAt - a.createdAt;
     });
 
@@ -159,7 +152,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Current Balance</p>
               <p className="text-lg font-semibold text-gray-900">
-                {formatCurrency(bankAccount.currentBalance || 0, bankAccount.currency)}
+                {formatCurrency(bankAccount.currentBalance || 0, bankAccount.currency as any)}
               </p>
             </div>
           </div>
@@ -173,7 +166,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Total Deposits</p>
               <p className="text-lg font-semibold text-gray-900">
-                {formatCurrency(transactionStats?.totalDeposits || 0, bankAccount.currency)}
+                {formatCurrency(transactionStats?.totalDeposits || 0, bankAccount.currency as any)}
               </p>
             </div>
           </div>
@@ -187,7 +180,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-500">Total Withdrawals</p>
               <p className="text-lg font-semibold text-gray-900">
-                {formatCurrency(transactionStats?.totalWithdrawals || 0, bankAccount.currency)}
+                {formatCurrency(transactionStats?.totalWithdrawals || 0, bankAccount.currency as any)}
               </p>
             </div>
           </div>

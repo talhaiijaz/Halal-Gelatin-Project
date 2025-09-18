@@ -248,14 +248,6 @@ export default function LocalClientsPage() {
     ? Array.from(new Set(orders.map(o => o.client?.name).filter(Boolean) as string[])).sort()
     : [];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-PK', {
-      style: 'currency',
-      currency: 'PKR',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount || 0);
-  };
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString("en-US", {

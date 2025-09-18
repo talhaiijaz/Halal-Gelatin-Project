@@ -8,6 +8,7 @@ import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyForm
 import { displayError } from "@/app/utils/errorHandling";
 import { type Payment } from "@/app/types";
 import Modal from "@/app/components/ui/Modal";
+import { timestampToDateString, dateStringToTimestamp } from "@/app/utils/dateUtils";
 
 export type EditablePayment = {
   _id: Id<"payments">;
@@ -42,7 +43,7 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
   const [form, setForm] = useState({
     amount: "",
     reference: "",
-    paymentDate: new Date().toISOString().split("T")[0],
+    paymentDate: timestampToDateString(Date.now()),
     notes: "",
     bankAccountId: "",
   });
@@ -52,7 +53,7 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
       setForm({
         amount: String(payment.amount),
         reference: payment.reference || "",
-        paymentDate: new Date(payment.paymentDate).toISOString().split("T")[0],
+        paymentDate: timestampToDateString(payment.paymentDate),
         notes: payment.notes || "",
         bankAccountId: payment.bankAccountId ? (payment.bankAccountId as string) : "",
       });
@@ -185,7 +186,7 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                     paymentId: payment._id,
                     amount: parseFloat(form.amount),
                     reference: form.reference,
-                    paymentDate: new Date(form.paymentDate).getTime(),
+                    paymentDate: dateStringToTimestamp(form.paymentDate),
                     notes: form.notes || undefined,
                     bankAccountId: form.bankAccountId ? (form.bankAccountId as unknown as Id<"bankAccounts">) : undefined,
                   });

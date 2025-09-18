@@ -2,10 +2,25 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { updateBankAccountBalance, calculateBankAccountBalance } from "./bankUtils";
 
-// Helper function to format currency
+// Helper function to format currency with proper locale and symbol support
 function formatCurrency(amount: number, currency: string) {
-  return new Intl.NumberFormat('en-US', {
+  // Handle EUR specially to ensure symbol appears before number
+  if (currency === 'EUR') {
+    const formatted = new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+    return `€${formatted}`;
+  }
+
+  // Use appropriate locale based on currency
+  const locale = currency === 'USD' ? 'en-US' : 
+                 currency === 'PKR' ? 'en-PK' : 
+                 currency === 'AED' ? 'en-AE' : 'en-US';
+
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: currency,
     minimumFractionDigits: 2,
@@ -117,31 +132,6 @@ export const recordTransaction = mutation({
   },
 });
 
-// Update bank account balance based on all transactions
-async function updateBankAccountBalance(ctx: any, bankAccountId: Id<"bankAccounts">) {
-  const bankAccount = await ctx.db.get(bankAccountId);
-  if (!bankAccount) return;
-
-  // Get all transactions for this bank account
-  const transactions = await ctx.db
-    .query("bankTransactions")
-    .filter((q: any) => q.eq(q.field("bankAccountId"), bankAccountId))
-    .collect();
-
-  // Calculate current balance: opening balance + sum of all transactions
-  const openingBalance = bankAccount.openingBalance || 0;
-  const totalTransactions = transactions
-    .filter((t: any) => t.status !== "cancelled" && !t.isReversed)
-    .reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
-  const currentBalance = openingBalance + totalTransactions;
-
-  // Update the bank account
-  await ctx.db.patch(bankAccountId, {
-    currentBalance: currentBalance,
-  });
-
-  return currentBalance;
-}
 
 // Get all transactions for a bank account
 export const getTransactions = query({
@@ -156,14 +146,14 @@ export const getTransactions = query({
 
     const transactions = await query.collect();
     
-    // Sort by transaction date (most recent first), then by creation time
+    // Sort by transaction date (most recent first), then by creation time (most recent first)
     const sortedTransactions = transactions.sort((a: any, b: any) => {
       // Sort by transaction date (most recent first)
       const dateDiff = b.transactionDate - a.transactionDate;
       if (dateDiff !== 0) return dateDiff;
       
       // If transaction dates are the same, sort by creation time (most recent first)
-      // This ensures newly added transactions appear at the top within the same date
+      // This ensures the most recently created transaction appears at the top
       return b.createdAt - a.createdAt;
     });
     
@@ -479,15 +469,14 @@ export const getAccountWithTransactions = query({
         if (dateDiff !== 0) return dateDiff;
         
         // If transaction dates are the same, sort by creation time (most recent first)
-        // This ensures newly added transactions appear at the top within the same date
+        // This ensures the most recently created transaction appears at the top
         return b.createdAt - a.createdAt;
       })
       .slice(0, args.transactionLimit || 50);
 
-    // Calculate current balance
+    // Calculate current balance using utility function
     const openingBalance = bankAccount.openingBalance || 0;
-    const totalTransactions = transactions.reduce((sum: number, transaction: any) => sum + transaction.amount, 0);
-    const currentBalance = openingBalance + totalTransactions;
+    const currentBalance = calculateBankAccountBalance(openingBalance, transactions);
 
     return {
       ...bankAccount,
@@ -512,10 +501,10 @@ export const getTransactionStats = query({
 
     const transactions = await query.collect();
 
-    // Filter by date range if provided
-    let filteredTransactions = transactions;
+    // Filter by date range and exclude cancelled/reversed transactions
+    let filteredTransactions = transactions.filter((t: any) => t.status !== "cancelled" && !t.isReversed);
     if (args.startDate || args.endDate) {
-      filteredTransactions = transactions.filter(transaction => {
+      filteredTransactions = filteredTransactions.filter(transaction => {
         if (args.startDate && transaction.transactionDate < args.startDate) return false;
         if (args.endDate && transaction.transactionDate > args.endDate) return false;
         return true;

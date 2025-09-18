@@ -14,6 +14,7 @@ import "react-loading-skeleton/dist/skeleton.css";
 import { useSearchParams } from "next/navigation";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
+import { formatCurrency } from "@/app/utils/currencyFormat";
 
 function OrdersPageContent() {
   const searchParams = useSearchParams();
@@ -28,26 +29,6 @@ function OrdersPageContent() {
     fiscalYear: selectedFiscalYear,
   });
 
-  const formatCurrency = (amount: number, currency: string) => {
-    // For EUR, use custom formatting to ensure symbol appears before number and uses comma for thousands separator
-    if (currency === 'EUR') {
-      return `€${new Intl.NumberFormat('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount || 0)}`;
-    }
-    
-    // Use appropriate locale based on currency for other currencies
-    const locale = currency === 'USD' ? 'en-US' : 
-                   currency === 'PKR' ? 'en-PK' : 
-                   currency === 'AED' ? 'en-AE' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount || 0);
-  };
 
   // Helper function to calculate financial metrics for an order
   const calculateFinancialMetrics = (order: any) => {
@@ -331,19 +312,19 @@ function OrdersPageContent() {
                       <td className="px-4 py-4 text-center">
                         <div className="space-y-1">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(metrics.total, order.currency)}
+                            {formatCurrency(metrics.total, order.currency as any)}
                           </div>
                           <div className="text-xs text-gray-600">
-                            Paid: {formatCurrency(metrics.paid, order.currency)}
+                            Paid: {formatCurrency(metrics.paid, order.currency as any)}
                             {metrics.advancePaid > 0 && (
                               <span className="text-blue-600">
-                                {" "}({formatCurrency(metrics.advancePaid, order.currency)} advance)
+                                {" "}({formatCurrency(metrics.advancePaid, order.currency as any)} advance)
                               </span>
                             )}
                           </div>
                           <div className={`text-xs font-medium ${metrics.outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                            Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency) : 
-                                         order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency) : 
+                            Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency as any) : 
+                                         order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as any) : 
                                          "Not due"}
                           </div>
                         </div>
