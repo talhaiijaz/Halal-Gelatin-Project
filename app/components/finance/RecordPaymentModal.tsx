@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { X } from "lucide-react";
 import { Id } from "@/convex/_generated/dataModel";
 import { dateStringToTimestamp } from "@/app/utils/dateUtils";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { parseError, displayError, validateRequiredFields, formatValidationError } from "@/app/utils/errorHandling";
+import Modal from "@/app/components/ui/Modal";
 
 interface RecordPaymentModalProps {
   isOpen: boolean;
@@ -172,29 +172,14 @@ export default function RecordPaymentModal({
   const withheld = rate > 0 ? Math.round((gross * rate) / 100) : 0;
   const netCash = Math.max(0, gross - withheld);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-        
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Record Payment
-              </h2>
-              <button
-                onClick={onClose}
-                className="rounded-lg p-1 hover:bg-gray-100"
-              >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Record Payment"
+      maxWidth="md"
+    >
+      <form onSubmit={handleSubmit} className="p-6">
             <div className="space-y-4">
               {/* Payment Type moved below invoice selection per request */}
 
@@ -534,8 +519,6 @@ export default function RecordPaymentModal({
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

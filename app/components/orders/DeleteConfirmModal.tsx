@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { X, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import Modal from "@/app/components/ui/Modal";
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -67,27 +68,20 @@ export default function DeleteConfirmModal({
     }
   };
 
-  if (!isOpen || !orderId) return null;
+  if (!orderId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black bg-opacity-25" onClick={onClose} />
-
-        <div className="relative bg-white rounded-lg w-full max-w-md">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
-            <div className="flex items-center">
-              <AlertTriangle className="h-6 w-6 text-red-500 mr-3" />
-              <h2 className="text-xl font-semibold text-gray-900">Delete Order</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Delete Order"
+      maxWidth="md"
+      showCloseButton={false}
+    >
+      <div className="flex items-center mb-4">
+        <AlertTriangle className="h-6 w-6 text-red-500 mr-3" />
+        <h2 className="text-xl font-semibold text-gray-900">Delete Order</h2>
+      </div>
 
           {/* Content */}
           <div className="p-6">
@@ -129,8 +123,6 @@ export default function DeleteConfirmModal({
               {isDeleting ? "Deleting..." : "Delete Order"}
             </button>
           </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

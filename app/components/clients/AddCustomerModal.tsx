@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { X, Search, Loader2, Upload, User, Camera } from "lucide-react";
+import { Search, Loader2, Upload, User, Camera } from "lucide-react";
+import Modal from "@/app/components/ui/Modal";
 
 interface AddCustomerModalProps {
   isOpen: boolean;
@@ -234,29 +235,14 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
     setShowCityDropdown(false);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-        
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Add New {type === "local" ? "Local" : "International"} Customer
-              </h2>
-              <button
-                onClick={onClose}
-                className="rounded-lg p-1 hover:bg-gray-100"
-              >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="p-6">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`Add New ${type === "local" ? "Local" : "International"} Customer`}
+      maxWidth="md"
+    >
+      <form onSubmit={handleSubmit} className="p-6">
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -498,8 +484,6 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

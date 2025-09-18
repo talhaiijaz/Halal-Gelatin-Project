@@ -8,6 +8,7 @@ import { X, DollarSign, Calendar, User, Building, FileText, Edit, Trash2, Eye } 
 import ActivityLog from "../ActivityLog";
 import EditPaymentModal from "./EditPaymentModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
+import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
 
 interface PaymentDetailModalProps {
   paymentId: Id<"payments"> | null;
@@ -20,17 +21,9 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
   const deletePayment = useMutation(api.payments.deletePayment);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [bodyOverflow, setBodyOverflow] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setBodyOverflow(document.body.style.overflow);
-      document.body.style.overflow = "hidden";
-    } else if (bodyOverflow !== null) {
-      document.body.style.overflow = bodyOverflow;
-      setBodyOverflow(null);
-    }
-  }, [isOpen]);
+  
+  // Lock body scroll when modal is open
+  useModalBodyScrollLock(isOpen);
 
   if (!isOpen || !paymentId) return null;
 

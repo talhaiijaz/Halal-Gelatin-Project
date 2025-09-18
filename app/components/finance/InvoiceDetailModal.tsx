@@ -7,6 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import { X, FileText, User, Package, DollarSign, Calendar } from "lucide-react";
 import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { type Payment, type OrderItem } from "@/app/types";
+import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
 
 
 interface InvoiceDetailModalProps {
@@ -18,17 +19,9 @@ interface InvoiceDetailModalProps {
 
 export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecordPayment }: InvoiceDetailModalProps) {
   const invoice = useQuery(api.invoices.get, invoiceId ? { id: invoiceId } : "skip");
-  const [bodyOverflow, setBodyOverflow] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setBodyOverflow(document.body.style.overflow);
-      document.body.style.overflow = "hidden";
-    } else if (bodyOverflow !== null) {
-      document.body.style.overflow = bodyOverflow;
-      setBodyOverflow(null);
-    }
-  }, [isOpen]);
+  
+  // Lock body scroll when modal is open
+  useModalBodyScrollLock(isOpen);
 
   if (!isOpen || !invoiceId) return null;
 
@@ -169,7 +162,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                             <th className="px-3 py-2 text-left">Type</th>
                             <th className="px-3 py-2 text-right">Amount</th>
                             <th className="px-3 py-2 text-left">Reference</th>
-                            <th className="px-3 py-2 text-left">Bank</th>
+                            <th className="px-3 py-2 text-left">Bank Details</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -200,7 +193,16 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                                 })()}
                               </td>
                               <td className="px-3 py-2">{p.reference}</td>
-                              <td className="px-3 py-2">{p.bankAccountId ? (p.bankAccount?.accountName || p.bankAccount?.bankName || "Bank Transfer") : "-"}</td>
+                              <td className="px-3 py-2">
+                                {p.bankAccountId ? (
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-900">{p.bankAccount?.bankName || "-"}</div>
+                                    <div className="text-xs text-gray-500">{p.bankAccount?.accountName || "-"}</div>
+                                  </div>
+                                ) : (
+                                  "-"
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

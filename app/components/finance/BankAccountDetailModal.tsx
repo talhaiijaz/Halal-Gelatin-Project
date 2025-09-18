@@ -8,6 +8,7 @@ import { X, Building2, Edit, Trash2, Calendar, CreditCard, DollarSign } from "lu
 import ActivityLog from "@/app/components/ActivityLog";
 import BankAccountModal from "./BankAccountModal";
 import DeleteBankConfirmModal from "./DeleteBankConfirmModal";
+import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
 
 interface BankAccountDetailModalProps {
   bankAccountId: Id<"bankAccounts"> | null;
@@ -18,19 +19,11 @@ interface BankAccountDetailModalProps {
 export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose }: BankAccountDetailModalProps) {
   const bankAccount = useQuery(api.banks.getWithBalance, bankAccountId ? { id: bankAccountId } : "skip");
   const payments = useQuery(api.banks.getPayments, bankAccountId ? { bankAccountId } : "skip");
-  const [bodyOverflow, setBodyOverflow] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setBodyOverflow(document.body.style.overflow);
-      document.body.style.overflow = "hidden";
-    } else if (bodyOverflow !== null) {
-      document.body.style.overflow = bodyOverflow;
-      setBodyOverflow(null);
-    }
-  }, [isOpen]);
+  // Lock body scroll when modal is open
+  useModalBodyScrollLock(isOpen);
 
   if (!isOpen || !bankAccountId) return null;
 

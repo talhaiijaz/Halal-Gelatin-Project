@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Info, AlertTriangle } from "lucide-react";
+import { Info, AlertTriangle } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import toast from "react-hot-toast";
 import { formatCurrencyAmount } from "@/app/utils/currencyConversion";
+import Modal from "@/app/components/ui/Modal";
 
 interface BankAccountModalProps {
   isOpen: boolean;
@@ -154,24 +155,14 @@ export default function BankAccountModal({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {bankAccount ? "Edit Bank Account" : "Add Bank Account"}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={bankAccount ? "Edit Bank Account" : "Add Bank Account"}
+      maxWidth="md"
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Account Name *
@@ -322,7 +313,6 @@ export default function BankAccountModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

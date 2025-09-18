@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, ArrowUpDown, ArrowDown, ArrowUp, CreditCard, Building2, Info } from "lucide-react";
+import { ArrowUpDown, ArrowDown, ArrowUp, CreditCard, Building2, Info } from "lucide-react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import toast from "react-hot-toast";
+import Modal from "@/app/components/ui/Modal";
 import { 
   convertCurrency, 
   formatCurrencyAmount, 
@@ -238,26 +239,24 @@ export default function BankTransactionModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            {getTransactionIcon()}
-            <span className="ml-2">{getTransactionTitle()}</span>
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={getTransactionTitle()}
+      maxWidth="md"
+      showCloseButton={false}
+    >
+      <div className="flex items-center mb-4">
+        {getTransactionIcon()}
+        <span className="ml-2 text-lg font-semibold text-gray-900">{getTransactionTitle()}</span>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Currency Information Display */}
+      <form onSubmit={handleSubmit} className="p-6">
+        <div className="space-y-4">
+          {/* Source Account Information */}
           {sourceAccount && (
-            <div className="bg-blue-50 p-3 rounded-md">
-              <div className="flex items-center text-sm text-blue-800">
+            <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
+              <div className="flex items-center text-sm text-gray-800">
                 <Building2 className="h-4 w-4 mr-2" />
                 <span className="font-medium">{sourceAccount.accountName}</span>
                 <span className="mx-2">•</span>
@@ -292,22 +291,22 @@ export default function BankTransactionModal({
                   </option>
                 ))}
               </select>
-              
-              {/* Currency conversion info */}
-              {needsConversion && (
-                <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <div className="flex items-start text-sm text-yellow-800">
-                    <Info className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-medium">Cross-Currency Transfer</p>
-                      <p className="text-xs mt-1">
-                        You're transferring from {sourceAccount?.currency} to {destinationAccount?.currency}. 
-                        Please enter the amount in {sourceAccount?.currency} and provide the exchange rate.
-                      </p>
-                    </div>
-                  </div>
+            </div>
+          )}
+
+          {/* Currency conversion info */}
+          {needsConversion && (
+            <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-start text-sm text-yellow-800">
+                <Info className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">Cross-Currency Transfer</p>
+                  <p className="text-xs mt-1">
+                    You're transferring from {sourceAccount?.currency} to {destinationAccount?.currency}. 
+                    Please enter the amount in {sourceAccount?.currency} and provide the exchange rate.
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -448,8 +447,8 @@ export default function BankTransactionModal({
               {isSubmitting ? "Processing..." : "Record Transaction"}
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+      </form>
+    </Modal>
   );
 }

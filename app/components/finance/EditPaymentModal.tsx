@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X } from "lucide-react";
 import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { displayError } from "@/app/utils/errorHandling";
 import { type Payment } from "@/app/types";
+import Modal from "@/app/components/ui/Modal";
 
 export type EditablePayment = {
   _id: Id<"payments">;
@@ -59,23 +59,18 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
     }
   }, [payment, isOpen]);
 
-  if (!isOpen || !payment) return null;
+  if (!payment) return null;
 
   // Note: formatCurrency is now imported from utils/currencyFormat
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black bg-opacity-50" onClick={onClose} />
-        <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md">
-          <div className="flex items-center justify-between px-5 py-3 border-b">
-            <h2 className="text-lg font-semibold text-gray-900">Edit Payment</h2>
-            <button onClick={onClose} className="rounded p-1 hover:bg-gray-100">
-              <X className="h-5 w-5 text-gray-500" />
-            </button>
-          </div>
-
-          <div className="p-5 space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Edit Payment"
+      maxWidth="md"
+    >
+      <div className="p-5 space-y-4">
             {/* Context summary */}
             <div className="bg-gray-50 border border-gray-200 rounded-md p-3">
               {payment.type === "advance" || !payment.invoiceId ? (
@@ -206,9 +201,7 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
               {isSaving ? "Saving..." : "Save Changes"}
             </button>
           </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
