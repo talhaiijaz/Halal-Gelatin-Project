@@ -260,6 +260,10 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())), // For categorization
     recordedBy: v.optional(v.id("users")),
     approvedBy: v.optional(v.id("users")),
+    // Reversal support
+    isReversed: v.optional(v.boolean()), // If this transaction has been reversed
+    reversalReason: v.optional(v.string()), // Reason for reversal
+    reversedAt: v.optional(v.number()), // When the transaction was reversed
     createdAt: v.number(),
   })
     .index("by_bank_account", ["bankAccountId"])

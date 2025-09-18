@@ -31,6 +31,8 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, formatFiscalYear } from "@/app/utils/fiscalYear";
+import { formatDateForDisplay } from "@/app/utils/dateUtils";
+import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
@@ -47,6 +49,9 @@ export default function LocalClientsPage() {
   // Get fiscal year for dashboard display (from settings or smart default)
   const [dashboardFiscalYear, setDashboardFiscalYear] = useState<number>(Math.max(2025, getCurrentFiscalYear()));
   const [isCustomFiscalYear, setIsCustomFiscalYear] = useState<boolean>(false);
+  
+  // State for expanded metric modal
+  const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables' | 'total_orders' | 'active_orders' | 'total_quantity' | 'pending_quantity'; audience: 'local' }>(null);
   
   // Load fiscal year setting from localStorage and listen for changes
   useEffect(() => {
@@ -126,13 +131,79 @@ export default function LocalClientsPage() {
     fiscalYear: dashboardFiscalYear,
   });
 
+  // Close modal on Escape and prevent body scroll
+  useEffect(() => {
+    if (!expandedMetric) return;
+    
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = 'hidden';
+    
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpandedMetric(null);
+    };
+    window.addEventListener('keydown', onKey);
+    
+    return () => {
+      document.body.style.overflow = 'unset';
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [expandedMetric]);
+
+  // Detail queries (lazy-loaded when a metric is expanded)
+  const receivablesDetails = useQuery(
+    api.dashboard.getReceivablesDetails,
+    expandedMetric && expandedMetric.metric === 'receivables'
+      ? { fiscalYear: dashboardFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
+  const advanceDetails = useQuery(
+    api.dashboard.getAdvancePaymentsDetails,
+    expandedMetric && expandedMetric.metric === 'advance'
+      ? { fiscalYear: dashboardFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
+  const revenueDetails = useQuery(
+    api.dashboard.getRevenueDetails,
+    expandedMetric && expandedMetric.metric === 'revenue'
+      ? { fiscalYear: dashboardFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
+  const pendingOrdersDetails = useQuery(
+    api.dashboard.getPendingOrdersDetails,
+    expandedMetric && expandedMetric.metric === 'pending'
+      ? { fiscalYear: dashboardFiscalYear, type: expandedMetric.audience }
+      : 'skip'
+  );
+  
+  // Specific order views
+  const totalOrdersDetails = useQuery(
+    api.orders.list,
+    expandedMetric && (expandedMetric.metric === 'total_orders' || expandedMetric.metric === 'total_quantity')
+      ? { clientType: 'local', fiscalYear: dashboardFiscalYear }
+      : 'skip'
+  );
+  
+  const activeOrdersDetails = useQuery(
+    api.orders.list,
+    expandedMetric && expandedMetric.metric === 'active_orders'
+      ? { clientType: 'local', status: 'in_production', fiscalYear: dashboardFiscalYear }
+      : 'skip'
+  );
+  
+  const pendingQuantityDetails = useQuery(
+    api.orders.list,
+    expandedMetric && expandedMetric.metric === 'pending_quantity'
+      ? { clientType: 'local', fiscalYear: dashboardFiscalYear }
+      : 'skip'
+  );
+
   // Filter orders
   const filteredOrders = orders?.filter(order => {
     // Search filter
     if (searchQuery) {
       const searchLower = searchQuery.toLowerCase();
       const matchesSearch = (
-        (order.invoiceNumber || order.orderNumber).toLowerCase().includes(searchLower) ||
+        order.invoiceNumber?.toLowerCase().includes(searchLower) ||
         order.client?.name?.toLowerCase().includes(searchLower) ||
         order.client?.city?.toLowerCase().includes(searchLower) ||
         order.client?.country?.toLowerCase().includes(searchLower) ||
@@ -259,7 +330,11 @@ export default function LocalClientsPage() {
             {/* Overview Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Total Quantity */}
-              <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200 shadow-sm">
+              <div
+                className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                role="button"
+                onClick={() => setExpandedMetric({ metric: 'total_quantity', audience: 'local' })}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-indigo-200 rounded-lg">
                     <Package className="h-6 w-6 text-indigo-700" />
@@ -277,8 +352,35 @@ export default function LocalClientsPage() {
                 </div>
               </div>
 
+              {/* Pending Quantity */}
+              <div
+                className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                role="button"
+                onClick={() => setExpandedMetric({ metric: 'pending_quantity', audience: 'local' })}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-orange-200 rounded-lg">
+                    <AlertCircle className="h-6 w-6 text-orange-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-orange-600 font-medium uppercase tracking-wide">Pending</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-orange-700 mb-1">Pending Quantity</p>
+                  <p className="text-2xl font-bold text-orange-900">
+                    {orderStats ? `${(orderStats.pendingQuantity || 0).toLocaleString()} kg` : <Skeleton width={100} height={32} />}
+                  </p>
+                  <p className="text-xs text-orange-600 mt-1">In production or pending</p>
+                </div>
+              </div>
+
               {/* Orders Count */}
-              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 border border-emerald-200 shadow-sm">
+              <div
+                className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 border border-emerald-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                role="button"
+                onClick={() => setExpandedMetric({ metric: 'total_orders', audience: 'local' })}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-emerald-200 rounded-lg">
                     <Users className="h-6 w-6 text-emerald-700" />
@@ -297,7 +399,11 @@ export default function LocalClientsPage() {
               </div>
 
               {/* Active Orders */}
-              <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200 shadow-sm">
+              <div
+                className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                role="button"
+                onClick={() => setExpandedMetric({ metric: 'active_orders', audience: 'local' })}
+              >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-amber-200 rounded-lg">
                     <CheckCircle className="h-6 w-6 text-amber-700" />
@@ -335,27 +441,12 @@ export default function LocalClientsPage() {
             
             {/* Key Metrics Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {/* Current Pending Orders Value */}
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-blue-200 rounded-lg">
-                    <Package className="h-6 w-6 text-blue-700" />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Pipeline</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
-                  <p className="text-2xl font-bold text-blue-900">
-                    {stats ? formatCurrency(((stats as any).currentPendingOrdersValue) || stats.totalOrderValue || 0) : <Skeleton width={100} height={32} />}
-                  </p>
-                  <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
-                </div>
-              </div>
-
-              {/* Revenue */}
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm">
+                {/* Revenue */}
+                <div
+                  className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                  role="button"
+                  onClick={() => setExpandedMetric({ metric: 'revenue', audience: 'local' })}
+                >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-green-200 rounded-lg">
                     <DollarSign className="h-6 w-6 text-green-700" />
@@ -373,8 +464,35 @@ export default function LocalClientsPage() {
                 </div>
               </div>
 
-              {/* Advance Payments */}
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm">
+                {/* Current Pending Orders Value */}
+                <div
+                  className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                  role="button"
+                  onClick={() => setExpandedMetric({ metric: 'pending', audience: 'local' })}
+                >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-blue-200 rounded-lg">
+                    <Package className="h-6 w-6 text-blue-700" />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-blue-600 font-medium uppercase tracking-wide">Pipeline</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
+                  <p className="text-2xl font-bold text-blue-900">
+                    {stats ? formatCurrency(((stats as any).currentPendingOrdersValue) || stats.totalOrderValue || 0) : <Skeleton width={100} height={32} />}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
+                </div>
+              </div>
+
+                {/* Advance Payments */}
+                <div
+                  className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                  role="button"
+                  onClick={() => setExpandedMetric({ metric: 'advance', audience: 'local' })}
+                >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-purple-200 rounded-lg">
                     <TrendingUp className="h-6 w-6 text-purple-700" />
@@ -392,8 +510,12 @@ export default function LocalClientsPage() {
                 </div>
               </div>
 
-              {/* Receivables */}
-              <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm">
+                {/* Receivables */}
+                <div
+                  className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-6 border border-red-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                  role="button"
+                  onClick={() => setExpandedMetric({ metric: 'receivables', audience: 'local' })}
+                >
                 <div className="flex items-center justify-between mb-4">
                   <div className="p-2 bg-red-200 rounded-lg">
                     <AlertCircle className="h-6 w-6 text-red-700" />
@@ -674,13 +796,8 @@ export default function LocalClientsPage() {
                         >
                           <td className="px-4 py-4">
                             <div className="text-sm font-medium text-gray-900">
-                              {order.invoiceNumber || order.orderNumber}
+                              {order.invoiceNumber}
                             </div>
-                            {order.invoiceNumber && (
-                              <div className="text-xs text-gray-500">
-                                Order: {order.orderNumber}
-                              </div>
-                            )}
                           </td>
                           <td className="px-4 py-4">
                             <div className="text-sm text-gray-900">{order.client?.name || "Unknown Client"}</div>
@@ -927,6 +1044,443 @@ export default function LocalClientsPage() {
         onClose={() => setIsAddCustomerOpen(false)}
         type="local"
       />
+
+      {/* Modal for Details */}
+      {expandedMetric && (
+        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4" style={{ width: '100vw', height: '100vh' }}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-4 overflow-hidden border border-gray-200">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 mb-1">
+                    {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
+                    {expandedMetric.metric === 'advance' && 'Advance Payments'}
+                    {expandedMetric.metric === 'receivables' && 'Receivables'}
+                    {expandedMetric.metric === 'revenue' && 'Total Revenue'}
+                    {expandedMetric.metric === 'total_quantity' && 'Total Quantity Breakdown'}
+                    {expandedMetric.metric === 'pending_quantity' && 'Pending Quantity Orders'}
+                    {expandedMetric.metric === 'total_orders' && 'All Orders'}
+                    {expandedMetric.metric === 'active_orders' && 'Active Orders'}
+                  </h2>
+                  <p className="text-sm text-gray-600">
+                    Local Clients • {formatFiscalYear(dashboardFiscalYear)} Fiscal Year
+                  </p>
+                </div>
+                <button
+                  onClick={() => setExpandedMetric(null)}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-auto h-[calc(100vh-2rem-80px)] bg-gray-50">
+              {expandedMetric.metric === 'pending' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!pendingOrdersDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : pendingOrdersDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No pending orders found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {pendingOrdersDetails.map((row) => (
+                            <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  row.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {row.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(row.totalAmount)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {expandedMetric.metric === 'advance' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!advanceDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : advanceDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <TrendingUp className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No advance payments found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advance Paid</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {advanceDetails.map((row) => (
+                            <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {expandedMetric.metric === 'receivables' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!receivablesDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : receivablesDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <AlertCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No receivables found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {receivablesDetails.map((row) => (
+                            <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {expandedMetric.metric === 'revenue' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!revenueDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : revenueDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <DollarSign className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No revenue payments found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {revenueDetails.map((row) => (
+                            <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.amount)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.method}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Total Quantity */}
+              {expandedMetric.metric === 'total_quantity' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!totalOrdersDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : totalOrdersDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No orders found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {totalOrdersDetails.map((order) => (
+                            <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 
+                                  order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
+                                  order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                                  order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {order.status.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Pending Quantity */}
+              {expandedMetric.metric === 'pending_quantity' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!pendingQuantityDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : pendingQuantityDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <AlertCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No pending orders found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {pendingQuantityDetails?.filter(order => order.status === 'pending' || order.status === 'in_production').map((order) => (
+                            <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {order.status.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Total Orders */}
+              {expandedMetric.metric === 'total_orders' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!totalOrdersDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : totalOrdersDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No orders found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {totalOrdersDetails.map((order) => (
+                            <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                  order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 
+                                  order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
+                                  order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                                  order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {order.status.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Active Orders */}
+              {expandedMetric.metric === 'active_orders' && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {!activeOrdersDetails ? (
+                    <div className="p-8">
+                      <Skeleton count={5} height={48} />
+                    </div>
+                  ) : activeOrdersDetails.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No active orders found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {activeOrdersDetails.map((order) => (
+                            <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  {order.status.replace('_', ' ')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount)}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

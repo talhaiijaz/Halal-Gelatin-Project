@@ -1074,6 +1074,7 @@ export const getStats = query({
 
     let totalRevenue = 0;
     let totalQuantity = 0;
+    let pendingQuantity = 0;
 
     for (const order of orders) {
       statusCounts[order.status as keyof typeof statusCounts]++;
@@ -1087,7 +1088,13 @@ export const getStats = query({
           .withIndex("by_order", (q) => q.eq("orderId", order._id))
           .collect();
         
-        totalQuantity += items.reduce((sum, item) => sum + item.quantityKg, 0);
+        const orderQuantity = items.reduce((sum, item) => sum + item.quantityKg, 0);
+        totalQuantity += orderQuantity;
+        
+        // Add to pending quantity if order is pending or in production
+        if (order.status === "pending" || order.status === "in_production") {
+          pendingQuantity += orderQuantity;
+        }
       }
     }
 
@@ -1099,6 +1106,7 @@ export const getStats = query({
       statusCounts,
       totalRevenue,
       totalQuantity,
+      pendingQuantity,
     };
   },
 });

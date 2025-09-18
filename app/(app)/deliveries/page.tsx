@@ -62,7 +62,7 @@ export default function DeliveriesPage() {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
-      delivery.order?.orderNumber?.toLowerCase().includes(searchLower) ||
+      delivery.order?.invoiceNumber?.toLowerCase().includes(searchLower) ||
       delivery.client?.name?.toLowerCase().includes(searchLower) ||
       delivery.trackingNumber?.toLowerCase().includes(searchLower) ||
       delivery.address?.toLowerCase().includes(searchLower)
@@ -87,7 +87,7 @@ export default function DeliveriesPage() {
     const csvContent = [
       ["Order", "Client", "Status", "Tracking Number", "Address", "Carrier", "Scheduled Date", "Delivered Date"],
       ...filteredDeliveries.map(delivery => [
-        delivery.order?.orderNumber || "",
+        delivery.order?.invoiceNumber || "",
         delivery.client?.name || "",
         delivery.status,
         delivery.trackingNumber || "",
@@ -318,7 +318,7 @@ export default function DeliveriesPage() {
                   <tr key={delivery._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {delivery.order?.orderNumber}
+                        {delivery.order?.invoiceNumber}
                       </div>
                     </td>
                     <td className="px-6 py-4 max-w-0">

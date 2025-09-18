@@ -129,7 +129,7 @@ function OrdersPageContent() {
       ...orders.map(order => {
         const metrics = calculateFinancialMetrics(order);
         return [
-          order.invoiceNumber || order.orderNumber,
+          order.invoiceNumber,
           order.client?.name || "",
           order.status,
           metrics.total.toFixed(2),
@@ -159,7 +159,7 @@ function OrdersPageContent() {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
-      (order.invoiceNumber || order.orderNumber).toLowerCase().includes(searchLower) ||
+      order.invoiceNumber?.toLowerCase().includes(searchLower) ||
       order.client?.name?.toLowerCase().includes(searchLower) ||
       order.client?.city?.toLowerCase().includes(searchLower) ||
       order.client?.country?.toLowerCase().includes(searchLower) ||
@@ -313,13 +313,8 @@ function OrdersPageContent() {
                     >
                       <td className="px-4 py-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {order.invoiceNumber || order.orderNumber}
+                          {order.invoiceNumber}
                         </div>
-                        {order.invoiceNumber && (
-                          <div className="text-xs text-gray-500">
-                            Order: {order.orderNumber}
-                          </div>
-                        )}
                       </td>
                       <td className="px-4 py-4">
                         <div className="text-sm text-gray-900">{order.client?.name || "Unknown Client"}</div>

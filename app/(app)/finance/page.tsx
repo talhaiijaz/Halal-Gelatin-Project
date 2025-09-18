@@ -167,7 +167,7 @@ export default function FinancePage() {
       const matchesSearch = 
         invoice.invoiceNumber?.toLowerCase().includes(searchLower) ||
         invoice.client?.name?.toLowerCase().includes(searchLower) ||
-        invoice.order?.orderNumber?.toLowerCase().includes(searchLower);
+        invoice.invoiceNumber?.toLowerCase().includes(searchLower);
       if (!matchesSearch) return false;
     }
 
@@ -573,7 +573,6 @@ export default function FinancePage() {
                         <td className="px-4 py-4">
                           <div>
                             <div className="text-sm font-medium text-gray-900">{invoice.invoiceNumber || "N/A"}</div>
-                            <div className="text-xs text-gray-500">Order: {invoice.order?.orderNumber}</div>
                           </div>
                         </td>
                         <td className="px-4 py-4 min-w-0">

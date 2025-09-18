@@ -96,7 +96,7 @@ export default function ShipmentsPage() {
       const clientName = client?.name || 'Unknown Client';
       
       // Debug: Log order details
-      console.log(`Processing order: ${order.invoiceNumber} (${order.orderNumber})`);
+      console.log(`Processing order: ${order.invoiceNumber}`);
       console.log(`  Stored fiscalYear: ${order.fiscalYear}`);
       console.log(`  Factory departure date: ${order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toISOString().split('T')[0] : 'Not set'}`);
       console.log(`  Order creation date: ${order.orderCreationDate ? new Date(order.orderCreationDate).toISOString().split('T')[0] : 'Not set'}`);

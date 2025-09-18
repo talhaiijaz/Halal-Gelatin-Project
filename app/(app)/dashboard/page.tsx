@@ -558,9 +558,9 @@ export default function DashboardPage() {
 
         {/* Modal for Details */}
         {expandedMetric && (
-          <div className="fixed top-0 left-0 right-0 bottom-0 z-[9999] flex items-center justify-center" style={{ width: '100vw', height: '100vh' }}>
-            <div className="absolute top-0 left-0 right-0 bottom-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} style={{ width: '100vw', height: '100vh' }} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] mx-4 overflow-hidden border border-gray-200">
+          <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4" style={{ width: '100vw', height: '100vh' }}>
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-4 overflow-hidden border border-gray-200">
               {/* Header */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
                 <div className="flex items-center justify-between">
@@ -588,7 +588,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Content */}
-              <div className="p-6 overflow-auto h-[calc(90vh-80px)] bg-gray-50">
+              <div className="p-6 overflow-auto h-[calc(100vh-2rem-80px)] bg-gray-50">
                 {expandedMetric.metric === 'pending' && (
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     {!pendingOrdersDetails ? (
@@ -605,7 +605,7 @@ export default function DashboardPage() {
                         <table className="min-w-full">
                           <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
@@ -617,7 +617,7 @@ export default function DashboardPage() {
                           <tbody className="bg-white divide-y divide-gray-200">
                             {pendingOrdersDetails.map((row) => (
                               <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.orderNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -657,7 +657,7 @@ export default function DashboardPage() {
                             <tr>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advance Paid</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
@@ -669,7 +669,7 @@ export default function DashboardPage() {
                               <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.orderNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid, row.currency as any)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
@@ -701,7 +701,7 @@ export default function DashboardPage() {
                             <tr>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order No</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
@@ -713,7 +713,7 @@ export default function DashboardPage() {
                               <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.orderNumber}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance, row.currency as any)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>

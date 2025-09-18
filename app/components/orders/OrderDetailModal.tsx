@@ -159,7 +159,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                 </h2>
                 {order && (
                   <p className="mt-1 text-sm text-gray-600">
-                    Order #{order.orderNumber}
+                    Invoice #{order.invoiceNumber}
                   </p>
                 )}
               </div>
@@ -797,7 +797,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
           onClose(); // Close the detail modal after successful deletion
         }}
         orderId={orderId}
-        orderNumber={order?.orderNumber}
+        invoiceNumber={order?.invoiceNumber}
       />
 
       {/* Record Payment Modal with preselected invoice and client */}

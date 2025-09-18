@@ -112,11 +112,11 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                     </p>
                   </div>
                   <div className="card p-4">
-                    <h3 className="font-medium text-gray-900 mb-2 flex items-center"><Package className="h-4 w-4 mr-2"/>Order</h3>
-                    <p className="text-sm font-medium text-gray-900 truncate" title={(invoice as any).order?.orderNumber || ""}>
-                      {(invoice as any).order?.orderNumber}
+                    <h3 className="font-medium text-gray-900 mb-2 flex items-center"><Package className="h-4 w-4 mr-2"/>Invoice</h3>
+                    <p className="text-sm font-medium text-gray-900 truncate" title={invoice.invoiceNumber || ""}>
+                      {invoice.invoiceNumber || "N/A"}
                     </p>
-                    <p className="text-xs text-gray-600">Invoice #{invoice.invoiceNumber || "N/A"}</p>
+                    <p className="text-xs text-gray-600">Invoice #{(invoice as any).invoiceNumber || "N/A"}</p>
                   </div>
                 </div>
 

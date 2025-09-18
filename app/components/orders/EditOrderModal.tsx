@@ -526,9 +526,14 @@ export default function EditOrderModal({
           <div className="flex items-center justify-between p-6 border-b">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Edit Order</h2>
-                              <p className="mt-1 text-sm text-gray-600">
-                  Step {currentStep - 1} of 3
+              {order && (
+                <p className="mt-1 text-sm text-gray-600">
+                  Invoice #{order.invoiceNumber}
                 </p>
+              )}
+              <p className="mt-1 text-sm text-gray-600">
+                Step {currentStep - 1} of 3
+              </p>
             </div>
             <button
               onClick={onClose}

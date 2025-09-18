@@ -816,6 +816,7 @@ export const getPendingOrdersDetails = query({
     v.object({
       orderId: v.id("orders"),
       orderNumber: v.string(),
+      invoiceNumber: v.union(v.string(), v.null()),
       clientId: v.id("clients"),
       clientName: v.union(v.string(), v.null()),
       status: v.string(),
@@ -847,7 +848,7 @@ export const getPendingOrdersDetails = query({
       orders = orders.filter((o) => o.fiscalYear === args.fiscalYear);
     }
 
-    const result = [] as Array<{ orderId: any; orderNumber: string; clientId: any; clientName: string | null; status: string; totalAmount: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
+    const result = [] as Array<{ orderId: any; orderNumber: string; invoiceNumber: string | null; clientId: any; clientName: string | null; status: string; totalAmount: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
 
     for (const order of orders) {
       const client = clients.find((c) => c._id === order.clientId);
@@ -859,6 +860,7 @@ export const getPendingOrdersDetails = query({
       result.push({
         orderId: order._id,
         orderNumber: order.orderNumber,
+        invoiceNumber: order.invoiceNumber || null,
         clientId: order.clientId,
         clientName: (client as any)?.name || null,
         status: order.status,

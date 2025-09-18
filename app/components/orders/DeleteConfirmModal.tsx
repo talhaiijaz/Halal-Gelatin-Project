@@ -11,7 +11,7 @@ interface DeleteConfirmModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   orderId: Id<"orders"> | null;
-  orderNumber?: string;
+  invoiceNumber?: string;
 }
 
 export default function DeleteConfirmModal({
@@ -19,7 +19,7 @@ export default function DeleteConfirmModal({
   onClose,
   onSuccess,
   orderId,
-  orderNumber,
+  invoiceNumber,
 }: DeleteConfirmModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const deleteOrder = useMutation(api.orders.deleteOrder);
@@ -97,7 +97,7 @@ export default function DeleteConfirmModal({
                 Are you sure you want to delete this order?
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                This action cannot be undone. The order "{orderNumber}" and all associated data will be permanently deleted.
+                This action cannot be undone. The order "{invoiceNumber}" and all associated data will be permanently deleted.
               </p>
               <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
                 <p className="text-sm text-red-700">

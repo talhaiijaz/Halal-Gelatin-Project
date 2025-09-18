@@ -434,7 +434,7 @@ export default function ClientDetailPage() {
                         <span className="text-lg">{getStatusIcon(order.status)}</span>
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            {order.invoiceNumber || order.orderNumber}
+                            {order.invoiceNumber}
                           </p>
                           <p className="text-xs text-gray-500">
                             {formatDate(order.factoryDepartureDate || order.orderCreationDate || order.createdAt)}

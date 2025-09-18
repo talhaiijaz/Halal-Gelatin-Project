@@ -238,9 +238,9 @@ export default function RecordPaymentModal({
                     <option value="">Select an invoice</option>
                     {unpaidInvoices?.map(invoice => (
                       <option key={invoice._id} value={invoice._id}>
-                        {(invoice.invoiceNumber && invoice.invoiceNumber.trim() !== "")
-                          ? `${invoice.invoiceNumber} • ${invoice.order?.orderNumber || "Order"}`
-                          : `${invoice.order?.orderNumber || "Order"}`
+                        {invoice.invoiceNumber && invoice.invoiceNumber.trim() !== ""
+                          ? invoice.invoiceNumber
+                          : "Invoice #" + invoice._id.slice(-8)
                         } - {(() => {
                           // Only show outstanding for shipped/delivered orders
                           const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
