@@ -221,19 +221,29 @@ export const recordPayment = mutation({
 
         // Create bank transaction for the payment
         const now = Date.now();
-        const bank = await ctx.db.get(args.bankAccountId);
         
         // For bank transactions, we need to store the amount in the bank account's currency
-        // If there's a currency mismatch, we need to convert the amount
+        // For local payments with withholding, the bank transaction should reflect the NET amount (after withholding)
         let bankTransactionAmount = args.amount;
         let bankTransactionCurrency = currency;
+        
+        // For local clients with withholding, bank transaction should be the net amount
+        if (isLocalClient && rate > 0) {
+          bankTransactionAmount = netCash; // Use net amount after withholding
+        }
         
         if (needsConversion && bank) {
           // If payment currency differs from bank account currency, we need to convert
           // For now, we'll store the original payment amount and currency
           // The conversion will be handled in the UI display
-          bankTransactionAmount = args.amount;
+          bankTransactionAmount = isLocalClient && rate > 0 ? netCash : args.amount;
           bankTransactionCurrency = currency;
+        }
+        
+        // Create description that shows gross amount, withholding, and net amount for local payments
+        let description = `Payment received from ${client?.name || "Customer"}: ${args.reference}`;
+        if (isLocalClient && rate > 0) {
+          description = `Payment received from ${client?.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldAmount, currency)}, Net: ${formatCurrency(netCash, currency)})`;
         }
         
         const bankTransactionData: any = {
@@ -241,7 +251,7 @@ export const recordPayment = mutation({
           transactionType: "payment_received",
           amount: bankTransactionAmount,
           currency: bankTransactionCurrency,
-          description: `Payment received from ${client?.name || "Customer"}: ${args.reference}`,
+          description: description,
           reference: args.reference,
           paymentId: paymentId,
           transactionDate: args.paymentDate || now, // Use the payment date entered by user
@@ -322,13 +332,23 @@ export const recordPayment = mutation({
     let conversionRateToUSD: number | undefined;
     let convertedAmountUSD: number | undefined;
     
-    if (client.type === "international" && currency !== "USD") {
+    // Get bank account currency for comparison
+    let bankCurrency: string | undefined;
+    if (args.bankAccountId) {
+      const bank = await ctx.db.get(args.bankAccountId);
+      bankCurrency = bank?.currency;
+    }
+    
+    // Only require conversion when bank account currency differs from payment currency
+    const needsConversion = !!bankCurrency && bankCurrency !== currency;
+    
+    if (needsConversion && client.type === "international") {
       if (!args.conversionRateToUSD) {
         throw new Error(`Payment validation failed: Conversion rate to USD is required for international advance payments in ${currency}. Please provide the exchange rate to convert ${currency} to USD.`);
       }
       conversionRateToUSD = args.conversionRateToUSD;
       convertedAmountUSD = args.amount * conversionRateToUSD;
-    } else {
+    } else if (!needsConversion) {
       // Same-currency or USD: no conversion fields
       conversionRateToUSD = undefined;
       convertedAmountUSD = undefined;
@@ -398,12 +418,25 @@ export const recordPayment = mutation({
 
       // Create bank transaction for the advance payment
       const now = Date.now();
+      
+      // For local clients with withholding, bank transaction should be the net amount
+      let bankTransactionAmount = args.amount;
+      if (client.type === "local" && rateForAdvance > 0) {
+        bankTransactionAmount = netCashAdvance; // Use net amount after withholding
+      }
+      
+      // Create description that shows gross amount, withholding, and net amount for local payments
+      let description = `Advance payment received from ${client.name || "Customer"}: ${args.reference}`;
+      if (client.type === "local" && rateForAdvance > 0) {
+        description = `Advance payment received from ${client.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldForAdvance, currency)}, Net: ${formatCurrency(netCashAdvance, currency)})`;
+      }
+      
       const bankTransactionData: any = {
         bankAccountId: args.bankAccountId,
         transactionType: "payment_received",
-        amount: args.amount,
+        amount: bankTransactionAmount,
         currency: currency,
-        description: `Advance payment received from ${client.name || "Customer"}: ${args.reference}`,
+        description: description,
         reference: args.reference,
         paymentId: paymentId,
         transactionDate: args.paymentDate || now, // Use the payment date entered by user

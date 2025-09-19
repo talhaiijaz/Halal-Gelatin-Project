@@ -18,6 +18,9 @@ interface Props {
 export default function BankTransactionDetailModal({ transactionId, isOpen, onClose }: Props) {
   const transaction = useQuery(api.bankTransactions.getTransaction, transactionId ? { id: transactionId } : "skip");
   const reverseTx = useMutation(api.bankTransactions.reverseTransaction);
+  
+  // Get the linked payment details if this is a payment-linked transaction
+  const payment = useQuery(api.payments.get, transaction?.paymentId ? { id: transaction.paymentId } : "skip");
 
   const [reversalReason, setReversalReason] = useState("");
   const [showReversalInput, setShowReversalInput] = useState(false);
@@ -212,6 +215,32 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                   <span className="font-medium">{formatCurrency(Math.abs(transaction.amount), transaction.currency as any)}</span>
                 </div>
                 <div className="text-blue-600">Exchange Rate: {transaction.exchangeRate.toFixed(4)}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Withholding Breakdown for Payment-Linked Transactions */}
+          {isPaymentLinked && payment && payment.withheldTaxAmount && payment.withheldTaxAmount > 0 && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <DollarSign className="h-4 w-4 text-orange-600" />
+                <span className="text-sm font-medium text-orange-800">Payment Breakdown</span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-orange-700">Gross Payment Amount:</span>
+                  <span className="font-medium text-orange-800">{formatCurrency(payment.amount, payment.currency as any)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-orange-700">Income Tax Withheld ({payment.withheldTaxRate}%):</span>
+                  <span className="font-medium text-orange-800">-{formatCurrency(payment.withheldTaxAmount, payment.currency as any)}</span>
+                </div>
+                <div className="border-t border-orange-200 pt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-orange-800">Net Amount Deposited:</span>
+                    <span className="text-lg font-bold text-orange-900">{formatCurrency(Math.abs(transaction.amount), transaction.currency as any)}</span>
+                  </div>
+                </div>
               </div>
             </div>
           )}
