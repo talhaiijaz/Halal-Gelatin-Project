@@ -58,8 +58,6 @@ import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyForm
 export default function FinancePage() {
   // Calculate current fiscal year
   const currentFiscalYear = getCurrentFiscalYear();
-  
-  const [selectedYear, setSelectedYear] = useState(currentFiscalYear);
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
@@ -67,7 +65,7 @@ export default function FinancePage() {
   const [preselectedClientId, setPreselectedClientId] = useState<string | null>(null);
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
   const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
-  const [invoiceDateFilter, setInvoiceDateFilter] = useState("all");
+  const [invoiceFiscalYearFilter, setInvoiceFiscalYearFilter] = useState<number | "all">("all");
   const [invoiceOrderStatusFilter, setInvoiceOrderStatusFilter] = useState("all");
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [isDeleteBankModalOpen, setIsDeleteBankModalOpen] = useState(false);
@@ -80,6 +78,7 @@ export default function FinancePage() {
   const [selectedPayment, setSelectedPayment] = useState<EditablePayment | null>(null);
   const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
+  const [paymentFiscalYearFilter, setPaymentFiscalYearFilter] = useState<number | "all">("all");
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <TrendingUp className="h-4 w-4" /> },
@@ -91,16 +90,24 @@ export default function FinancePage() {
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
 
   // Fetch dashboard data
-  const dashboardStats = useQuery(api.finance.getDashboardStats, { year: selectedYear });
-  const monthlyStats = useQuery(api.finance.getMonthlyOrderStats, { year: selectedYear });
+  const dashboardStats = useQuery(api.finance.getDashboardStats, { year: currentFiscalYear });
+  const monthlyStats = useQuery(api.finance.getMonthlyOrderStats, { year: currentFiscalYear });
   
   // Fetch invoices data
-  const invoices = useQuery(api.invoices.list, { fiscalYear: selectedYear });
-  const invoiceStats = useQuery(api.finance.getInvoiceStats, { fiscalYear: selectedYear });
+  const invoices = useQuery(api.invoices.list, { 
+    fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter 
+  });
+  const invoiceStats = useQuery(api.finance.getInvoiceStats, { 
+    fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter 
+  });
   
   // Fetch payments data
-  const payments = useQuery(api.payments.list, { fiscalYear: selectedYear });
-  const paymentStats = useQuery(api.payments.getStats, { fiscalYear: selectedYear });
+  const payments = useQuery(api.payments.list, { 
+    fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter 
+  });
+  const paymentStats = useQuery(api.payments.getStats, { 
+    fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter 
+  });
   
   // Fetch banks data
   const bankAccounts = useQuery(api.banks.listWithBalances);
@@ -179,32 +186,6 @@ export default function FinancePage() {
       return false;
     }
 
-    if (invoiceDateFilter !== "all") {
-      const now = Date.now();
-      const thirtyDaysAgo = now - (30 * 24 * 60 * 60 * 1000);
-      const sixtyDaysAgo = now - (60 * 24 * 60 * 60 * 1000);
-      
-      switch (invoiceDateFilter) {
-        case "thisMonth":
-          const thisMonthStart = new Date(now).setDate(1);
-          if (invoice.issueDate < thisMonthStart) return false;
-          break;
-        case "lastMonth":
-          const dNow = new Date(now);
-          const lastMonthDate = new Date(dNow.getFullYear(), dNow.getMonth() - 1, 1);
-          const lastMonthStart = lastMonthDate.getTime();
-          const lastMonthEnd = new Date(dNow.getFullYear(), dNow.getMonth(), 1).getTime() - 1;
-          if (invoice.issueDate < lastMonthStart || invoice.issueDate > lastMonthEnd) return false;
-          break;
-        case "overdue":
-          // Only consider shipped/delivered orders as overdue
-          const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
-          const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
-          if (invoice.dueDate >= now || outstandingAmount === 0) return false;
-          break;
-      }
-    }
-
     return true;
   });
 
@@ -246,19 +227,6 @@ export default function FinancePage() {
         </button>
       </div>
 
-      {/* Fiscal Year Selector - Top Level */}
-      <div className="mb-6 flex items-center space-x-4">
-        <label className="text-sm font-medium text-gray-700">Fiscal Year:</label>
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-          className="px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-        >
-          {getFiscalYearOptions().map(option => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-      </div>
 
       {/* Tab Navigation */}
       <TabNavigation
@@ -274,7 +242,7 @@ export default function FinancePage() {
           {/* Fiscal Year Sales Summary */}
           <div>
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              {getFiscalYearLabel(selectedYear)} Sales Summary
+              {getFiscalYearLabel(currentFiscalYear)} Sales Summary
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="card p-6">
@@ -488,18 +456,18 @@ export default function FinancePage() {
                 </select>
               </div>
 
-              {/* Date Filter */}
+              {/* Fiscal Year Filter */}
               <div className="flex flex-col">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fiscal Year</label>
                 <select
-                  value={invoiceDateFilter}
-                  onChange={(e) => setInvoiceDateFilter(e.target.value)}
+                  value={invoiceFiscalYearFilter}
+                  onChange={(e) => setInvoiceFiscalYearFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
                   className="w-full px-3 py-2 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                 >
-                  <option value="all">All Dates</option>
-                  <option value="thisMonth">This Month</option>
-                  <option value="lastMonth">Last Month</option>
-                  <option value="overdue">Overdue</option>
+                  <option value="all">All Years</option>
+                  {getFiscalYearOptions().map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -705,6 +673,28 @@ export default function FinancePage() {
           </div>
 
           
+
+          {/* Payments Filter */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-end space-x-4">
+              <div className="flex flex-col">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Fiscal Year</label>
+                <select
+                  value={paymentFiscalYearFilter}
+                  onChange={(e) => setPaymentFiscalYearFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="all">All Years</option>
+                  {getFiscalYearOptions().map(option => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center text-sm text-gray-600 mb-1">
+                {payments ? `${payments.length} payments found` : <div className="w-20 h-4 bg-gray-200 rounded animate-pulse" />}
+              </div>
+            </div>
+          </div>
 
           {/* Payments History */}
           <div className="card overflow-hidden">

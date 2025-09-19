@@ -37,17 +37,18 @@ export default function DashboardPage() {
 
   // Get dashboard order limit from localStorage
   const [dashboardOrderLimit, setDashboardOrderLimit] = useState<number>(5);
-  const [selectedFiscalYear, setSelectedFiscalYear] = useState<number>(Math.max(2025, getCurrentFiscalYear()));
+  // Always use current fiscal year for dashboard totals
+  const currentFiscalYear = getCurrentFiscalYear();
   
   // Fetch real data from Convex
-  const dashboardStats = useQuery(api.dashboard.getStats, { fiscalYear: selectedFiscalYear });
-  const orders = useQuery(api.orders.list, { fiscalYear: selectedFiscalYear });
+  const dashboardStats = useQuery(api.dashboard.getStats, { fiscalYear: currentFiscalYear });
+  const orders = useQuery(api.orders.list, {}); // Orders are rolling, no fiscal year filter
   const orderItems = useQuery(api.orders.listItems, {});
   const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
   
   // Fetch client-specific stats for accurate local/international breakdown
-  const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: selectedFiscalYear });
-  const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: selectedFiscalYear });
+  const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: currentFiscalYear });
+  const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: currentFiscalYear });
   const [usdRates, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
   // USD total and info toggles removed per request
   useEffect(() => {
@@ -87,57 +88,34 @@ export default function DashboardPage() {
     if (saved) {
       setDashboardOrderLimit(parseInt(saved));
     }
-    
-    // Load fiscal year setting from localStorage
-    const savedFiscalYear = localStorage.getItem('selectedFiscalYear');
-    if (savedFiscalYear) {
-      setSelectedFiscalYear(parseInt(savedFiscalYear));
-    } else {
-      // Smart default: Use current fiscal year, but ensure it's at least 2025
-      const defaultYear = Math.max(2025, getCurrentFiscalYear());
-      setSelectedFiscalYear(defaultYear);
-    }
-
-    // Listen for fiscal year changes from settings
-    const handleStorageChange = (event: CustomEvent) => {
-      if (event.detail.key === 'selectedFiscalYear') {
-        setSelectedFiscalYear(event.detail.value);
-      }
-    };
-
-    window.addEventListener('localStorageChange', handleStorageChange as EventListener);
-    
-    return () => {
-      window.removeEventListener('localStorageChange', handleStorageChange as EventListener);
-    };
   }, []);
 
-  // Fetch orders by status
-  const ordersData = useQuery(api.dashboard.getOrdersByStatus, { limit: dashboardOrderLimit, fiscalYear: selectedFiscalYear });
+  // Fetch orders by status - use rolling data (no fiscal year filter for orders)
+  const ordersData = useQuery(api.dashboard.getOrdersByStatus, { limit: dashboardOrderLimit });
 
   // Detail queries (lazy-loaded when a metric is expanded)
   const receivablesDetails = useQuery(
     api.dashboard.getReceivablesDetails,
     expandedMetric && expandedMetric.metric === 'receivables'
-      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      ? { fiscalYear: currentFiscalYear, type: expandedMetric.audience }
       : 'skip'
   );
   const advanceDetails = useQuery(
     api.dashboard.getAdvancePaymentsDetails,
     expandedMetric && expandedMetric.metric === 'advance'
-      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      ? { fiscalYear: currentFiscalYear, type: expandedMetric.audience }
       : 'skip'
   );
   const revenueDetails = useQuery(
     api.dashboard.getRevenueDetails,
     expandedMetric && expandedMetric.metric === 'revenue'
-      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      ? { fiscalYear: currentFiscalYear, type: expandedMetric.audience }
       : 'skip'
   );
   const pendingOrdersDetails = useQuery(
     api.dashboard.getPendingOrdersDetails,
     expandedMetric && expandedMetric.metric === 'pending'
-      ? { fiscalYear: selectedFiscalYear, type: expandedMetric.audience }
+      ? { fiscalYear: currentFiscalYear, type: expandedMetric.audience }
       : 'skip'
   );
 
@@ -326,7 +304,7 @@ export default function DashboardPage() {
         <div className="card p-8">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Financial Performance - Local Clients</h2>
-            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(selectedFiscalYear)} Fiscal Year{selectedFiscalYear !== getCurrentFiscalYear() ? ' (Custom)' : ''}</div>
+            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(currentFiscalYear)} Fiscal Year</div>
           </div>
           
           {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
@@ -429,7 +407,7 @@ export default function DashboardPage() {
         <div className="card p-8">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-gray-900">Financial Performance - International Clients</h2>
-            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(selectedFiscalYear)} Fiscal Year{selectedFiscalYear !== getCurrentFiscalYear() ? ' (Custom)' : ''}</div>
+            <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{formatFiscalYear(currentFiscalYear)} Fiscal Year</div>
           </div>
           
           {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
@@ -589,7 +567,7 @@ export default function DashboardPage() {
                       {expandedMetric.metric === 'revenue' && 'Total Revenue'}
                     </h2>
                     <p className="text-sm text-gray-600">
-                      {expandedMetric.audience === 'local' ? 'Local' : 'International'} Clients • {formatFiscalYear(selectedFiscalYear)} Fiscal Year
+                      {expandedMetric.audience === 'local' ? 'Local' : 'International'} Clients • {formatFiscalYear(currentFiscalYear)} Fiscal Year
                     </p>
                   </div>
                   <button

@@ -488,7 +488,7 @@ export const getRecentActivity = query({
 export const getOrdersByStatus = query({
   args: {
     limit: v.optional(v.number()),
-    fiscalYear: v.optional(v.number())
+    // Removed fiscalYear filter - orders are rolling
   },
   returns: v.object({
     pendingOrders: v.array(v.object({
@@ -566,39 +566,33 @@ export const getOrdersByStatus = query({
       );
     };
 
-    // Helper function to filter orders by fiscal year
-    const filterByFiscalYear = (orders: any[]) => {
-      if (args.fiscalYear) {
-        return orders.filter(order => order.fiscalYear === args.fiscalYear);
-      }
-      return orders;
-    };
+    // Orders are rolling - no fiscal year filtering
 
     // Get orders by status, sorted by factory departure date (nearest first)
     const [pendingOrders, inProductionOrders, shippedOrders, deliveredOrders] = await Promise.all([
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "pending")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => {
+        orders.sort((a, b) => {
           const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
           const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
           return dateA - dateB;
         }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "in_production")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => {
+        orders.sort((a, b) => {
           const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
           const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
           return dateA - dateB;
         }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "shipped")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => {
+        orders.sort((a, b) => {
           const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
           const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
           return dateA - dateB;
         }).slice(0, limit)
       ),
       ctx.db.query("orders").withIndex("by_status", q => q.eq("status", "delivered")).collect().then(orders => 
-        filterByFiscalYear(orders).sort((a, b) => {
+        orders.sort((a, b) => {
           const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
           const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
           return dateA - dateB;

@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, Users, DollarSign, FileText, User, Calendar } from "lucide-react";
+import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, Users, DollarSign, FileText, User } from "lucide-react";
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 
 export default function SettingsPage() {
   // Dashboard Settings State
@@ -22,11 +21,6 @@ export default function SettingsPage() {
   const [shipmentHasChanges, setShipmentHasChanges] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
 
-  // Fiscal Year Settings State
-  const [selectedFiscalYear, setSelectedFiscalYear] = useState<string>("");
-  const [currentFiscalYear, setCurrentFiscalYear] = useState<number>(0);
-  const [fiscalYearHasChanges, setFiscalYearHasChanges] = useState(false);
-  const [fiscalYearLoading, setFiscalYearLoading] = useState(false);
 
   // Try to get from Convex, fallback to localStorage
   const currentLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
@@ -59,51 +53,6 @@ export default function SettingsPage() {
     }
   }, []);
 
-  // Load fiscal year setting from localStorage
-  useEffect(() => {
-    const loadFiscalYear = () => {
-      const saved = localStorage.getItem('selectedFiscalYear');
-      const systemCurrentYear = getCurrentFiscalYear();
-      
-      if (saved) {
-        const savedYear = parseInt(saved);
-        setCurrentFiscalYear(savedYear); // Set currentFiscalYear to the saved value
-        setSelectedFiscalYear(savedYear.toString());
-        setFiscalYearHasChanges(savedYear !== systemCurrentYear);
-    } else {
-      // Smart default: Use current fiscal year, but ensure it's at least 2025
-      const defaultYear = Math.max(2025, systemCurrentYear);
-      setCurrentFiscalYear(defaultYear); // Set currentFiscalYear to the default value
-      setSelectedFiscalYear(defaultYear.toString());
-      setFiscalYearHasChanges(defaultYear !== systemCurrentYear);
-    }
-    };
-
-    // Load initial value
-    loadFiscalYear();
-
-    // Listen for localStorage changes (when settings are updated from other pages)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'selectedFiscalYear') {
-        loadFiscalYear();
-      }
-    };
-
-    // Listen for custom events (for same-tab updates)
-    const handleCustomStorageChange = (e: CustomEvent) => {
-      if (e.detail.key === 'selectedFiscalYear') {
-        loadFiscalYear();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('localStorageChange', handleCustomStorageChange as EventListener);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('localStorageChange', handleCustomStorageChange as EventListener);
-    };
-  }, []);
 
   const handleLimitChange = (value: string) => {
     setMonthlyLimit(value);
@@ -210,52 +159,6 @@ export default function SettingsPage() {
     setShipmentHasChanges(false);
   };
 
-  const handleFiscalYearChange = (value: string) => {
-    setSelectedFiscalYear(value);
-    setFiscalYearHasChanges(value !== currentFiscalYear.toString());
-  };
-
-  const handleSaveSystemSettings = async () => {
-    const fiscalYearValue = parseInt(selectedFiscalYear);
-    
-    if (isNaN(fiscalYearValue) || fiscalYearValue < 2020 || fiscalYearValue > 2030) {
-      toast.error("Please select a valid fiscal year between 2020 and 2030");
-      return;
-    }
-
-    setFiscalYearLoading(true);
-    try {
-      // Save fiscal year setting to localStorage
-      localStorage.setItem('selectedFiscalYear', fiscalYearValue.toString());
-      setCurrentFiscalYear(fiscalYearValue);
-      
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new CustomEvent('localStorageChange', {
-        detail: { key: 'selectedFiscalYear', value: fiscalYearValue }
-      }));
-      
-      toast.success("System settings updated successfully!");
-      setFiscalYearHasChanges(false);
-      
-      // Show info about immediate update
-      setTimeout(() => {
-        toast.success("All dashboards have been updated automatically", {
-          duration: 4000,
-          icon: "✅",
-        });
-      }, 1000);
-    } catch (error) {
-      console.error("Failed to update system settings:", error);
-      toast.error("Failed to update system settings. Please try again.");
-    } finally {
-      setFiscalYearLoading(false);
-    }
-  };
-
-  const handleResetFiscalYear = () => {
-    setSelectedFiscalYear(currentFiscalYear.toString());
-    setFiscalYearHasChanges(false);
-  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -268,99 +171,6 @@ export default function SettingsPage() {
         <Settings className="h-8 w-8 text-gray-400" />
       </div>
 
-      {/* System Settings */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <Settings className="h-5 w-5 text-purple-500 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-900">System Settings</h2>
-          </div>
-          <p className="text-sm text-gray-600 mt-1">Configure global system preferences</p>
-        </div>
-        
-        <div className="p-6">
-          <div className="max-w-md">
-            <label htmlFor="fiscalYear" className="block text-sm font-medium text-gray-700 mb-2">
-              <Calendar className="h-4 w-4 inline mr-1" />
-              Default Fiscal Year for Dashboards
-            </label>
-            <div className="relative">
-              <select
-                id="fiscalYear"
-                value={selectedFiscalYear}
-                onChange={(e) => handleFiscalYearChange(e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-              >
-                {getFiscalYearOptions().map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <p className="mt-2 text-sm text-gray-500">
-              This setting controls which fiscal year data is displayed in all dashboards by default
-            </p>
-            
-            {/* Current Status */}
-            <div className="mt-4 p-3 bg-gray-50 rounded-md">
-              <div className="flex items-center text-sm">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
-                <span className="text-gray-700">
-                  Current setting: <strong>{getFiscalYearLabel(currentFiscalYear)}</strong>
-                </span>
-              </div>
-              {fiscalYearHasChanges && (
-                <div className="flex items-center text-sm mt-2">
-                  <AlertCircle className="h-4 w-4 text-orange-500 mr-2" />
-                  <span className="text-orange-700">
-                    Will be updated to: <strong>{getFiscalYearLabel(parseInt(selectedFiscalYear))}</strong>
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Info Notice */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-              <div className="flex items-start text-sm">
-                <Info className="h-4 w-4 text-blue-500 mr-2 mt-0.5 flex-shrink-0" />
-                <div className="text-blue-700">
-                  <p><strong>Note:</strong> This setting affects all dashboard views across the system. The system automatically detects the current fiscal year, but you can override it here for historical data viewing.</p>
-                  <p className="mt-1 text-xs">Changes will take effect immediately across all dashboard pages.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="mt-6 flex items-center space-x-3">
-            <button
-              onClick={handleSaveSystemSettings}
-              disabled={!fiscalYearHasChanges || fiscalYearLoading}
-              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
-                fiscalYearHasChanges && !fiscalYearLoading
-                  ? "bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                  : "bg-gray-400 cursor-not-allowed"
-              }`}
-            >
-              {fiscalYearLoading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              {fiscalYearLoading ? "Saving..." : "Save System Settings"}
-            </button>
-            
-            {fiscalYearHasChanges && (
-              <button
-                onClick={handleResetFiscalYear}
-                disabled={fiscalYearLoading}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                Reset
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Dashboard Settings */}
       <div className="bg-white rounded-lg shadow">
