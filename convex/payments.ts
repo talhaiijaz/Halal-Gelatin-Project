@@ -128,8 +128,33 @@ export const recordPayment = mutation({
         }
       }
       
-      const withheldAmount = rate > 0 ? Math.round((args.amount * rate) / 100) : 0;
-      const netCash = Math.max(0, args.amount - withheldAmount);
+      // Calculate withholding - for international payments to local banks, withhold after conversion
+      let withheldAmount = 0;
+      let withheldAmountOriginalCurrency = 0; // Store withholding in original currency for payment record
+      let netCash = args.amount;
+      
+      if (rate > 0) {
+        if (isInternationalClient && args.bankAccountId) {
+          const bank = await ctx.db.get(args.bankAccountId);
+          if (bank && bank.currency === "PKR" && args.conversionRateToUSD) {
+            // For international payments to PKR bank accounts: convert first, then withhold
+            const convertedAmount = args.amount * args.conversionRateToUSD;
+            withheldAmount = Math.round((convertedAmount * rate) / 100); // PKR withholding
+            withheldAmountOriginalCurrency = Math.round(withheldAmount / args.conversionRateToUSD); // USD withholding for payment record
+            netCash = Math.max(0, convertedAmount - withheldAmount);
+          } else {
+            // For local payments or same currency: withhold on original amount
+            withheldAmount = Math.round((args.amount * rate) / 100);
+            withheldAmountOriginalCurrency = withheldAmount;
+            netCash = Math.max(0, args.amount - withheldAmount);
+          }
+        } else {
+          // For local payments: withhold on original amount
+          withheldAmount = Math.round((args.amount * rate) / 100);
+          withheldAmountOriginalCurrency = withheldAmount;
+          netCash = Math.max(0, args.amount - withheldAmount);
+        }
+      }
 
       // Validate bank account currency if provided
       if (args.bankAccountId) {
@@ -201,7 +226,7 @@ export const recordPayment = mutation({
         convertedAmountUSD,
         cashReceived: netCash,
         withheldTaxRate: rate > 0 ? rate : undefined,
-        withheldTaxAmount: rate > 0 ? withheldAmount : undefined,
+        withheldTaxAmount: rate > 0 ? withheldAmountOriginalCurrency : undefined,
         recordedBy: undefined as any,
         createdAt: Date.now(),
       });
@@ -250,27 +275,35 @@ export const recordPayment = mutation({
         const now = Date.now();
         
         // For bank transactions, we need to store the amount in the bank account's currency
-        // For local payments with withholding, the bank transaction should reflect the NET amount (after withholding)
         let bankTransactionAmount = args.amount;
         let bankTransactionCurrency = currency;
         
-        // For clients with withholding (local OR international using local bank), bank transaction should be the net amount
-        if (rate > 0) {
-          bankTransactionAmount = netCash; // Use net amount after withholding
-        }
-        
         if (needsConversion && bank && conversionRateToUSD) {
           // If payment currency differs from bank account currency, we need to convert
-          // Store the converted amount in the bank account's currency
-          const convertedAmount = rate > 0 ? netCash * conversionRateToUSD : args.amount * conversionRateToUSD;
-          bankTransactionAmount = convertedAmount;
-          bankTransactionCurrency = bank.currency;
+          if (rate > 0 && isInternationalClient && bank.currency === "PKR") {
+            // For international payments to PKR banks: netCash is already in PKR (converted and withheld)
+            bankTransactionAmount = netCash;
+            bankTransactionCurrency = bank.currency;
+          } else {
+            // For other conversions: convert the gross amount
+            bankTransactionAmount = args.amount * conversionRateToUSD;
+            bankTransactionCurrency = bank.currency;
+          }
+        } else if (rate > 0) {
+          // For local payments with withholding: netCash is in original currency
+          bankTransactionAmount = netCash;
         }
         
         // Create description that shows gross amount, withholding, and net amount for payments with withholding
         let description = `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference}`;
         if (rate > 0) {
-          description = `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldAmount, currency)}, Net: ${formatCurrency(netCash, currency)})`;
+          if (needsConversion && isInternationalClient && bank && bank.currency === "PKR") {
+            // For international payments to PKR banks: show gross in USD, tax and net in PKR
+            description = `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldAmount, bank.currency)}, Net: ${formatCurrency(netCash, bank.currency)})`;
+          } else {
+            // For local payments: show all amounts in original currency
+            description = `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldAmount, currency)}, Net: ${formatCurrency(netCash, currency)})`;
+          }
         }
         
         const bankTransactionData: any = {
@@ -290,12 +323,20 @@ export const recordPayment = mutation({
 
         // Add currency conversion fields if conversion was needed
         if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
-          // Store the actual amount that was converted (net amount if withholding applied)
-          const actualConvertedAmount = rate > 0 ? netCash : args.amount;
-          bankTransactionData.originalAmount = actualConvertedAmount;
-          bankTransactionData.originalCurrency = currency;
-          bankTransactionData.exchangeRate = conversionRateToUSD;
-          bankTransactionData.convertedAmountUSD = convertedAmountUSD;
+          if (rate > 0 && isInternationalClient && bank && bank.currency === "PKR") {
+            // For international payments to PKR banks: show gross conversion
+            bankTransactionData.originalAmount = args.amount;
+            bankTransactionData.originalCurrency = currency;
+            bankTransactionData.exchangeRate = conversionRateToUSD;
+            bankTransactionData.convertedAmountUSD = args.amount * conversionRateToUSD; // Gross converted amount
+          } else {
+            // For other conversions: show net conversion
+            const actualConvertedAmount = rate > 0 ? netCash : args.amount;
+            bankTransactionData.originalAmount = actualConvertedAmount;
+            bankTransactionData.originalCurrency = currency;
+            bankTransactionData.exchangeRate = conversionRateToUSD;
+            bankTransactionData.convertedAmountUSD = convertedAmountUSD;
+          }
         }
 
         await ctx.db.insert("bankTransactions", bankTransactionData);
@@ -367,8 +408,33 @@ export const recordPayment = mutation({
       }
     }
     
-    const withheldForAdvance = rateForAdvance > 0 ? Math.round((args.amount * rateForAdvance) / 100) : 0;
-    const netCashAdvance = Math.max(0, args.amount - withheldForAdvance);
+    // Calculate withholding for advance payments - for international payments to local banks, withhold after conversion
+    let withheldForAdvance = 0;
+    let withheldForAdvanceOriginalCurrency = 0; // Store withholding in original currency for payment record
+    let netCashAdvance = args.amount;
+    
+    if (rateForAdvance > 0) {
+      if (client.type === "international" && args.bankAccountId) {
+        const bank = await ctx.db.get(args.bankAccountId);
+        if (bank && bank.currency === "PKR" && args.conversionRateToUSD) {
+          // For international advance payments to PKR bank accounts: convert first, then withhold
+          const convertedAmount = args.amount * args.conversionRateToUSD;
+          withheldForAdvance = Math.round((convertedAmount * rateForAdvance) / 100); // PKR withholding
+          withheldForAdvanceOriginalCurrency = Math.round(withheldForAdvance / args.conversionRateToUSD); // USD withholding for payment record
+          netCashAdvance = Math.max(0, convertedAmount - withheldForAdvance);
+        } else {
+          // For local advance payments or same currency: withhold on original amount
+          withheldForAdvance = Math.round((args.amount * rateForAdvance) / 100);
+          withheldForAdvanceOriginalCurrency = withheldForAdvance;
+          netCashAdvance = Math.max(0, args.amount - withheldForAdvance);
+        }
+      } else {
+        // For local advance payments: withhold on original amount
+        withheldForAdvance = Math.round((args.amount * rateForAdvance) / 100);
+        withheldForAdvanceOriginalCurrency = withheldForAdvance;
+        netCashAdvance = Math.max(0, args.amount - withheldForAdvance);
+      }
+    }
 
     // Handle conversion rate for international advance payments
     let conversionRateToUSD: number | undefined;
@@ -428,7 +494,7 @@ export const recordPayment = mutation({
       convertedAmountUSD,
       cashReceived: netCashAdvance,
       withheldTaxRate: rateForAdvance > 0 ? rateForAdvance : undefined,
-      withheldTaxAmount: rateForAdvance > 0 ? withheldForAdvance : undefined,
+      withheldTaxAmount: rateForAdvance > 0 ? withheldForAdvanceOriginalCurrency : undefined,
       recordedBy: undefined as any,
       createdAt: Date.now(),
     });
@@ -461,25 +527,36 @@ export const recordPayment = mutation({
       // Create bank transaction for the advance payment
       const now = Date.now();
       
-      // For clients with withholding (local OR international using local bank), bank transaction should be the net amount
+      // For bank transactions, we need to store the amount in the bank account's currency
       let bankTransactionAmount = args.amount;
       let bankTransactionCurrency = currency;
       
-      if (rateForAdvance > 0) {
-        bankTransactionAmount = netCashAdvance; // Use net amount after withholding
-      }
-      
-      // Handle currency conversion for advance payments
-      if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
-        const convertedAmount = rateForAdvance > 0 ? netCashAdvance * conversionRateToUSD : args.amount * conversionRateToUSD;
-        bankTransactionAmount = convertedAmount;
-        bankTransactionCurrency = bankCurrency!;
+      if (needsConversion && bankCurrency && conversionRateToUSD) {
+        // If payment currency differs from bank account currency, we need to convert
+        if (rateForAdvance > 0 && client.type === "international" && bankCurrency === "PKR") {
+          // For international advance payments to PKR banks: netCashAdvance is already in PKR (converted and withheld)
+          bankTransactionAmount = netCashAdvance;
+          bankTransactionCurrency = bankCurrency;
+        } else {
+          // For other conversions: convert the gross amount
+          bankTransactionAmount = args.amount * conversionRateToUSD;
+          bankTransactionCurrency = bankCurrency;
+        }
+      } else if (rateForAdvance > 0) {
+        // For local advance payments with withholding: netCashAdvance is in original currency
+        bankTransactionAmount = netCashAdvance;
       }
       
       // Create description that shows gross amount, withholding, and net amount for payments with withholding
       let description = `Advance payment received from ${(client as any).name || "Customer"}: ${args.reference}`;
       if (rateForAdvance > 0) {
-        description = `Advance payment received from ${(client as any).name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldForAdvance, currency)}, Net: ${formatCurrency(netCashAdvance, currency)})`;
+        if (needsConversion && client.type === "international" && bankCurrency === "PKR") {
+          // For international advance payments to PKR banks: show gross in USD, tax and net in PKR
+          description = `Advance payment received from ${(client as any).name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldForAdvance, bankCurrency)}, Net: ${formatCurrency(netCashAdvance, bankCurrency)})`;
+        } else {
+          // For local advance payments: show all amounts in original currency
+          description = `Advance payment received from ${(client as any).name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldForAdvance, currency)}, Net: ${formatCurrency(netCashAdvance, currency)})`;
+        }
       }
       
       const bankTransactionData: any = {
@@ -499,12 +576,20 @@ export const recordPayment = mutation({
 
       // Add currency conversion fields if conversion was needed
       if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
-        // Store the actual amount that was converted (net amount if withholding applied)
-        const actualConvertedAmount = rateForAdvance > 0 ? netCashAdvance : args.amount;
-        bankTransactionData.originalAmount = actualConvertedAmount;
-        bankTransactionData.originalCurrency = currency;
-        bankTransactionData.exchangeRate = conversionRateToUSD;
-        bankTransactionData.convertedAmountUSD = convertedAmountUSD;
+        if (rateForAdvance > 0 && client.type === "international" && bankCurrency === "PKR") {
+          // For international advance payments to PKR banks: show gross conversion
+          bankTransactionData.originalAmount = args.amount;
+          bankTransactionData.originalCurrency = currency;
+          bankTransactionData.exchangeRate = conversionRateToUSD;
+          bankTransactionData.convertedAmountUSD = args.amount * conversionRateToUSD; // Gross converted amount
+        } else {
+          // For other conversions: show net conversion
+          const actualConvertedAmount = rateForAdvance > 0 ? netCashAdvance : args.amount;
+          bankTransactionData.originalAmount = actualConvertedAmount;
+          bankTransactionData.originalCurrency = currency;
+          bankTransactionData.exchangeRate = conversionRateToUSD;
+          bankTransactionData.convertedAmountUSD = convertedAmountUSD;
+        }
       }
 
       await ctx.db.insert("bankTransactions", bankTransactionData);
@@ -1006,19 +1091,76 @@ export const updatePayment = mutation({
     paymentDate: v.number(),
     notes: v.optional(v.string()),
     bankAccountId: v.optional(v.id("bankAccounts")),
+    // Multi-currency conversion support
+    conversionRateToUSD: v.optional(v.number()),
+    // Withholding fields
+    withheldTaxRate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.paymentId);
     if (!existing) throw new Error("Payment not found");
 
-    // Handle bank account changes
+    // Get related data for calculations
+    const client = await ctx.db.get(existing.clientId);
+    const invoice = existing.invoiceId ? await ctx.db.get(existing.invoiceId) : null;
+    const bankAccount = args.bankAccountId ? await ctx.db.get(args.bankAccountId) : null;
+    
+    if (!client) throw new Error("Client not found");
+
+    // Determine currency and calculate withholding
+    const currency = invoice ? (invoice as any).currency : ((client as any).type === 'local' ? 'PKR' : 'USD');
+    const bankCurrency = bankAccount ? bankAccount.currency : null;
+    
+    // Calculate withholding tax
+    let withheldTaxRate = args.withheldTaxRate || 0;
+    let withheldAmount = 0;
+    let withheldAmountOriginalCurrency = 0;
+    let netCash = args.amount;
+    let conversionRateToUSD = args.conversionRateToUSD;
+    let convertedAmountUSD = undefined;
+
+    // Apply withholding tax logic (same as recordPayment)
+    if (withheldTaxRate > 0) {
+      const isInternationalClient = (client as any).type === 'international';
+      
+      if (isInternationalClient && args.bankAccountId && bankCurrency === "PKR" && conversionRateToUSD) {
+        // For international payments to PKR bank accounts: convert first, then withhold
+        const convertedAmount = args.amount * conversionRateToUSD;
+        withheldAmount = Math.round((convertedAmount * withheldTaxRate) / 100); // PKR withholding
+        withheldAmountOriginalCurrency = Math.round(withheldAmount / conversionRateToUSD); // USD withholding for payment record
+        netCash = Math.max(0, convertedAmount - withheldAmount);
+      } else {
+        // For local payments or same currency: withhold on original amount
+        withheldAmount = Math.round((args.amount * withheldTaxRate) / 100);
+        withheldAmountOriginalCurrency = withheldAmount;
+        netCash = Math.max(0, args.amount - withheldAmount);
+      }
+    }
+
+    // Handle currency conversion
+    const needsConversion = !!bankCurrency && bankCurrency !== currency;
+    if (needsConversion && (client as any).type === "international") {
+      if (!conversionRateToUSD) {
+        throw new Error(`Conversion rate is required when paying ${currency} invoice with ${bankCurrency} bank account`);
+      }
+      convertedAmountUSD = args.amount * conversionRateToUSD;
+    } else if (!needsConversion) {
+      conversionRateToUSD = undefined;
+      convertedAmountUSD = undefined;
+    } else if (currency === "USD") {
+      convertedAmountUSD = args.amount;
+    }
+
+    // Handle bank account changes and recalculate bank transaction
     const oldBankAccountId = existing.bankAccountId;
     const newBankAccountId = args.bankAccountId;
     const bankAccountChanged = oldBankAccountId !== newBankAccountId;
     const amountChanged = existing.amount !== args.amount;
+    const conversionChanged = existing.conversionRateToUSD !== conversionRateToUSD;
+    const withholdingChanged = existing.withheldTaxRate !== withheldTaxRate;
 
-    // If bank account changed or amount changed, update bank transactions
-    if ((bankAccountChanged || amountChanged) && (oldBankAccountId || newBankAccountId)) {
+    // If any relevant field changed, update bank transactions
+    if ((bankAccountChanged || amountChanged || conversionChanged || withholdingChanged) && (oldBankAccountId || newBankAccountId)) {
       // Find existing bank transaction
       const existingBankTransaction = await ctx.db
         .query("bankTransactions")
@@ -1026,68 +1168,59 @@ export const updatePayment = mutation({
         .first();
 
       if (existingBankTransaction) {
-        // If bank account changed, remove from old account and add to new account
-        if (bankAccountChanged) {
-          // Delete old transaction
-          await ctx.db.delete(existingBankTransaction._id);
+        // Delete old transaction
+        await ctx.db.delete(existingBankTransaction._id);
+        
+        // Update old bank account balance
+        if (oldBankAccountId) {
+          await updateBankAccountBalance(ctx, oldBankAccountId);
+        }
+
+        // Create new transaction in new bank account
+        if (newBankAccountId) {
+          const bankTransactionAmount = needsConversion && bankCurrency ? netCash : args.amount;
+          const bankTransactionCurrency = bankCurrency || currency;
           
-          // Update old bank account balance
-          if (oldBankAccountId) {
-            await updateBankAccountBalance(ctx, oldBankAccountId);
-          }
+          const description = withheldTaxRate > 0 
+            ? `Payment received from ${(client as any).name || "Customer"}: ${formatCurrency(args.amount, currency)}${needsConversion && bankCurrency ? ` (converted to ${formatCurrency(bankTransactionAmount, bankTransactionCurrency)})` : ""}${withheldTaxRate > 0 ? ` - Tax withheld: ${formatCurrency(withheldAmount, bankTransactionCurrency)}` : ""}`
+            : `Payment received from ${(client as any).name || "Customer"}: ${args.reference}`;
 
-          // Create new transaction in new bank account
-          if (newBankAccountId) {
-            const client = await ctx.db.get(existing.clientId);
-            const newBankAccount = await ctx.db.get(newBankAccountId);
-            
-            await ctx.db.insert("bankTransactions", {
-              bankAccountId: newBankAccountId,
-              transactionType: "payment_received",
-              amount: args.amount,
-              currency: existing.currency,
-              description: `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference}`,
-              reference: args.reference,
-              paymentId: args.paymentId,
-              transactionDate: args.paymentDate,
-              status: "completed",
-              notes: args.notes,
-              recordedBy: undefined as any,
-              createdAt: Date.now(),
-            });
-
-            // Update new bank account balance
-            await updateBankAccountBalance(ctx, newBankAccountId);
-
-            // Log bank account activity
-            await logEvent(ctx, {
-              entityTable: "banks",
-              entityId: String(newBankAccountId),
-              action: "update",
-              message: `Payment updated${newBankAccount ? ` in ${newBankAccount.accountName}` : ""}: ${formatCurrency(args.amount, existing.currency)}${client ? ` from ${(client as any).name}` : ""}`,
-              metadata: {
-                paymentId: args.paymentId,
-                oldBankAccountId,
-                newBankAccountId,
-                oldAmount: existing.amount,
-                newAmount: args.amount,
-                reference: args.reference,
-              },
-            });
-          }
-        } else if (amountChanged) {
-          // Just update the amount in the existing transaction
-          await ctx.db.patch(existingBankTransaction._id, {
-            amount: args.amount,
-            description: `Payment received from ${((await ctx.db.get(existing.clientId)) as any)?.name || "Customer"}: ${args.reference}`,
+          const bankTransactionData: any = {
+            bankAccountId: newBankAccountId,
+            transactionType: "payment_received",
+            amount: bankTransactionAmount,
+            currency: bankTransactionCurrency,
+            description: description,
             reference: args.reference,
+            paymentId: args.paymentId,
+            transactionDate: args.paymentDate,
+            status: "completed",
             notes: args.notes,
-          });
+            recordedBy: undefined as any,
+            createdAt: Date.now(),
+          };
 
-          // Update bank account balance
-          if (oldBankAccountId) {
-            await updateBankAccountBalance(ctx, oldBankAccountId);
+          // Add currency conversion fields if conversion was needed
+          if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
+            if (withheldTaxRate > 0 && (client as any).type === "international" && bankCurrency === "PKR") {
+              // For international payments to PKR banks: show gross conversion
+              bankTransactionData.originalAmount = args.amount;
+              bankTransactionData.originalCurrency = currency;
+              bankTransactionData.exchangeRate = conversionRateToUSD;
+              bankTransactionData.convertedAmountUSD = args.amount * conversionRateToUSD; // Gross converted amount
+            } else {
+              // For other conversions: show net conversion
+              bankTransactionData.originalAmount = withheldTaxRate > 0 ? netCash : args.amount;
+              bankTransactionData.originalCurrency = currency;
+              bankTransactionData.exchangeRate = conversionRateToUSD;
+              bankTransactionData.convertedAmountUSD = convertedAmountUSD;
+            }
           }
+
+          await ctx.db.insert("bankTransactions", bankTransactionData);
+
+          // Update new bank account balance
+          await updateBankAccountBalance(ctx, newBankAccountId);
         }
       }
     }
@@ -1113,12 +1246,14 @@ export const updatePayment = mutation({
       paymentDate: args.paymentDate,
       notes: args.notes,
       bankAccountId: args.bankAccountId,
+      conversionRateToUSD,
+      convertedAmountUSD,
+      cashReceived: netCash,
+      withheldTaxRate: withheldTaxRate > 0 ? withheldTaxRate : undefined,
+      withheldTaxAmount: withheldTaxRate > 0 ? withheldAmountOriginalCurrency : undefined,
     });
+
     // Get related information for meaningful logging
-    const client = await ctx.db.get(existing.clientId);
-    const invoice = existing.invoiceId ? await ctx.db.get(existing.invoiceId) : null;
-    const bankAccount = args.bankAccountId ? await ctx.db.get(args.bankAccountId) : null;
-    
     const clientName = (client as any)?.name || "Unknown Client";
     const invoiceNumber = invoice?.invoiceNumber || "N/A";
     const bankName = bankAccount?.accountName || "N/A";
@@ -1129,8 +1264,18 @@ export const updatePayment = mutation({
       action: "update",
       message: `Payment updated: ${invoiceNumber} - ${formatCurrency(args.amount, existing.currency)} (${clientName})`,
       metadata: { 
-        previous: { amount: existing.amount, bankAccountId: existing.bankAccountId }, 
-        next: { amount: args.amount, bankAccountId: args.bankAccountId },
+        previous: { 
+          amount: existing.amount, 
+          bankAccountId: existing.bankAccountId,
+          conversionRateToUSD: existing.conversionRateToUSD,
+          withheldTaxRate: existing.withheldTaxRate
+        }, 
+        next: { 
+          amount: args.amount, 
+          bankAccountId: args.bankAccountId,
+          conversionRateToUSD: conversionRateToUSD,
+          withheldTaxRate: withheldTaxRate
+        },
         clientName: clientName,
         invoiceNumber: invoiceNumber,
         bankName: bankName
@@ -1210,11 +1355,21 @@ export const get = query({
     const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
     const bankAccount = payment.bankAccountId ? await ctx.db.get(payment.bankAccountId) : null;
 
+    // Get bank transaction data if payment is linked to a bank account
+    let bankTransaction = null;
+    if (payment.bankAccountId) {
+      bankTransaction = await ctx.db
+        .query("bankTransactions")
+        .filter(q => q.eq(q.field("paymentId"), args.id))
+        .first();
+    }
+
     return {
       ...payment,
       client,
       invoice,
       bankAccount,
+      bankTransaction,
     };
   },
 });

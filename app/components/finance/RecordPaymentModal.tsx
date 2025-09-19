@@ -197,8 +197,29 @@ export default function RecordPaymentModal({
     }
   }
   
-  const withheld = rate > 0 ? Math.round((gross * rate) / 100) : 0;
-  const netCash = Math.max(0, gross - withheld);
+  // Calculate withholding - for international payments to local banks, withhold after conversion
+  let withheld = 0;
+  let netCash = gross;
+  
+  if (rate > 0) {
+    if (selectedClient?.type === 'international' && selectedBankAccountId && bankAccounts) {
+      const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+      if (selectedBank?.currency === 'PKR' && formData.conversionRateToUSD) {
+        // For international payments to PKR bank accounts: convert first, then withhold
+        const convertedAmount = gross * parseFloat(formData.conversionRateToUSD);
+        withheld = Math.round((convertedAmount * rate) / 100);
+        netCash = Math.max(0, convertedAmount - withheld);
+      } else {
+        // For local payments or same currency: withhold on original amount
+        withheld = Math.round((gross * rate) / 100);
+        netCash = Math.max(0, gross - withheld);
+      }
+    } else {
+      // For local payments: withhold on original amount
+      withheld = Math.round((gross * rate) / 100);
+      netCash = Math.max(0, gross - withheld);
+    }
+  }
 
   // Check if withholding should be shown (local clients OR international clients using local bank accounts)
   let isInternationalUsingLocalBank = false;
@@ -334,68 +355,6 @@ export default function RecordPaymentModal({
 
               {/* Payment Method intentionally removed — only Bank Transfer is supported */}
 
-              {/* Withholding (local clients OR international clients using local bank accounts) */}
-              {shouldShowWithholding && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {isLocalClient ? 'Income Tax Withheld?' : 'Tax Withheld?'}
-                    </label>
-                    <input
-                      type="checkbox"
-                      checked={formData.applyWithholding}
-                      onChange={(e) => setFormData(prev => ({ ...prev, applyWithholding: e.target.checked }))}
-                    />
-                  </div>
-                  {formData.applyWithholding && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm text-gray-700">Rate (%)</label>
-                      <input
-                        type="number"
-                        value={formData.withholdingRate}
-                        onChange={(e) => setFormData(prev => ({ ...prev, withholdingRate: e.target.value }))}
-                        min="0"
-                        step="0.01"
-                        placeholder="e.g. 4 or 5"
-                        className="w-28 px-2 py-1 border rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                      />
-                      <div className="text-xs text-gray-500">Custom rate allowed</div>
-                    </div>
-                    
-                  )}
-                  {/* Preview */}
-                  {formData.applyWithholding && (
-                    <div className="bg-gray-50 rounded-md p-3 text-sm grid grid-cols-2 gap-2">
-                      <div>
-                        <div className="text-gray-600">Gross Amount</div>
-                        <div className="font-semibold">{formatCurrency(gross, getCurrencyForDisplay())}</div>
-                      </div>
-                      <div>
-                        <div className="text-gray-600">Withheld ({rate || 0}%)</div>
-                        <div className="font-semibold">{formatCurrency(withheld, getCurrencyForDisplay())}</div>
-                      </div>
-                      <div className="col-span-2">
-                        <div className="text-gray-600">Net Cash to Deposit</div>
-                        <div className="font-semibold">{formatCurrency(netCash, getCurrencyForDisplay())}</div>
-                      </div>
-                      {selectedInvoiceId && unpaidInvoices && (() => {
-                        const inv = unpaidInvoices.find(i => i._id === selectedInvoiceId);
-                        if (!inv) return null;
-                        // Only calculate outstanding for shipped/delivered orders
-                        const shouldShowOutstanding = inv.order?.status === "shipped" || inv.order?.status === "delivered";
-                        const currentOutstanding = shouldShowOutstanding ? inv.outstandingBalance : 0;
-                        const newOutstanding = Math.max(0, currentOutstanding - gross);
-                        return (
-                          <div className="col-span-2">
-                            <div className="text-gray-600">Receivables after this payment</div>
-                            <div className="font-semibold text-primary">{formatCurrency(newOutstanding, getCurrencyForDisplay())}</div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Conversion Rate - Only when invoice currency differs from bank account currency */}
               {selectedClient?.type === 'international' && selectedInvoiceId && selectedBankAccountId && unpaidInvoices && bankAccounts && (() => {
@@ -432,21 +391,153 @@ export default function RecordPaymentModal({
                       Required when paying {invoice.currency} invoice with {selectedBank.currency} bank account.
                     </p>
                     
-                    {/* Conversion Display */}
+                    {/* Conversion and Withholding Breakdown */}
                     {formData.conversionRateToUSD && formData.amount && (
                       <div className="mt-2 bg-blue-50 rounded-md p-3 text-sm">
-                        <div className="text-gray-600">{selectedBank.currency} Conversion Preview:</div>
-                        <div className="font-semibold text-blue-800">
-                          {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), selectedBank.currency as SupportedCurrency)}
+                        <div className="text-gray-600 mb-2 font-medium">Conversion & Withholding Breakdown:</div>
+                        
+                        {/* Step 1: Original Amount */}
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-gray-600">1. Original Amount:</span>
+                          <span className="font-medium">{formatCurrency(parseFloat(formData.amount), invoice.currency as SupportedCurrency)}</span>
                         </div>
-                        <div className="text-xs text-gray-500 mt-1">
-                          {formData.amount} {invoice.currency} × {formData.conversionRateToUSD} = {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), selectedBank.currency as SupportedCurrency)}
+                        
+                        {/* Step 2: Converted Amount */}
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-gray-600">2. Converted to {selectedBank.currency}:</span>
+                          <span className="font-medium text-blue-800">
+                            {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), selectedBank.currency as SupportedCurrency)}
+                          </span>
+                        </div>
+                        
+                        {/* Step 3: Tax Withheld (if applicable) */}
+                        {formData.applyWithholding && rate > 0 && (
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-gray-600">3. Tax Withheld ({rate}%):</span>
+                            <span className="font-medium text-orange-600">
+                              -{formatCurrency(Math.round((parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD) * rate) / 100), selectedBank.currency as SupportedCurrency)}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {/* Step 4: Net Amount */}
+                        <div className="flex justify-between items-center pt-2 border-t border-blue-200">
+                          <span className="text-gray-700 font-medium">4. Net Amount Deposited:</span>
+                          <span className="font-bold text-green-700">
+                            {formatCurrency(
+                              Math.max(0, 
+                                parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD) - 
+                                (formData.applyWithholding && rate > 0 ? Math.round((parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD) * rate) / 100) : 0)
+                              ), 
+                              selectedBank.currency as SupportedCurrency
+                            )}
+                          </span>
+                        </div>
+                        
+                        {/* Conversion Formula */}
+                        <div className="text-xs text-gray-500 mt-2 pt-2 border-t border-blue-200">
+                          Conversion: {formData.amount} {invoice.currency} × {formData.conversionRateToUSD} = {formatCurrency(parseFloat(formData.amount) * parseFloat(formData.conversionRateToUSD), selectedBank.currency as SupportedCurrency)}
                         </div>
                       </div>
                     )}
                   </div>
                 );
               })()}
+
+              {/* Withholding (local clients OR international clients using local bank accounts) */}
+              {shouldShowWithholding && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {isLocalClient ? 'Income Tax Withheld?' : 'Tax Withheld?'}
+                    </label>
+                    <input
+                      type="checkbox"
+                      checked={formData.applyWithholding}
+                      onChange={(e) => setFormData(prev => ({ ...prev, applyWithholding: e.target.checked }))}
+                    />
+                  </div>
+                  {formData.applyWithholding && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-700">Rate (%)</label>
+                      <input
+                        type="number"
+                        value={formData.withholdingRate}
+                        onChange={(e) => setFormData(prev => ({ ...prev, withholdingRate: e.target.value }))}
+                        min="0"
+                        step="0.01"
+                        placeholder="e.g. 4 or 5"
+                        className="w-28 px-2 py-1 border rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      />
+                      <div className="text-xs text-gray-500">Custom rate allowed</div>
+                    </div>
+                  )}
+                  
+                  {/* Preview - Show gross amount in both currencies for international payments */}
+                  {formData.applyWithholding && (
+                    <div className="bg-gray-50 rounded-md p-3 text-sm grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-gray-600">Gross Amount</div>
+                        <div className="font-semibold">{formatCurrency(gross, getCurrencyForDisplay())}</div>
+                        {/* Show PKR equivalent for international payments */}
+                        {selectedClient?.type === 'international' && selectedBankAccountId && bankAccounts && formData.conversionRateToUSD && (() => {
+                          const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+                          if (selectedBank?.currency === 'PKR') {
+                            return (
+                              <div className="text-xs text-gray-500 mt-1">
+                                = {formatCurrency(gross * parseFloat(formData.conversionRateToUSD), selectedBank.currency as any)}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                      <div>
+                        <div className="text-gray-600">Withheld ({rate || 0}%)</div>
+                        <div className="font-semibold">
+                          {(() => {
+                            if (selectedClient?.type === 'international' && selectedBankAccountId && bankAccounts) {
+                              const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+                              if (selectedBank?.currency === 'PKR' && formData.conversionRateToUSD) {
+                                return formatCurrency(withheld, selectedBank.currency as any);
+                              }
+                            }
+                            return formatCurrency(withheld, getCurrencyForDisplay());
+                          })()}
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <div className="text-gray-600">Net Cash to Deposit</div>
+                        <div className="font-semibold">
+                          {(() => {
+                            if (selectedClient?.type === 'international' && selectedBankAccountId && bankAccounts) {
+                              const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+                              if (selectedBank?.currency === 'PKR' && formData.conversionRateToUSD) {
+                                return formatCurrency(netCash, selectedBank.currency as any);
+                              }
+                            }
+                            return formatCurrency(netCash, getCurrencyForDisplay());
+                          })()}
+                        </div>
+                      </div>
+                      {selectedInvoiceId && unpaidInvoices && (() => {
+                        const inv = unpaidInvoices.find(i => i._id === selectedInvoiceId);
+                        if (!inv) return null;
+                        // Only calculate outstanding for shipped/delivered orders
+                        const shouldShowOutstanding = inv.order?.status === "shipped" || inv.order?.status === "delivered";
+                        const currentOutstanding = shouldShowOutstanding ? inv.outstandingBalance : 0;
+                        const newOutstanding = Math.max(0, currentOutstanding - gross);
+                        return (
+                          <div className="col-span-2">
+                            <div className="text-gray-600">Receivables after this payment</div>
+                            <div className="font-semibold text-primary">{formatCurrency(newOutstanding, getCurrencyForDisplay())}</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Bank Account Selection */}
               <div>

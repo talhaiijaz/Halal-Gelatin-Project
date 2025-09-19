@@ -20,6 +20,9 @@ export type EditablePayment = {
   paymentDate: number;
   notes?: string | null;
   bankAccountId?: Id<"bankAccounts"> | null;
+  conversionRateToUSD?: number | null;
+  withheldTaxRate?: number | null;
+  currency?: string;
 };
 
 interface EditPaymentModalProps {
@@ -37,7 +40,7 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
   );
   const client = useQuery(
     api.clients.get,
-    payment?.type === "advance" && payment?.clientId ? { id: payment.clientId as Id<"clients"> } : "skip"
+    payment?.clientId ? { id: payment.clientId as Id<"clients"> } : "skip"
   );
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState({
@@ -46,6 +49,8 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
     paymentDate: timestampToDateString(Date.now()),
     notes: "",
     bankAccountId: "",
+    conversionRateToUSD: "",
+    withheldTaxRate: "",
   });
 
   useEffect(() => {
@@ -56,6 +61,8 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
         paymentDate: timestampToDateString(payment.paymentDate),
         notes: payment.notes || "",
         bankAccountId: payment.bankAccountId ? (payment.bankAccountId as string) : "",
+        conversionRateToUSD: payment.conversionRateToUSD ? String(payment.conversionRateToUSD) : "",
+        withheldTaxRate: payment.withheldTaxRate ? String(payment.withheldTaxRate) : "",
       });
     }
   }, [payment, isOpen]);
@@ -173,6 +180,113 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                 className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary"
               />
             </div>
+
+            {/* Conversion Rate Field (for international payments) */}
+            {(() => {
+              const selectedBankAccount = bankAccounts?.find(bank => bank._id === form.bankAccountId);
+              const isInternationalClient = client && (client as any).type === 'international';
+              const needsConversion = selectedBankAccount && selectedBankAccount.currency !== payment.currency;
+              
+              if (isInternationalClient && needsConversion) {
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Conversion Rate ({payment.currency} to {selectedBankAccount.currency})
+                    </label>
+                    <input
+                      type="number"
+                      value={form.conversionRateToUSD}
+                      onChange={(e) => setForm((s) => ({ ...s, conversionRateToUSD: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      min="0.01"
+                      step="0.01"
+                      placeholder={`Enter ${payment.currency} to ${selectedBankAccount.currency} rate`}
+                    />
+                    {form.conversionRateToUSD && form.amount && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        {formatCurrency(parseFloat(form.amount), payment.currency as SupportedCurrency)} = {formatCurrency(parseFloat(form.amount) * parseFloat(form.conversionRateToUSD), selectedBankAccount.currency as SupportedCurrency)}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Debug Info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-xs">
+                <div>Client Type: {client ? (client as any).type : 'Loading...'}</div>
+                <div>Payment Currency: {payment.currency}</div>
+                <div>Current Withholding Rate: {payment.withheldTaxRate || 'None'}</div>
+                <div>Form Withholding Rate: {form.withheldTaxRate || 'None'}</div>
+              </div>
+            )}
+
+            {/* Withholding Tax Field */}
+            {(() => {
+              const selectedBankAccount = bankAccounts?.find(bank => bank._id === form.bankAccountId);
+              const isInternationalClient = client && (client as any).type === 'international';
+              const isLocalClient = client && (client as any).type === 'local';
+              
+              // Always show withholding tax field for any client type, or if payment has withholding data
+              if (client || payment.withheldTaxRate) {
+                return (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Withholding Tax Rate (%)
+                      {!client && payment.withheldTaxRate && (
+                        <span className="text-xs text-gray-500 ml-2">(Currently: {payment.withheldTaxRate}%)</span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      value={form.withheldTaxRate}
+                      onChange={(e) => setForm((s) => ({ ...s, withheldTaxRate: e.target.value }))}
+                      className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      placeholder="Enter withholding tax rate (e.g., 5 for 5%)"
+                    />
+                    {form.withheldTaxRate && form.amount && (
+                      <div className="mt-2 text-sm text-gray-600">
+                        {(() => {
+                          const rate = parseFloat(form.withheldTaxRate);
+                          const selectedBankAccount = bankAccounts?.find(bank => bank._id === form.bankAccountId);
+                          
+                          if (isInternationalClient && selectedBankAccount && selectedBankAccount.currency === "PKR" && form.conversionRateToUSD) {
+                            // For international payments to PKR banks: convert first, then withhold
+                            const convertedAmount = parseFloat(form.amount) * parseFloat(form.conversionRateToUSD);
+                            const pkrWithholding = Math.round((convertedAmount * rate) / 100);
+                            const netAmount = Math.max(0, convertedAmount - pkrWithholding);
+                            
+                            return (
+                              <div className="space-y-1">
+                                <div>Tax Withheld: {formatCurrency(pkrWithholding, selectedBankAccount.currency as SupportedCurrency)}</div>
+                                <div>Net Amount: {formatCurrency(netAmount, selectedBankAccount.currency as SupportedCurrency)}</div>
+                              </div>
+                            );
+                          } else {
+                            // For local payments or same currency: withhold on original amount
+                            const withholding = Math.round((parseFloat(form.amount) * rate) / 100);
+                            const netAmount = Math.max(0, parseFloat(form.amount) - withholding);
+                            
+                            return (
+                              <div className="space-y-1">
+                                <div>Tax Withheld: {formatCurrency(withholding, payment.currency as SupportedCurrency)}</div>
+                                <div>Net Amount: {formatCurrency(netAmount, payment.currency as SupportedCurrency)}</div>
+                              </div>
+                            );
+                          }
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           <div className="px-5 py-4 border-t flex justify-end space-x-3">
@@ -189,6 +303,8 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                     paymentDate: dateStringToTimestamp(form.paymentDate),
                     notes: form.notes || undefined,
                     bankAccountId: form.bankAccountId ? (form.bankAccountId as unknown as Id<"bankAccounts">) : undefined,
+                    conversionRateToUSD: form.conversionRateToUSD ? parseFloat(form.conversionRateToUSD) : undefined,
+                    withheldTaxRate: form.withheldTaxRate ? parseFloat(form.withheldTaxRate) : undefined,
                   });
                   onClose();
                 } catch (e: unknown) {

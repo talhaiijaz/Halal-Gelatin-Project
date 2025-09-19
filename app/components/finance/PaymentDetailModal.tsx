@@ -271,11 +271,35 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-500">Cash Received</label>
-                        <p className="mt-1 text-sm text-gray-900">{formatCurrency(payment.cashReceived || 0, payment.currency as SupportedCurrency)}</p>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {(() => {
+                            // For international payments to PKR banks, show cash received in PKR
+                            const bankAccount = (payment as any).bankAccount;
+                            const bankTransaction = (payment as any).bankTransaction;
+                            if (bankAccount && bankAccount.currency === "PKR" && payment.currency !== "PKR" && bankTransaction) {
+                              // Use the bank transaction amount (which is in PKR)
+                              return formatCurrency(Math.abs(bankTransaction.amount), bankAccount.currency as SupportedCurrency);
+                            }
+                            return formatCurrency(payment.cashReceived || 0, payment.currency as SupportedCurrency);
+                          })()}
+                        </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Tax Withheld</label>
-                        <p className="mt-1 text-sm text-gray-900">{formatCurrency(payment.withheldTaxAmount, payment.currency as SupportedCurrency)}</p>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {(() => {
+                            // For international payments to PKR banks, show tax withheld in PKR
+                            const bankAccount = (payment as any).bankAccount;
+                            const bankTransaction = (payment as any).bankTransaction;
+                            if (bankAccount && bankAccount.currency === "PKR" && payment.currency !== "PKR" && bankTransaction) {
+                              // Calculate the actual PKR withholding amount
+                              const convertedAmount = payment.amount * (payment.conversionRateToUSD || 1);
+                              const pkrWithholding = Math.round((convertedAmount * (payment.withheldTaxRate || 0)) / 100);
+                              return formatCurrency(pkrWithholding, bankAccount.currency as SupportedCurrency);
+                            }
+                            return formatCurrency(payment.withheldTaxAmount, payment.currency as SupportedCurrency);
+                          })()}
+                        </p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Tax Rate</label>
@@ -332,6 +356,9 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
           paymentDate: payment.paymentDate,
           notes: payment.notes,
           bankAccountId: payment.bankAccountId,
+          conversionRateToUSD: payment.conversionRateToUSD,
+          withheldTaxRate: payment.withheldTaxRate,
+          currency: payment.currency,
         } : null}
       />
 

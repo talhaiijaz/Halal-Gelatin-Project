@@ -776,10 +776,20 @@ export default function FinancePage() {
                           }
                           return null;
                         })()}
-                        {/* Show withholding info for local payments */}
+                        {/* Show withholding info */}
                         {(payment as any).withheldTaxAmount && (payment as any).withheldTaxAmount > 0 && (
                           <div className="text-xs text-orange-600">
-                            -{formatCurrency((payment as any).withheldTaxAmount, payment.currency as SupportedCurrency)} withheld
+                            {(() => {
+                              // For international payments to PKR banks, show withholding in PKR
+                              const bankAccount = (payment as any).bankAccount;
+                              if (bankAccount && bankAccount.currency === "PKR" && payment.currency !== "PKR") {
+                                // Calculate the actual PKR withholding amount
+                                const convertedAmount = payment.amount * (payment.conversionRateToUSD || 1);
+                                const pkrWithholding = Math.round((convertedAmount * (payment.withheldTaxRate || 0)) / 100);
+                                return `-${formatCurrency(pkrWithholding, bankAccount.currency as SupportedCurrency)} withheld`;
+                              }
+                              return `-${formatCurrency((payment as any).withheldTaxAmount, payment.currency as SupportedCurrency)} withheld`;
+                            })()}
                           </div>
                         )}
                       </td>
