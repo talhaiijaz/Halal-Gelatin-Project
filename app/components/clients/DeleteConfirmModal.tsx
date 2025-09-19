@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { X, AlertTriangle } from "lucide-react";
@@ -76,75 +77,88 @@ export default function DeleteConfirmModal({ isOpen, onClose, client, onSuccess 
 
   if (!isOpen || !client) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black bg-opacity-50" onClick={handleClose} />
-        
-        <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full">
-          <div className="border-b border-gray-200 px-6 py-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Delete Customer
-              </h2>
-              <button
-                onClick={handleClose}
-                className="rounded-lg p-1 hover:bg-gray-100"
-              >
-                <X className="h-5 w-5 text-gray-500" />
-              </button>
+  const modalContent = (
+    <div 
+      className="fixed z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50"
+      style={{ 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        width: '100vw',
+        height: '100vh'
+      }}
+      onClick={handleClose}
+    >
+      <div 
+        className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-gray-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Delete Customer
+            </h2>
+            <button
+              onClick={handleClose}
+              className="rounded-lg p-1 hover:bg-gray-100"
+            >
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="flex-shrink-0">
+              <AlertTriangle className="h-10 w-10 text-red-500" />
+            </div>
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">
+                Are you sure?
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                This action cannot be undone. This will permanently delete the customer "{client.name}" and all associated data.
+              </p>
             </div>
           </div>
 
-          <div className="p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="h-10 w-10 text-red-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">
-                  Are you sure?
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  This action cannot be undone. This will permanently delete the customer "{client.name}" and all associated data.
-                </p>
-              </div>
-            </div>
+          <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
+            <p className="text-sm text-red-700">
+              <strong>Warning:</strong> Deleting this customer will also affect any orders, invoices, and payments associated with them.
+            </p>
+          </div>
 
-            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-4">
-              <p className="text-sm text-red-700">
-                <strong>Warning:</strong> Deleting this customer will also affect any orders, invoices, and payments associated with them.
+          {error && (
+            <div className="bg-red-100 border border-red-300 rounded-md p-3 mb-4">
+              <p className="text-sm text-red-800">
+                <strong>Error:</strong> {error}
               </p>
             </div>
+          )}
 
-            {error && (
-              <div className="bg-red-100 border border-red-300 rounded-md p-3 mb-4">
-                <p className="text-sm text-red-800">
-                  <strong>Error:</strong> {error}
-                </p>
-              </div>
-            )}
-
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={isDeleting}
-                className="btn-secondary disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isDeleting ? "Deleting..." : "Delete Customer"}
-              </button>
-            </div>
+          <div className="flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={handleClose}
+              disabled={isDeleting}
+              className="btn-secondary disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isDeleting ? "Deleting..." : "Delete Customer"}
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }

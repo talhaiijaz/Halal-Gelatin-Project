@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, AlertTriangle } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -69,67 +70,80 @@ export default function DeleteConfirmModal({
 
   if (!isOpen || !paymentId) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black bg-opacity-25" onClick={onClose} />
-
-        <div className="relative bg-white rounded-lg w-full max-w-md">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
-            <div className="flex items-center">
-              <AlertTriangle className="h-6 w-6 text-red-500 mr-3" />
-              <h2 className="text-xl font-semibold text-gray-900">Delete Payment</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <X className="h-5 w-5" />
-            </button>
+  const modalContent = (
+    <div 
+      className="fixed z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50"
+      style={{ 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        width: '100vw',
+        height: '100vh'
+      }}
+      onClick={onClose}
+    >
+      <div 
+        className="relative bg-white rounded-lg w-full max-w-md mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center">
+            <AlertTriangle className="h-6 w-6 text-red-500 mr-3" />
+            <h2 className="text-xl font-semibold text-gray-900">Delete Payment</h2>
           </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-500"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
 
-          {/* Content */}
-          <div className="p-6">
-            <div className="text-center">
-              <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Are you sure you want to delete this payment?
-              </h3>
-              <p className="text-sm text-gray-600 mb-4">
-                This action cannot be undone. The payment "{paymentReference}" will be permanently deleted.
+        {/* Content */}
+        <div className="p-6">
+          <div className="text-center">
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Are you sure you want to delete this payment?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This action cannot be undone. The payment "{paymentReference}" will be permanently deleted.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
+              <p className="text-sm text-red-700">
+                <strong>Warning:</strong> This will also:
               </p>
-              <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
-                <p className="text-sm text-red-700">
-                  <strong>Warning:</strong> This will also:
-                </p>
-                <ul className="text-sm text-red-600 mt-1 list-disc list-inside">
-                  <li>Update the associated invoice balance</li>
-                  <li>Remove the payment from all records</li>
-                  <li>Update client payment history</li>
-                </ul>
-              </div>
+              <ul className="text-sm text-red-600 mt-1 list-disc list-inside">
+                <li>Update the associated invoice balance</li>
+                <li>Remove the payment from all records</li>
+                <li>Update client payment history</li>
+              </ul>
             </div>
           </div>
+        </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-end space-x-3 p-6 border-t bg-gray-50">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isDeleting ? "Deleting..." : "Delete Payment"}
-            </button>
-          </div>
+        {/* Footer */}
+        <div className="flex items-center justify-end space-x-3 p-6 border-t bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDeleting ? "Deleting..." : "Delete Payment"}
+          </button>
         </div>
       </div>
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }

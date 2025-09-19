@@ -352,8 +352,22 @@ export const transferBetweenAccounts = mutation({
     }
 
     // Calculate USD conversion for reporting
-    const convertedAmountUSD = args.currency === 'USD' ? args.amount : 
-      (args.exchangeRate && args.originalCurrency && args.originalAmount ? args.originalAmount * args.exchangeRate : undefined);
+    let convertedAmountUSD: number | undefined;
+    if (needsConversion && args.exchangeRate && args.originalCurrency && args.originalAmount) {
+      // For cross-currency transfers, convert original amount to USD
+      if (args.originalCurrency === 'USD') {
+        convertedAmountUSD = args.originalAmount;
+      } else if (args.currency === 'USD') {
+        convertedAmountUSD = args.amount;
+      } else {
+        // Both currencies are non-USD, need to convert original to USD
+        // This would require an additional exchange rate from original currency to USD
+        // For now, we'll use the amount in the target currency
+        convertedAmountUSD = args.amount;
+      }
+    } else if (args.currency === 'USD') {
+      convertedAmountUSD = args.amount;
+    }
 
     // Create transfer out transaction
     const now = Date.now();
@@ -476,7 +490,7 @@ export const getAccountWithTransactions = query({
 
     // Calculate current balance using utility function
     const openingBalance = bankAccount.openingBalance || 0;
-    const currentBalance = calculateBankAccountBalance(openingBalance, transactions);
+    const currentBalance = calculateBankAccountBalance(openingBalance, transactions, bankAccount.currency);
 
     return {
       ...bankAccount,

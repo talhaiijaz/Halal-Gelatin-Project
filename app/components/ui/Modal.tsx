@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -62,9 +63,17 @@ export default function Modal({
     }
   };
 
-  return (
+  const modalContent = (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+      className="fixed z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50"
+      style={{ 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        width: '100vw',
+        height: '100vh'
+      }}
       onClick={handleBackdropClick}
     >
       <div 
@@ -98,4 +107,7 @@ export default function Modal({
       </div>
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }

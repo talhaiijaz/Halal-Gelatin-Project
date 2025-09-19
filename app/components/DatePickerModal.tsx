@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Calendar } from "lucide-react";
 import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
 
@@ -90,8 +91,18 @@ export default function DatePickerModal({
   // Set max date to today in Pakistan timezone for delivery dates
   const today = timestampToDateString(Date.now());
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  const modalContent = (
+    <div 
+      className="fixed z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50"
+      style={{ 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0,
+        width: '100vw',
+        height: '100vh'
+      }}
+    >
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -152,4 +163,7 @@ export default function DatePickerModal({
       </div>
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }

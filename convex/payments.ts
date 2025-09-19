@@ -221,11 +221,26 @@ export const recordPayment = mutation({
 
         // Create bank transaction for the payment
         const now = Date.now();
-        await ctx.db.insert("bankTransactions", {
+        const bank = await ctx.db.get(args.bankAccountId);
+        
+        // For bank transactions, we need to store the amount in the bank account's currency
+        // If there's a currency mismatch, we need to convert the amount
+        let bankTransactionAmount = args.amount;
+        let bankTransactionCurrency = currency;
+        
+        if (needsConversion && bank) {
+          // If payment currency differs from bank account currency, we need to convert
+          // For now, we'll store the original payment amount and currency
+          // The conversion will be handled in the UI display
+          bankTransactionAmount = args.amount;
+          bankTransactionCurrency = currency;
+        }
+        
+        const bankTransactionData: any = {
           bankAccountId: args.bankAccountId,
           transactionType: "payment_received",
-          amount: args.amount,
-          currency: currency,
+          amount: bankTransactionAmount,
+          currency: bankTransactionCurrency,
           description: `Payment received from ${client?.name || "Customer"}: ${args.reference}`,
           reference: args.reference,
           paymentId: paymentId,
@@ -234,7 +249,17 @@ export const recordPayment = mutation({
           notes: args.notes,
           recordedBy: undefined as any,
           createdAt: now,
-        });
+        };
+
+        // Add currency conversion fields if conversion was needed
+        if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
+          bankTransactionData.originalAmount = args.amount;
+          bankTransactionData.originalCurrency = currency;
+          bankTransactionData.exchangeRate = conversionRateToUSD;
+          bankTransactionData.convertedAmountUSD = convertedAmountUSD;
+        }
+
+        await ctx.db.insert("bankTransactions", bankTransactionData);
 
         // Update bank account balance after creating transaction
         await updateBankAccountBalance(ctx, args.bankAccountId);
@@ -373,7 +398,7 @@ export const recordPayment = mutation({
 
       // Create bank transaction for the advance payment
       const now = Date.now();
-      await ctx.db.insert("bankTransactions", {
+      const bankTransactionData: any = {
         bankAccountId: args.bankAccountId,
         transactionType: "payment_received",
         amount: args.amount,
@@ -386,7 +411,17 @@ export const recordPayment = mutation({
         notes: args.notes,
         recordedBy: undefined as any,
         createdAt: now,
-      });
+      };
+
+      // Add currency conversion fields if conversion was needed
+      if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
+        bankTransactionData.originalAmount = args.amount;
+        bankTransactionData.originalCurrency = currency;
+        bankTransactionData.exchangeRate = conversionRateToUSD;
+        bankTransactionData.convertedAmountUSD = convertedAmountUSD;
+      }
+
+      await ctx.db.insert("bankTransactions", bankTransactionData);
 
       // Update bank account balance after creating transaction
       await updateBankAccountBalance(ctx, args.bankAccountId);

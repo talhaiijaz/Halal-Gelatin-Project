@@ -198,7 +198,7 @@ export const getWithBalance = query({
 
     // Calculate current balance using utility function
     const openingBalance = bankAccount.openingBalance || 0;
-    const currentBalance = calculateBankAccountBalance(openingBalance, transactions);
+    const currentBalance = calculateBankAccountBalance(openingBalance, transactions, bankAccount.currency);
 
     return {
       ...bankAccount,
@@ -240,7 +240,7 @@ export const listWithBalances = query({
           .collect();
 
         const openingBalance = account.openingBalance || 0;
-        const currentBalance = calculateBankAccountBalance(openingBalance, transactions);
+        const currentBalance = calculateBankAccountBalance(openingBalance, transactions, account.currency);
 
         return {
           ...account,
