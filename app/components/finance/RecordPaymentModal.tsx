@@ -63,12 +63,11 @@ export default function RecordPaymentModal({
     if (selectedInvoiceId && unpaidInvoices) {
       const invoice = unpaidInvoices.find(inv => inv._id === selectedInvoiceId);
       if (invoice) {
-        // Only auto-fill outstanding amount for shipped/delivered orders
-        const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
-        const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+        // Auto-fill with remaining amount (Total - Paid)
+        const remainingAmount = invoice.amount - invoice.totalPaid;
         setFormData(prev => ({
           ...prev,
-          amount: outstandingAmount.toString(),
+          amount: remainingAmount.toString(),
           conversionRateToUSD: "",
         }));
       }
@@ -284,11 +283,10 @@ export default function RecordPaymentModal({
                           ? invoice.invoiceNumber
                           : "Invoice #" + invoice._id.slice(-8)
                         } - {(() => {
-                          // Only show outstanding for shipped/delivered orders
-                          const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
-                          const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
-                          return formatCurrency(outstandingAmount, invoice.currency as SupportedCurrency);
-                        })()} receivables
+                          // Show remaining amount (Total - Paid)
+                          const remainingAmount = invoice.amount - invoice.totalPaid;
+                          return formatCurrency(remainingAmount, invoice.currency as SupportedCurrency);
+                        })()} remaining
                       </option>
                     ))}
                   </select>
@@ -303,33 +301,56 @@ export default function RecordPaymentModal({
               {/* Selected Invoice Details */}
               {selectedInvoiceId && unpaidInvoices && (
                 <div className="bg-gray-50 p-3 rounded-md">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 mb-2">
                     Invoice Details:
                   </p>
                   {(() => {
                     const invoice = unpaidInvoices.find(inv => inv._id === selectedInvoiceId);
                     if (!invoice) return null;
+                    
+                    const remainingAmount = invoice.amount - invoice.totalPaid;
+                    const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
+                    const receivablesAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+                    
                     return (
-                      <div className="mt-1 space-y-1">
-                        <p className="text-sm">
-                          <span className="font-medium">Total Amount:</span> {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
-                        </p>
-                        <p className="text-sm">
-                          <span className="font-medium">Paid:</span> {formatCurrency(invoice.totalPaid, invoice.currency as SupportedCurrency)}
-                          {invoice.advancePaid > 0 && (
-                            <span className="text-blue-600">
-                              {" "}({formatCurrency(invoice.advancePaid, invoice.currency as SupportedCurrency)} advance)
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-sm font-medium text-primary">
-                          Receivables: {(() => {
-                            // Only show outstanding for shipped/delivered orders
-                            const shouldShowOutstanding = invoice.order?.status === "shipped" || invoice.order?.status === "delivered";
-                            const outstandingAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
-                            return formatCurrency(outstandingAmount, invoice.currency as SupportedCurrency);
-                          })()}
-                        </p>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="font-medium text-gray-700">Total Amount:</span>
+                          <div className="font-semibold text-gray-900">
+                            {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <span className="font-medium text-gray-700">Paid:</span>
+                          <div className="font-semibold text-green-600">
+                            {formatCurrency(invoice.totalPaid, invoice.currency as SupportedCurrency)}
+                            {invoice.advancePaid > 0 && (
+                              <div className="text-xs text-blue-600">
+                                ({formatCurrency(invoice.advancePaid, invoice.currency as SupportedCurrency)} advance)
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <span className="font-medium text-gray-700">Remaining:</span>
+                          <div className="font-semibold text-orange-600">
+                            {formatCurrency(remainingAmount, invoice.currency as SupportedCurrency)}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <span className="font-medium text-gray-700">Receivables:</span>
+                          <div className="font-semibold text-primary">
+                            {formatCurrency(receivablesAmount, invoice.currency as SupportedCurrency)}
+                            {!shouldShowOutstanding && (
+                              <div className="text-xs text-gray-500">
+                                (Order not shipped yet)
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     );
                   })()}
