@@ -253,63 +253,68 @@ export const reverseTransaction = mutation({
     success: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const original = await ctx.db.get(args.id);
-    if (!original) throw new Error("Transaction not found");
-    if (original.isReversed) throw new Error("Transaction already reversed");
-    if (original.paymentId) throw new Error("Payment-linked transactions can only be reversed from the Payments tab");
+    try {
+      const original = await ctx.db.get(args.id);
+      if (!original) throw new Error("Transaction not found");
+      if (original.isReversed) throw new Error("Transaction already reversed");
+      if (original.paymentId) throw new Error("Payment-linked transactions can only be reversed from the Payments tab");
 
-    const now = Date.now();
-    
-    // Reverse the original transaction
-    await ctx.db.patch(args.id, {
-      isReversed: true,
-      reversedAt: now,
-      reversalReason: args.reason || "Manual reversal",
-    });
+      const now = Date.now();
+      
+      // Reverse the original transaction
+      await ctx.db.patch(args.id, {
+        isReversed: true,
+        reversedAt: now,
+        reversalReason: args.reason || "Manual reversal",
+      });
 
-    // Check if this transaction is linked to another transaction (inter-bank transfer)
-    if (original.linkedTransactionId) {
-      const linkedTransaction = await ctx.db.get(original.linkedTransactionId);
-      if (linkedTransaction && !linkedTransaction.isReversed) {
-        // Reverse the linked transaction as well
-        await ctx.db.patch(original.linkedTransactionId, {
-          isReversed: true,
-          reversedAt: now,
-          reversalReason: `Linked reversal: ${args.reason || "Manual reversal"}`,
-        });
+      // Check if this transaction is linked to another transaction (inter-bank transfer)
+      if (original.linkedTransactionId) {
+        const linkedTransaction = await ctx.db.get(original.linkedTransactionId);
+        if (linkedTransaction && !linkedTransaction.isReversed) {
+          // Reverse the linked transaction as well
+          await ctx.db.patch(original.linkedTransactionId, {
+            isReversed: true,
+            reversedAt: now,
+            reversalReason: `Linked reversal: ${args.reason || "Manual reversal"}`,
+          });
 
-        // Update the linked transaction's bank account balance
-        await updateBankAccountBalance(ctx, linkedTransaction.bankAccountId);
+          // Update the linked transaction's bank account balance
+          await updateBankAccountBalance(ctx, linkedTransaction.bankAccountId);
 
-        // Log the linked reversal
-        await logBankTransactionEvent(ctx, {
-          entityId: String(original.linkedTransactionId),
-          action: "update",
-          message: `Linked transaction reversed: ${linkedTransaction.description} - Linked reversal: ${args.reason || "Manual reversal"}`,
-          metadata: { 
-            originalId: args.id, 
-            linkedId: original.linkedTransactionId,
-            reason: args.reason 
-          },
-        });
+          // Log the linked reversal
+          await logBankTransactionEvent(ctx, {
+            entityId: String(original.linkedTransactionId),
+            action: "update",
+            message: `Linked transaction reversed: ${linkedTransaction.description} - Linked reversal: ${args.reason || "Manual reversal"}`,
+            metadata: { 
+              originalId: args.id, 
+              linkedId: original.linkedTransactionId,
+              reason: args.reason 
+            },
+          });
+        }
       }
+
+      // Update bank account balance (reversed transactions don't contribute to balance)
+      await updateBankAccountBalance(ctx, original.bankAccountId);
+
+      await logBankTransactionEvent(ctx, {
+        entityId: String(args.id),
+        action: "update",
+        message: `Transaction reversed: ${original.description}${args.reason ? ` - ${args.reason}` : ""}`,
+        metadata: { 
+          originalId: args.id, 
+          linkedId: original.linkedTransactionId,
+          reason: args.reason 
+        },
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error reversing transaction:", error);
+      throw error;
     }
-
-    // Update bank account balance (reversed transactions don't contribute to balance)
-    await updateBankAccountBalance(ctx, original.bankAccountId);
-
-    await logBankTransactionEvent(ctx, {
-      entityId: String(args.id),
-      action: "update",
-      message: `Transaction reversed: ${original.description}${args.reason ? ` - ${args.reason}` : ""}`,
-      metadata: { 
-        originalId: args.id, 
-        linkedId: original.linkedTransactionId,
-        reason: args.reason 
-      },
-    });
-
-    return { success: true };
   },
 });
 
@@ -330,59 +335,60 @@ export const transferBetweenAccounts = mutation({
     originalCurrency: v.optional(v.string()), // Source currency
   },
   handler: async (ctx, args) => {
-    if (args.fromBankAccountId === args.toBankAccountId) {
-      throw new Error("Cannot transfer to the same account");
-    }
+    try {
+      if (args.fromBankAccountId === args.toBankAccountId) {
+        throw new Error("Cannot transfer to the same account");
+      }
 
-    if (args.amount <= 0) {
-      throw new Error("Transfer amount must be positive");
-    }
+      if (args.amount <= 0) {
+        throw new Error("Transfer amount must be positive");
+      }
 
-    // Get both bank accounts
-    const fromAccount = await ctx.db.get(args.fromBankAccountId);
-    const toAccount = await ctx.db.get(args.toBankAccountId);
-    
-    if (!fromAccount || !toAccount) {
-      throw new Error("One or both bank accounts not found");
-    }
+      // Get both bank accounts
+      const fromAccount = await ctx.db.get(args.fromBankAccountId);
+      const toAccount = await ctx.db.get(args.toBankAccountId);
+      
+      if (!fromAccount || !toAccount) {
+        throw new Error("One or both bank accounts not found");
+      }
 
-    // Determine if currency conversion is needed
-    const needsConversion = fromAccount.currency !== toAccount.currency;
-    
-    if (needsConversion) {
-      // Validate conversion parameters
-      if (!args.exchangeRate || !args.originalAmount || !args.originalCurrency) {
-        throw new Error("Exchange rate, original amount, and original currency are required for cross-currency transfers");
-      }
+      // Determine if currency conversion is needed
+      const needsConversion = fromAccount.currency !== toAccount.currency;
       
-      if (args.exchangeRate <= 0) {
-        throw new Error("Exchange rate must be greater than 0");
+      if (needsConversion) {
+        // Validate conversion parameters
+        if (!args.exchangeRate || !args.originalAmount || !args.originalCurrency) {
+          throw new Error("Exchange rate, original amount, and original currency are required for cross-currency transfers");
+        }
+        
+        if (args.exchangeRate <= 0) {
+          throw new Error("Exchange rate must be greater than 0");
+        }
+        
+        if (args.originalAmount <= 0) {
+          throw new Error("Original amount must be greater than 0");
+        }
+        
+        // Validate that original currency matches source account
+        if (args.originalCurrency !== fromAccount.currency) {
+          throw new Error(`Original currency (${args.originalCurrency}) must match source account currency (${fromAccount.currency})`);
+        }
+        
+        // Validate that target currency matches destination account
+        if (args.currency !== toAccount.currency) {
+          throw new Error(`Target currency (${args.currency}) must match destination account currency (${toAccount.currency})`);
+        }
+        
+        // Check if source account has sufficient balance in original currency
+        if (fromAccount.currentBalance && fromAccount.currentBalance < args.originalAmount) {
+          throw new Error(`Insufficient balance. Available: ${formatCurrency(fromAccount.currentBalance, fromAccount.currency)}, Required: ${formatCurrency(args.originalAmount, args.originalCurrency)}`);
+        }
+      } else {
+        // Same currency transfer - validate balance
+        if (fromAccount.currentBalance && fromAccount.currentBalance < args.amount) {
+          throw new Error(`Insufficient balance. Available: ${formatCurrency(fromAccount.currentBalance, fromAccount.currency)}, Required: ${formatCurrency(args.amount, args.currency)}`);
+        }
       }
-      
-      if (args.originalAmount <= 0) {
-        throw new Error("Original amount must be greater than 0");
-      }
-      
-      // Validate that original currency matches source account
-      if (args.originalCurrency !== fromAccount.currency) {
-        throw new Error(`Original currency (${args.originalCurrency}) must match source account currency (${fromAccount.currency})`);
-      }
-      
-      // Validate that target currency matches destination account
-      if (args.currency !== toAccount.currency) {
-        throw new Error(`Target currency (${args.currency}) must match destination account currency (${toAccount.currency})`);
-      }
-      
-      // Check if source account has sufficient balance in original currency
-      if (fromAccount.currentBalance && fromAccount.currentBalance < args.originalAmount) {
-        throw new Error(`Insufficient balance. Available: ${formatCurrency(fromAccount.currentBalance, fromAccount.currency)}, Required: ${formatCurrency(args.originalAmount, args.originalCurrency)}`);
-      }
-    } else {
-      // Same currency transfer - validate balance
-      if (fromAccount.currentBalance && fromAccount.currentBalance < args.amount) {
-        throw new Error(`Insufficient balance. Available: ${formatCurrency(fromAccount.currentBalance, fromAccount.currency)}, Required: ${formatCurrency(args.amount, args.currency)}`);
-      }
-    }
 
     // Calculate USD conversion for reporting
     let convertedAmountUSD: number | undefined;
@@ -487,7 +493,11 @@ export const transferBetweenAccounts = mutation({
       },
     });
 
-    return { transferOutId, transferInId };
+      return { transferOutId, transferInId };
+    } catch (error) {
+      console.error("Error in transfer between accounts:", error);
+      throw error;
+    }
   },
 });
 
@@ -508,6 +518,7 @@ export const getAccountWithTransactions = query({
       .query("bankTransactions")
       .filter(q => q.eq(q.field("bankAccountId"), args.bankAccountId))
       .collect();
+
 
     const sortedTransactions = transactions
       .sort((a, b) => {

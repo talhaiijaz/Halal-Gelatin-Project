@@ -225,6 +225,22 @@ export default function BankAccountModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Opening Balance
             </label>
+            
+            {/* Show current opening balance for editing */}
+            {bankAccount && (
+              <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                <div className="text-sm text-gray-700">
+                  <div className="font-medium mb-1">Current Opening Balance:</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {formatCurrencyAmount(originalOpeningBalance || 0, currency)}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    This is the original opening balance set when the account was created
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <input
               type="number"
               step="0.01"
@@ -235,27 +251,39 @@ export default function BankAccountModal({
             />
             <p className="text-xs text-gray-500 mt-1">
               {bankAccount 
-                ? "Current opening balance. Changing this will create an adjustment transaction."
+                ? "Enter the new opening balance. This will create an adjustment transaction."
                 : "Optional: Enter the initial balance when creating this bank account"
               }
             </p>
             
             {/* Show opening balance change impact for editing */}
             {bankAccount && hasOpeningBalanceChange && (
-              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-md">
                 <div className="flex items-start text-sm">
                   <Info className="h-4 w-4 mr-2 mt-0.5 text-blue-600 flex-shrink-0" />
                   <div className="text-blue-800">
-                    <p className="font-medium">Opening Balance Change Detected</p>
-                    <div className="mt-1 text-xs">
-                      <div>Original: {formatCurrencyAmount(originalOpeningBalance || 0, currency)}</div>
-                      <div>New: {formatCurrencyAmount(currentOpeningBalance, currency)}</div>
-                      <div className={`font-medium ${openingBalanceChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        Change: {openingBalanceChange > 0 ? '+' : ''}{formatCurrencyAmount(openingBalanceChange, currency)}
+                    <p className="font-medium mb-2">Opening Balance Adjustment Summary</p>
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between">
+                        <span>Original Opening Balance:</span>
+                        <span className="font-medium">{formatCurrencyAmount(originalOpeningBalance || 0, currency)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>New Opening Balance:</span>
+                        <span className="font-medium">{formatCurrencyAmount(currentOpeningBalance, currency)}</span>
+                      </div>
+                      <div className="border-t border-blue-200 pt-1 mt-2">
+                        <div className="flex justify-between">
+                          <span className="font-medium">Adjustment Amount:</span>
+                          <span className={`font-bold ${openingBalanceChange > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {openingBalanceChange > 0 ? '+' : ''}{formatCurrencyAmount(openingBalanceChange, currency)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <p className="mt-2 text-xs text-blue-600">
-                      This change will create an adjustment transaction in the transaction history.
+                    <p className="mt-3 text-xs text-blue-600 bg-blue-100 p-2 rounded">
+                      <strong>Note:</strong> This adjustment will be recorded as a transaction in the account history, 
+                      {openingBalanceChange > 0 ? ' increasing' : ' decreasing'} the account balance accordingly.
                     </p>
                   </div>
                 </div>
@@ -268,9 +296,10 @@ export default function BankAccountModal({
                 <div className="flex items-start text-sm">
                   <AlertTriangle className="h-4 w-4 mr-2 mt-0.5 text-yellow-600 flex-shrink-0" />
                   <div className="text-yellow-800">
-                    <p className="font-medium">Large Balance Change</p>
+                    <p className="font-medium">Large Balance Adjustment</p>
                     <p className="text-xs mt-1">
-                      This is a significant change to the opening balance. Please verify this is correct before saving.
+                      This is a significant change to the opening balance ({formatCurrencyAmount(Math.abs(openingBalanceChange), currency)}). 
+                      Please verify this adjustment is correct before saving.
                     </p>
                   </div>
                 </div>

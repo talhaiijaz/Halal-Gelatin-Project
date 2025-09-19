@@ -34,6 +34,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
   const [dateFilter, setDateFilter] = useState("all");
   const [selectedTxId, setSelectedTxId] = useState<string | null>(null);
   const [isTxDetailOpen, setIsTxDetailOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const bankAccount = useQuery(api.bankTransactions.getAccountWithTransactions, 
     bankAccountId ? { bankAccountId, transactionLimit: 50 } : "skip"
@@ -47,7 +48,13 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
       <div className="text-center py-12">
         <Building2 className="mx-auto h-12 w-12 text-gray-400" />
         <h3 className="mt-2 text-sm font-medium text-gray-900">No Bank Account Selected</h3>
-        <p className="mt-1 text-sm text-gray-500">Select a bank account to view transactions</p>
+        <p className="mt-1 text-sm text-gray-500">Select a bank account from the list above to view transactions and opening balance adjustments</p>
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
+          <div className="text-sm text-blue-800">
+            <p className="font-medium mb-1">💡 Tip:</p>
+            <p>Opening balance adjustments will appear in the transaction history when you modify a bank account's opening balance in the settings.</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -96,6 +103,19 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
       case "adjustment": return "Balance Adjustment";
       default: return type;
     }
+  };
+
+  const isOpeningBalanceAdjustment = (transaction: any) => {
+    return transaction.transactionType === "adjustment" && 
+           transaction.description && 
+           (transaction.description.includes("Opening balance adjustment") || 
+            transaction.description.includes("Initial opening balance"));
+  };
+
+  const isInitialOpeningBalance = (transaction: any) => {
+    return transaction.transactionType === "adjustment" && 
+           transaction.description && 
+           transaction.description.includes("Initial opening balance");
   };
 
   const filteredTransactions = bankAccount.recentTransactions
@@ -206,30 +226,36 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
         <div className="flex flex-wrap gap-3">
           <button
             onClick={() => {
+              if (isProcessing) return;
               setSelectedTransactionType("deposit");
               setIsTransactionModalOpen(true);
             }}
-            className="btn-primary flex items-center space-x-2"
+            disabled={isProcessing}
+            className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowDown className="h-4 w-4" />
             <span>Record Deposit</span>
           </button>
           <button
             onClick={() => {
+              if (isProcessing) return;
               setSelectedTransactionType("withdrawal");
               setIsTransactionModalOpen(true);
             }}
-            className="btn-secondary flex items-center space-x-2"
+            disabled={isProcessing}
+            className="btn-secondary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowUp className="h-4 w-4" />
             <span>Record Withdrawal</span>
           </button>
           <button
             onClick={() => {
+              if (isProcessing) return;
               setSelectedTransactionType("transfer");
               setIsTransactionModalOpen(true);
             }}
-            className="btn-outline flex items-center space-x-2"
+            disabled={isProcessing}
+            className="btn-outline flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowUpDown className="h-4 w-4" />
             <span>Transfer Money</span>
@@ -303,6 +329,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                     key={transaction._id} 
                     className="hover:bg-gray-50 cursor-pointer"
                     onClick={() => {
+                      if (isProcessing) return;
                       setSelectedTxId(transaction._id as unknown as string);
                       setIsTxDetailOpen(true);
                     }}
@@ -325,9 +352,37 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                         {transaction.isReversed && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-yellow-100 text-yellow-700">Reversed</span>
                         )}
+                        {isInitialOpeningBalance(transaction) && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-100 text-green-700">Initial Balance</span>
+                        )}
+                        {isOpeningBalanceAdjustment(transaction) && !isInitialOpeningBalance(transaction) && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Balance Adjustment</span>
+                        )}
                       </div>
                       {transaction.notes && (
                         <div className="text-xs text-gray-500 mt-1">{transaction.notes}</div>
+                      )}
+                      {isInitialOpeningBalance(transaction) && (
+                        <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                          <div className="flex items-center text-green-700">
+                            <Info className="h-3 w-3 mr-1" />
+                            <span className="font-medium">Initial Opening Balance</span>
+                          </div>
+                          <div className="mt-1 text-green-600">
+                            This transaction represents the initial opening balance set when the account was created
+                          </div>
+                        </div>
+                      )}
+                      {isOpeningBalanceAdjustment(transaction) && !isInitialOpeningBalance(transaction) && (
+                        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                          <div className="flex items-center text-blue-700">
+                            <Info className="h-3 w-3 mr-1" />
+                            <span className="font-medium">Opening Balance Adjustment</span>
+                          </div>
+                          <div className="mt-1 text-blue-600">
+                            This transaction represents an adjustment to the account's opening balance
+                          </div>
+                        </div>
                       )}
                       {/* Show currency conversion info for transfers */}
                       {transaction.originalAmount && transaction.originalCurrency && transaction.exchangeRate && (
@@ -368,9 +423,13 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
       {/* Transaction Modal */}
       <BankTransactionModal
         isOpen={isTransactionModalOpen}
-        onClose={() => setIsTransactionModalOpen(false)}
+        onClose={() => {
+          setIsTransactionModalOpen(false);
+          setIsProcessing(false);
+        }}
         onSuccess={() => {
           setIsTransactionModalOpen(false);
+          setIsProcessing(false);
           // Data will refresh automatically due to Convex reactivity
         }}
         bankAccountId={bankAccountId}

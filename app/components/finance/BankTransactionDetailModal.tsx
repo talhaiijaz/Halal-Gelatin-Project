@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, RotateCcw, Link2, AlertTriangle, Calendar, DollarSign, FileText, ArrowUpDown, ArrowUp, ArrowDown, CreditCard } from "lucide-react";
+import { X, RotateCcw, Link2, AlertTriangle, Calendar, DollarSign, FileText, ArrowUpDown, ArrowUp, ArrowDown, CreditCard, Info } from "lucide-react";
 import Modal from "@/app/components/ui/Modal";
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/app/utils/currencyFormat";
@@ -32,6 +32,14 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
   const isPaymentLinked = !!transaction?.paymentId;
   const isFinancialTransaction = transaction?.transactionType && 
     ['deposit', 'withdrawal', 'transfer_in', 'transfer_out'].includes(transaction.transactionType);
+  const isOpeningBalanceAdjustment = transaction?.transactionType === "adjustment" && 
+    transaction?.description && 
+    (transaction.description.includes("Opening balance adjustment") || 
+     transaction.description.includes("Initial opening balance"));
+  
+  const isInitialOpeningBalance = transaction?.transactionType === "adjustment" && 
+    transaction?.description && 
+    transaction.description.includes("Initial opening balance");
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
@@ -71,12 +79,14 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
 
   const onReverse = async () => {
     if (!transaction || transaction.isReversed || isPaymentLinked) return;
+    
     try {
       await reverseTx({ id: transaction._id as any, reason: reversalReason || undefined });
       setShowReversalInput(false);
       setReversalReason("");
       toast.success("Transaction reversed successfully");
     } catch (error: any) {
+      console.error("Error reversing transaction:", error);
       toast.error(error.message || "Failed to reverse transaction");
     }
   };
@@ -96,6 +106,37 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                   <div className="font-medium text-yellow-800">Payment-Linked Transaction</div>
                   <div className="text-sm text-yellow-700 mt-1">
                     This transaction is linked to a customer payment. Changes can only be made from the Payments tab.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Initial Opening Balance Info */}
+          {isInitialOpeningBalance && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Info className="h-5 w-5 text-green-600" />
+                <div>
+                  <div className="font-medium text-green-800">Initial Opening Balance</div>
+                  <div className="text-sm text-green-700 mt-1">
+                    This transaction represents the initial opening balance set when the bank account was created.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Opening Balance Adjustment Info */}
+          {isOpeningBalanceAdjustment && !isInitialOpeningBalance && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Info className="h-5 w-5 text-blue-600" />
+                <div>
+                  <div className="font-medium text-blue-800">Opening Balance Adjustment</div>
+                  <div className="text-sm text-blue-700 mt-1">
+                    This transaction represents an adjustment to the account's opening balance. 
+                    It was created when the opening balance was modified in the bank account settings.
                   </div>
                 </div>
               </div>
@@ -255,7 +296,7 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
               </div>
             ) : (
               <div className="flex items-center justify-center gap-4">
-                {!transaction.isReversed && transaction.status !== 'cancelled' && (
+                {!transaction.isReversed && transaction.status !== 'cancelled' && !isOpeningBalanceAdjustment && (
                   <>
                     {!showReversalInput ? (
                       <button
@@ -289,6 +330,12 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                       </div>
                     )}
                   </>
+                )}
+                
+                {isOpeningBalanceAdjustment && (
+                  <div className="text-center py-2">
+                    <div className="text-sm text-gray-500">Opening balance adjustments cannot be reversed. Modify the opening balance in bank account settings instead.</div>
+                  </div>
                 )}
                 
                 {transaction.isReversed && (

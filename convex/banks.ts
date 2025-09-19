@@ -70,7 +70,27 @@ export const create = mutation({
       createdAt: Date.now(),
     });
 
-    // Set current balance to opening balance initially (no transaction needed)
+    // If opening balance is provided, create an initial opening balance transaction
+    if (args.openingBalance && args.openingBalance !== 0) {
+      const now = Date.now();
+      
+      // Create opening balance transaction
+      await ctx.db.insert("bankTransactions", {
+        bankAccountId: bankAccountId,
+        transactionType: "adjustment",
+        amount: args.openingBalance, // Positive for opening balance
+        currency: args.currency,
+        description: `Initial opening balance: ${args.openingBalance}`,
+        reference: `OB-INIT-${now}`,
+        transactionDate: now,
+        status: "completed",
+        notes: `Initial opening balance set when account was created: ${args.openingBalance}`,
+        recordedBy: undefined as any, // TODO: Get from auth context
+        createdAt: now,
+      });
+    }
+
+    // Set current balance to opening balance initially
     await ctx.db.patch(bankAccountId, {
       currentBalance: args.openingBalance || 0,
     });
@@ -121,6 +141,7 @@ export const update = mutation({
     const oldOpeningBalance = currentAccount.openingBalance || 0;
     const newOpeningBalance = args.openingBalance || 0;
     const openingBalanceChanged = oldOpeningBalance !== newOpeningBalance;
+    const openingBalanceDifference = newOpeningBalance - oldOpeningBalance;
 
     // Update the bank account
     await ctx.db.patch(args.id, {
@@ -132,8 +153,26 @@ export const update = mutation({
       status: args.status,
     });
 
-    // If opening balance changed, recalculate current balance (no adjustment transaction needed)
+    // If opening balance changed, create an adjustment transaction
     if (openingBalanceChanged) {
+      const now = Date.now();
+      
+      // Create adjustment transaction
+      await ctx.db.insert("bankTransactions", {
+        bankAccountId: args.id,
+        transactionType: "adjustment",
+        amount: openingBalanceDifference, // Positive for increase, negative for decrease
+        currency: args.currency,
+        description: `Opening balance adjustment: ${oldOpeningBalance} → ${newOpeningBalance}`,
+        reference: `OB-ADJ-${now}`,
+        transactionDate: now,
+        status: "completed",
+        notes: `Opening balance adjusted from ${oldOpeningBalance} to ${newOpeningBalance}. Difference: ${openingBalanceDifference > 0 ? '+' : ''}${openingBalanceDifference}`,
+        recordedBy: undefined as any, // TODO: Get from auth context
+        createdAt: now,
+      });
+
+      // Recalculate current balance
       await updateBankAccountBalance(ctx, args.id);
     }
 
@@ -278,3 +317,4 @@ export const getStats = query({
     };
   },
 });
+

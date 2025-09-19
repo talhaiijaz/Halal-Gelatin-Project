@@ -104,6 +104,7 @@ export default function BankTransactionModal({
       if (transactionType === "transfer") {
         if (!formData.toBankAccountId || !destinationAccount) {
           toast.error("Please select destination account");
+          setIsSubmitting(false);
           return;
         }
 
@@ -111,6 +112,7 @@ export default function BankTransactionModal({
         if (needsConversion) {
           if (!formData.originalAmount || !formData.exchangeRate) {
             toast.error("Original amount and exchange rate are required for cross-currency transfers");
+            setIsSubmitting(false);
             return;
           }
 
@@ -119,12 +121,14 @@ export default function BankTransactionModal({
           
           if (originalAmount <= 0) {
             toast.error("Original amount must be greater than 0");
+            setIsSubmitting(false);
             return;
           }
 
           const validation = validateExchangeRate(exchangeRate, sourceAccount.currency, destinationAccount.currency);
           if (!validation.isValid) {
             toast.error(validation.error || "Invalid exchange rate");
+            setIsSubmitting(false);
             return;
           }
 
@@ -150,12 +154,14 @@ export default function BankTransactionModal({
           // Same currency transfer
           if (!formData.amount) {
             toast.error("Please enter transfer amount");
+            setIsSubmitting(false);
             return;
           }
 
           const amount = parseFloat(formData.amount);
           if (amount <= 0) {
             toast.error("Amount must be greater than 0");
+            setIsSubmitting(false);
             return;
           }
 
@@ -176,12 +182,14 @@ export default function BankTransactionModal({
         // Deposit or withdrawal
         if (!formData.amount) {
           toast.error("Please enter amount");
+          setIsSubmitting(false);
           return;
         }
 
         const amount = parseFloat(formData.amount);
         if (amount <= 0) {
           toast.error("Amount must be greater than 0");
+          setIsSubmitting(false);
           return;
         }
 
