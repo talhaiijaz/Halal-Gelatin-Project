@@ -419,11 +419,11 @@ export const transferBetweenAccounts = mutation({
       description: `Transfer to ${toAccount.accountName}: ${args.description}`,
       reference: args.reference,
       relatedBankAccountId: args.toBankAccountId,
-      transactionDate: userTransactionDate - 1000, // 1 second earlier for outgoing transfer
+      transactionDate: userTransactionDate, // Use same transaction date as transfer in
       status: "completed",
       notes: args.notes,
       recordedBy: undefined as any,
-      createdAt: now - 1000,
+      createdAt: now + 1, // Slightly later to ensure it appears first in sorting
     };
 
     // Add conversion fields for outgoing transaction
