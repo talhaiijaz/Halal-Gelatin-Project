@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { 
@@ -557,10 +558,26 @@ export default function DashboardPage() {
         </div>
 
         {/* Modal for Details */}
-        {expandedMetric && (
-          <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4" style={{ width: '100vw', height: '100vh' }}>
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-4 overflow-hidden border border-gray-200">
+        {expandedMetric && createPortal((
+          <div 
+            className="fixed z-[60] flex items-start justify-center pt-4" 
+            style={{ 
+              top: 0, 
+              left: 0, 
+              right: 0, 
+              bottom: 0,
+              width: '100vw', 
+              height: '100vh' 
+            }}
+          >
+            <div 
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+              onClick={() => setExpandedMetric(null)} 
+            />
+            <div 
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-4 overflow-hidden border border-gray-200"
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Header */}
               <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
                 <div className="flex items-center justify-between">
@@ -773,7 +790,7 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        )}
+        ), document.body)}
 
       </div>
 
