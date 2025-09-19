@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, Search, Plus } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -11,6 +12,7 @@ import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUt
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 import { formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import toast from "react-hot-toast";
+import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
 
 interface OrderItem {
   product: string;
@@ -93,6 +95,9 @@ export default function CreateOrderModal({
   const clients = useQuery(api.clients.list, {});
   const bankAccounts = useQuery(api.banks.list);
   const createOrder = useMutation(api.orders.create);
+
+  // Lock body scroll when modal is open
+  useModalBodyScrollLock(isOpen);
 
   // Currency helpers
   const selectedClient = (Array.isArray(clients) ? clients : clients?.page || []).find(c => c._id === selectedClientId);
@@ -557,12 +562,12 @@ export default function CreateOrderModal({
 
   if (!isOpen) return null;
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="fixed inset-0 bg-black bg-opacity-25" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
 
-        <div className="relative bg-white rounded-lg w-full max-w-2xl">
+        <div className="relative bg-white rounded-lg w-full max-w-2xl shadow-2xl">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b">
             <div>
@@ -1375,4 +1380,7 @@ export default function CreateOrderModal({
       </div>
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }
