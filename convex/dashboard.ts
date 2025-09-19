@@ -160,20 +160,22 @@ export const getStats = query({
     });
     const outstandingAmount = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
     
-    // Calculate revenue by currency using payments (with conversion for international)
-    const revenueUSD = filteredPayments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "international" && p.convertedAmountUSD;
-      })
-      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
-    
-    const revenuePKR = filteredPayments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "local";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
+    // Calculate revenue by currency using payments; group by realized (bank) currency when converted
+    const paidByCurrency: Record<string, number> = {};
+    for (const p of filteredPayments) {
+      let cur = p.currency;
+      let amt = p.amount;
+      if (p.bankAccountId) {
+        const bank = await ctx.db.get(p.bankAccountId);
+        if (bank && bank.currency && bank.currency !== p.currency && (p as any).convertedAmountUSD) {
+          cur = bank.currency;
+          amt = (p as any).convertedAmountUSD as number;
+        }
+      }
+      paidByCurrency[cur] = (paidByCurrency[cur] || 0) + amt;
+    }
+    const revenueUSD = paidByCurrency["USD"] || 0;
+    const revenuePKR = paidByCurrency["PKR"] || 0;
     
     // Calculate outstanding by currency (only for shipped/delivered orders)
     const outstandingByCurrency: Record<string, number> = {};

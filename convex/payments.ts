@@ -209,8 +209,20 @@ export const recordPayment = mutation({
         entityTable: "payments",
         entityId: String(paymentId),
         action: "create",
-        message: `Payment recorded for invoice ${invoice.invoiceNumber || String(invoice._id)}: ${args.amount}`,
-        metadata: { invoiceId: args.invoiceId, clientId, netCash, withheldAmount, rate },
+        message: `Payment recorded for invoice ${invoice.invoiceNumber || String(invoice._id)}: ${formatCurrency(args.amount, currency)}${(needsConversion && convertedAmountUSD && bankCurrency) ? ` (${formatCurrency(convertedAmountUSD, bankCurrency)})` : ""}`,
+        metadata: { 
+          invoiceId: args.invoiceId, 
+          clientId, 
+          netCash, 
+          withheldAmount, 
+          rate,
+          conversion: needsConversion ? {
+            fromCurrency: currency,
+            toCurrency: bankCurrency,
+            exchangeRate: conversionRateToUSD,
+            convertedAmount: convertedAmountUSD,
+          } : undefined,
+        },
       });
 
       // If linked to a bank account, also log activity under that bank account and update balance
@@ -278,7 +290,9 @@ export const recordPayment = mutation({
 
         // Add currency conversion fields if conversion was needed
         if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
-          bankTransactionData.originalAmount = args.amount;
+          // Store the actual amount that was converted (net amount if withholding applied)
+          const actualConvertedAmount = rate > 0 ? netCash : args.amount;
+          bankTransactionData.originalAmount = actualConvertedAmount;
           bankTransactionData.originalCurrency = currency;
           bankTransactionData.exchangeRate = conversionRateToUSD;
           bankTransactionData.convertedAmountUSD = convertedAmountUSD;
@@ -372,7 +386,7 @@ export const recordPayment = mutation({
     
     if (needsConversion && client.type === "international") {
       if (!args.conversionRateToUSD) {
-        throw new Error(`Payment validation failed: Conversion rate to USD is required for international advance payments in ${currency}. Please provide the exchange rate to convert ${currency} to USD.`);
+        throw new Error(`Conversion rate is required when paying ${currency} advance with ${bankCurrency} bank account`);
       }
       conversionRateToUSD = args.conversionRateToUSD;
       convertedAmountUSD = args.amount * conversionRateToUSD;
@@ -485,7 +499,9 @@ export const recordPayment = mutation({
 
       // Add currency conversion fields if conversion was needed
       if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
-        bankTransactionData.originalAmount = args.amount;
+        // Store the actual amount that was converted (net amount if withholding applied)
+        const actualConvertedAmount = rateForAdvance > 0 ? netCashAdvance : args.amount;
+        bankTransactionData.originalAmount = actualConvertedAmount;
         bankTransactionData.originalCurrency = currency;
         bankTransactionData.exchangeRate = conversionRateToUSD;
         bankTransactionData.convertedAmountUSD = convertedAmountUSD;
@@ -588,6 +604,7 @@ export const list = query({
             accountName: bankAccount.accountName,
             bankName: bankAccount.bankName,
             accountNumber: bankAccount.accountNumber,
+            currency: bankAccount.currency,
           } : null,
           recordedByUser: recordedBy ? {
             _id: recordedBy._id,

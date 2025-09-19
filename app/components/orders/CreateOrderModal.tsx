@@ -747,7 +747,7 @@ export default function CreateOrderModal({
                         <option value="SGD">SGD - Singapore Dollar</option>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">
-                        Select the currency for this order. Conversion rate to USD will be required during payment.
+                        Select the currency for this order. A conversion rate may be required during payment if the bank account currency differs.
                       </p>
                     </div>
                   )}

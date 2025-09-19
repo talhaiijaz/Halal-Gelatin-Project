@@ -120,13 +120,19 @@ export const getDashboardStats = query({
       revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + order.totalAmount;
     });
     
-    // Payments come from actual payments
-    yearPayments.forEach(payment => {
-      const currency = payment.currency;
-      const amount = payment.amount;
-      
-      paidByCurrency[currency] = (paidByCurrency[currency] || 0) + amount;
-    });
+    // Payments come from actual payments (respect bank currency if conversion occurred)
+    for (const payment of yearPayments) {
+      let bucketCurrency = payment.currency;
+      let bucketAmount = payment.amount;
+      if (payment.bankAccountId) {
+        const bank = await ctx.db.get(payment.bankAccountId);
+        if (bank && bank.currency && bank.currency !== payment.currency && (payment as any).convertedAmountUSD) {
+          bucketCurrency = bank.currency;
+          bucketAmount = (payment as any).convertedAmountUSD as number;
+        }
+      }
+      paidByCurrency[bucketCurrency] = (paidByCurrency[bucketCurrency] || 0) + bucketAmount;
+    }
     
     // For backward compatibility, extract individual currency totals
     const totalRevenueUSD = revenueByCurrency["USD"] || 0;
@@ -145,9 +151,23 @@ export const getDashboardStats = query({
       return order && (order.status === "pending" || order.status === "in_production");
     });
     const advanceByCurrency: Record<string, number> = {};
-    preShipmentInvoices.forEach(inv => {
-      advanceByCurrency[inv.currency] = (advanceByCurrency[inv.currency] || 0) + inv.totalPaid;
-    });
+    // Derive advance totals by bank currency where applicable
+    for (const inv of preShipmentInvoices) {
+      // Gather payments linked to this invoice
+      const invoicePayments = yearPayments.filter(p => p.invoiceId === inv._id);
+      for (const p of invoicePayments) {
+        let cur = inv.currency;
+        let amt = p.amount;
+        if (p.bankAccountId) {
+          const bank = await ctx.db.get(p.bankAccountId);
+          if (bank && bank.currency && bank.currency !== p.currency && (p as any).convertedAmountUSD) {
+            cur = bank.currency;
+            amt = (p as any).convertedAmountUSD as number;
+          }
+        }
+        advanceByCurrency[cur] = (advanceByCurrency[cur] || 0) + amt;
+      }
+    }
     const advancePaymentsUSD = advanceByCurrency["USD"] || 0;
     const advancePaymentsPKR = advanceByCurrency["PKR"] || 0;
     const advancePaymentsEUR = advanceByCurrency["EUR"] || 0;
@@ -398,56 +418,50 @@ export const getInvoiceStats = query({
       }
     });
 
-    // Get payments and clients for accurate paid amounts
+    // Get payments
     const payments = await ctx.db.query("payments").collect();
-    const clients = await ctx.db.query("clients").collect();
     
-    // Calculate paid amounts by currency using actual payments (with conversion for international)
-    const totalPaidUSD = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "international" && p.convertedAmountUSD;
-      })
-      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
-    
-    const totalPaidPKR = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return client?.type === "local";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
+    // Calculate paid amounts by currency using actual payments; group by bank currency when converted
+    const paidByCurrency: Record<string, number> = {};
+    for (const p of payments) {
+      let cur = p.currency;
+      let amt = p.amount;
+      if (p.bankAccountId) {
+        const bank = await ctx.db.get(p.bankAccountId);
+        if (bank && bank.currency && bank.currency !== p.currency && (p as any).convertedAmountUSD) {
+          cur = bank.currency;
+          amt = (p as any).convertedAmountUSD as number;
+        }
+      }
+      paidByCurrency[cur] = (paidByCurrency[cur] || 0) + amt;
+    }
 
-    // Calculate advance payments by currency
-    const advancePaymentsUSD = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return p.type === "advance" && client?.type === "international" && p.convertedAmountUSD;
-      })
-      .reduce((sum, p) => sum + (p.convertedAmountUSD || 0), 0);
-    
-    const advancePaymentsPKR = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return p.type === "advance" && client?.type === "local";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
+    const totalPaidUSD = paidByCurrency["USD"] || 0;
+    const totalPaidPKR = paidByCurrency["PKR"] || 0;
+    const totalPaidEUR = paidByCurrency["EUR"] || 0;
+    const totalPaidAED = paidByCurrency["AED"] || 0;
 
-    const advancePaymentsEUR = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return p.type === "advance" && client?.type === "international" && p.currency === "EUR";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
-
-    const advancePaymentsAED = payments
-      .filter(p => {
-        const client = clients.find(c => c._id === p.clientId);
-        return p.type === "advance" && client?.type === "international" && p.currency === "AED";
-      })
-      .reduce((sum, p) => sum + p.amount, 0);
+    // Calculate advance payments by currency using same grouping
+    const advanceByCurrency: Record<string, number> = {};
+    for (const p of payments.filter(p => p.type === "advance")) {
+      let cur = p.currency;
+      let amt = p.amount;
+      if (p.bankAccountId) {
+        const bank = await ctx.db.get(p.bankAccountId);
+        if (bank && bank.currency && bank.currency !== p.currency && (p as any).convertedAmountUSD) {
+          cur = bank.currency;
+          amt = (p as any).convertedAmountUSD as number;
+        }
+      }
+      advanceByCurrency[cur] = (advanceByCurrency[cur] || 0) + amt;
+    }
+    const advancePaymentsUSD = advanceByCurrency["USD"] || 0;
+    const advancePaymentsPKR = advanceByCurrency["PKR"] || 0;
+    const advancePaymentsEUR = advanceByCurrency["EUR"] || 0;
+    const advancePaymentsAED = advanceByCurrency["AED"] || 0;
 
     const totalOutstanding = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
-    const totalPaid = totalPaidUSD + totalPaidPKR; // Use converted amounts
+    const totalPaid = totalPaidUSD + totalPaidPKR + totalPaidEUR + totalPaidAED; // Use grouped amounts
     const totalOutstandingUSD = shippedOrDeliveredInvoices.filter(i => i.currency === "USD").reduce((s, i) => s + i.outstandingBalance, 0);
     const totalOutstandingPKR = shippedOrDeliveredInvoices.filter(i => i.currency === "PKR").reduce((s, i) => s + i.outstandingBalance, 0);
     const totalOutstandingEUR = shippedOrDeliveredInvoices.filter(i => i.currency === "EUR").reduce((s, i) => s + i.outstandingBalance, 0);
@@ -455,14 +469,8 @@ export const getInvoiceStats = query({
     const overdueCount = 0;
     const totalCount = invoices.length;
 
-    // Calculate paid by currency for display (only show USD and PKR for paid amounts)
-    const paidByCurrency: Record<string, number> = {};
-    if (totalPaidUSD > 0) {
-      paidByCurrency["USD"] = totalPaidUSD;
-    }
-    if (totalPaidPKR > 0) {
-      paidByCurrency["PKR"] = totalPaidPKR;
-    }
+    // Include all currencies present
+    // Note: paidByCurrency already built above
 
     return {
       totalOutstanding,

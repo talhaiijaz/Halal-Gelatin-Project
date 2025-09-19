@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { getSuggestedExchangeRate } from "@/app/utils/currencyConversion";
 import { parseError, displayError, validateRequiredFields, formatValidationError } from "@/app/utils/errorHandling";
 import Modal from "@/app/components/ui/Modal";
 
@@ -416,7 +417,10 @@ export default function RecordPaymentModal({
                         onChange={(e) => setFormData(prev => ({ ...prev, conversionRateToUSD: e.target.value }))}
                         min="0"
                         step="0.0001"
-                        placeholder={`e.g. ${invoice.currency === 'EUR' ? '1.08' : invoice.currency === 'AED' ? '0.27' : '1.0'}`}
+                        placeholder={(() => {
+                          const suggested = getSuggestedExchangeRate(invoice.currency, selectedBank.currency);
+                          return suggested ? `e.g. ${suggested}` : "Enter rate";
+                        })()}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                         required
                       />
