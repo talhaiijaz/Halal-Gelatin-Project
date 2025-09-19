@@ -88,8 +88,8 @@ export const getDashboardStats = query({
 
     const totalPaid = yearInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     
-    // Calculate outstanding only for shipped/delivered orders
-    const shippedOrDeliveredInvoices = yearInvoices.filter(inv => {
+    // Calculate outstanding only for shipped/delivered orders - ROLLING (all invoices)
+    const shippedOrDeliveredInvoices = invoices.filter(inv => {
       const order = allOrders.find(o => o._id === inv.orderId);
       return order && (order.status === "shipped" || order.status === "delivered");
     });
@@ -146,15 +146,16 @@ export const getDashboardStats = query({
     const totalPaidAED = paidByCurrency["AED"] || 0;
     
     // Compute advance payments as payments recorded against invoices whose orders are pending/in_production
-    const preShipmentInvoices = yearInvoices.filter(inv => {
+    // Advance payments for orders not yet shipped (pending/in_production) - ROLLING (all invoices)
+    const preShipmentInvoices = invoices.filter(inv => {
       const order = allOrders.find(o => o._id === inv.orderId);
       return order && (order.status === "pending" || order.status === "in_production");
     });
     const advanceByCurrency: Record<string, number> = {};
     // Derive advance totals by bank currency where applicable
     for (const inv of preShipmentInvoices) {
-      // Gather payments linked to this invoice
-      const invoicePayments = yearPayments.filter(p => p.invoiceId === inv._id);
+      // Gather payments linked to this invoice (ROLLING - all payments)
+      const invoicePayments = payments.filter(p => p.invoiceId === inv._id);
       for (const p of invoicePayments) {
         let cur = inv.currency;
         let amt = p.amount;
@@ -173,8 +174,8 @@ export const getDashboardStats = query({
     const advancePaymentsEUR = advanceByCurrency["EUR"] || 0;
     const advancePaymentsAED = advanceByCurrency["AED"] || 0;
 
-    // Pipeline order value by currency (pending + in_production)
-    const pipelineOrders = yearOrders.filter(o => ["pending", "in_production"].includes(o.status));
+    // Pipeline order value by currency (pending + in_production) - ROLLING (all orders)
+    const pipelineOrders = allOrders.filter(o => ["pending", "in_production"].includes(o.status));
     const pipelineByCurrency: Record<string, number> = {};
     pipelineOrders.forEach(order => {
       pipelineByCurrency[order.currency] = (pipelineByCurrency[order.currency] || 0) + order.totalAmount;

@@ -97,13 +97,13 @@ export default function DashboardPage() {
   const receivablesDetails = useQuery(
     api.dashboard.getReceivablesDetails,
     expandedMetric && expandedMetric.metric === 'receivables'
-      ? { fiscalYear: currentFiscalYear, type: expandedMetric.audience }
+      ? { type: expandedMetric.audience } // Rolling - no fiscal year filter
       : 'skip'
   );
   const advanceDetails = useQuery(
     api.dashboard.getAdvancePaymentsDetails,
     expandedMetric && expandedMetric.metric === 'advance'
-      ? { fiscalYear: currentFiscalYear, type: expandedMetric.audience }
+      ? { type: expandedMetric.audience } // Rolling - no fiscal year filter
       : 'skip'
   );
   const revenueDetails = useQuery(
@@ -115,7 +115,7 @@ export default function DashboardPage() {
   const pendingOrdersDetails = useQuery(
     api.dashboard.getPendingOrdersDetails,
     expandedMetric && expandedMetric.metric === 'pending'
-      ? { fiscalYear: currentFiscalYear, type: expandedMetric.audience }
+      ? { type: expandedMetric.audience } // Rolling - no fiscal year filter
       : 'skip'
   );
 

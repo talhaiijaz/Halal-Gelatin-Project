@@ -133,28 +133,33 @@ export const getStats = query({
       return client?.type === "international";
     }).length;
 
-    // Filter invoices and payments by fiscal year if specified
-    let filteredInvoices = invoices;
-    let filteredPayments = payments;
+    // For rolling metrics (pending orders, advance payments, receivables), use all invoices
+    // For fiscal year metrics (total revenue, total orders), filter by fiscal year
+    let fiscalYearInvoices = invoices;
+    let fiscalYearPayments = payments;
     
     if (args.fiscalYear) {
-      filteredInvoices = invoices.filter(inv => {
+      fiscalYearInvoices = invoices.filter(inv => {
         const order = orders.find(o => o._id === inv.orderId);
         return order && order.fiscalYear === args.fiscalYear;
       });
       
-      filteredPayments = payments.filter(payment => {
-        const invoice = filteredInvoices.find(inv => inv._id === payment.invoiceId);
+      fiscalYearPayments = payments.filter(payment => {
+        const invoice = fiscalYearInvoices.find(inv => inv._id === payment.invoiceId);
         return invoice !== undefined;
       });
     }
-
-    // Calculate financial stats using payments with converted amounts
-    const totalRevenue = filteredInvoices.reduce((sum, inv) => sum + inv.amount, 0);
-    const totalPaid = filteredInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
     
-    // Calculate outstanding only for shipped/delivered orders
-    const shippedOrDeliveredInvoices = filteredInvoices.filter(inv => {
+    // Use all invoices for rolling metrics (pending orders, advance payments, receivables)
+    const rollingInvoices = invoices;
+    const rollingPayments = payments;
+
+    // Calculate financial stats using fiscal year invoices for totals
+    const totalRevenue = fiscalYearInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const totalPaid = fiscalYearInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
+    
+    // Calculate outstanding only for shipped/delivered orders (ROLLING - use all invoices)
+    const shippedOrDeliveredInvoices = rollingInvoices.filter(inv => {
       const order = orders.find(o => o._id === inv.orderId);
       return order && (order.status === "shipped" || order.status === "delivered");
     });
@@ -162,7 +167,7 @@ export const getStats = query({
     
     // Calculate revenue by currency using payments; group by realized (bank) currency when converted
     const paidByCurrency: Record<string, number> = {};
-    for (const p of filteredPayments) {
+    for (const p of fiscalYearPayments) {
       let cur = p.currency;
       let amt = p.amount;
       if (p.bankAccountId) {
@@ -257,8 +262,8 @@ export const getStats = query({
       })
       .reduce((sum, order) => sum + order.totalAmount, 0);
 
-    // 2. Advance Payments - payments for orders not yet shipped (pending/in_production)
-    const advancePaymentInvoices = filteredInvoices.filter(inv => {
+    // 2. Advance Payments - payments for orders not yet shipped (pending/in_production) (ROLLING)
+    const advancePaymentInvoices = rollingInvoices.filter(inv => {
       const order = orders.find(o => o._id === inv.orderId);
       return order && ["pending", "in_production"].includes(order.status);
     });
@@ -640,15 +645,9 @@ export const getReceivablesDetails = query({
   handler: async (ctx, args) => {
     const clients = await ctx.db.query("clients").collect();
     const orders = await ctx.db.query("orders").collect();
-    let invoices = await ctx.db.query("invoices").collect();
+    const invoices = await ctx.db.query("invoices").collect();
 
-    if (args.fiscalYear) {
-      invoices = invoices.filter((inv) => {
-        const order = orders.find((o) => o._id === inv.orderId);
-        return order && order.fiscalYear === args.fiscalYear;
-      });
-    }
-
+    // Receivables are rolling - no fiscal year filtering
     // Only shipped/delivered orders and positive outstanding
     const result = [] as Array<{
       invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; outstandingBalance: number; issueDate: number; dueDate: number;
@@ -702,14 +701,9 @@ export const getAdvancePaymentsDetails = query({
   handler: async (ctx, args) => {
     const clients = await ctx.db.query("clients").collect();
     const orders = await ctx.db.query("orders").collect();
-    let invoices = await ctx.db.query("invoices").collect();
+    const invoices = await ctx.db.query("invoices").collect();
 
-    if (args.fiscalYear) {
-      invoices = invoices.filter((inv) => {
-        const order = orders.find((o) => o._id === inv.orderId);
-        return order && order.fiscalYear === args.fiscalYear;
-      });
-    }
+    // Advance payments are rolling - no fiscal year filtering
 
     const result = [] as Array<{
       invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; advancePaid: number; issueDate: number; dueDate: number;
@@ -840,9 +834,7 @@ export const getPendingOrdersDetails = query({
         return client?.type === args.type;
       });
     }
-    if (args.fiscalYear) {
-      orders = orders.filter((o) => o.fiscalYear === args.fiscalYear);
-    }
+    // Pending orders are rolling - no fiscal year filtering
 
     const result = [] as Array<{ orderId: any; orderNumber: string; invoiceNumber: string | null; clientId: any; clientName: string | null; status: string; totalAmount: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
 

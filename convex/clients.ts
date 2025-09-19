@@ -361,9 +361,13 @@ export const getStats = query({
         })
       : orders;
 
-    // Filter by fiscal year if specified
+    // For rolling metrics (pending orders, receivables), keep all orders
+    // For fiscal year metrics (total revenue, total orders), filter by fiscal year
+    const rollingOrders = clientOrders;
+    let fiscalYearOrders = clientOrders;
+    
     if (args.fiscalYear) {
-      clientOrders = clientOrders.filter(order => order.fiscalYear === args.fiscalYear);
+      fiscalYearOrders = clientOrders.filter(order => order.fiscalYear === args.fiscalYear);
     }
 
     // Calculate revenue from actual payments (not invoices)
@@ -391,7 +395,7 @@ export const getStats = query({
       });
     }
 
-    // Calculate revenue from payments (use original amounts, not converted)
+    // Calculate revenue from payments (use original amounts, not converted) - FISCAL YEAR
     const totalRevenue = clientPayments.reduce((sum, payment) => {
       return sum + payment.amount;
     }, 0);
@@ -402,17 +406,21 @@ export const getStats = query({
         })
       : invoices;
 
-    // Filter invoices by fiscal year if specified
+    // For rolling metrics (receivables), keep all invoices
+    // For fiscal year metrics, filter by fiscal year
+    const rollingInvoices = clientInvoices;
+    let fiscalYearInvoices = clientInvoices;
+    
     if (args.fiscalYear) {
-      clientInvoices = clientInvoices.filter(invoice => {
-        const order = clientOrders.find(o => o._id === invoice.orderId);
+      fiscalYearInvoices = clientInvoices.filter(invoice => {
+        const order = fiscalYearOrders.find(o => o._id === invoice.orderId);
         return order && order.fiscalYear === args.fiscalYear;
       });
     }
 
-    // Calculate outstanding by currency (only for shipped/delivered orders)
-    const shippedOrDeliveredInvoices = clientInvoices.filter(inv => {
-      const order = clientOrders.find(o => o._id === inv.orderId);
+    // Calculate outstanding by currency (only for shipped/delivered orders) - ROLLING
+    const shippedOrDeliveredInvoices = rollingInvoices.filter(inv => {
+      const order = rollingOrders.find(o => o._id === inv.orderId);
       return order && (order.status === "shipped" || order.status === "delivered");
     });
 
@@ -427,8 +435,8 @@ export const getStats = query({
     const outstandingAmount = shippedOrDeliveredInvoices
       .reduce((sum, inv) => sum + inv.outstandingBalance, 0);
 
-    // Calculate pipeline order value (pending + in_production)
-    const pipelineOrders = clientOrders.filter(o => ["pending", "in_production"].includes(o.status));
+    // Calculate pipeline order value (pending + in_production) - ROLLING
+    const pipelineOrders = rollingOrders.filter(o => ["pending", "in_production"].includes(o.status));
     const currentPendingOrdersValue = pipelineOrders.reduce((sum, order) => sum + order.totalAmount, 0);
 
     // Pipeline order value by currency
@@ -438,9 +446,9 @@ export const getStats = query({
       currentPendingValueByCurrency[currency] = (currentPendingValueByCurrency[currency] || 0) + order.totalAmount;
     });
 
-    // Calculate advance payments as amounts paid on invoices whose orders are not yet shipped/delivered
-    const preShipmentInvoices = clientInvoices.filter(inv => {
-      const order = clientOrders.find(o => o._id === inv.orderId);
+    // Calculate advance payments as amounts paid on invoices whose orders are not yet shipped/delivered - ROLLING
+    const preShipmentInvoices = rollingInvoices.filter(inv => {
+      const order = rollingOrders.find(o => o._id === inv.orderId);
       return order && (order.status === "pending" || order.status === "in_production");
     });
     const advancePayments = preShipmentInvoices.reduce((sum, inv) => sum + inv.totalPaid, 0);
@@ -462,10 +470,10 @@ export const getStats = query({
     return {
       totalClients: clients.length,
       activeClients: activeClients.length,
-      totalOrders: clientOrders.length,
-      activeOrders: clientOrders.filter(o => 
+      totalOrders: fiscalYearOrders.length, // FISCAL YEAR
+      activeOrders: fiscalYearOrders.filter(o => 
         ["pending", "in_production", "shipped"].includes(o.status)
-      ).length,
+      ).length, // FISCAL YEAR
       totalRevenue,
       outstandingAmount,
       outstandingByCurrency,

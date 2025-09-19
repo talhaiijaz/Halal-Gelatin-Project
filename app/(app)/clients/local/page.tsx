@@ -153,13 +153,13 @@ export default function LocalClientsPage() {
   const receivablesDetails = useQuery(
     api.dashboard.getReceivablesDetails,
     expandedMetric && expandedMetric.metric === 'receivables'
-      ? { fiscalYear: dashboardFiscalYear, type: expandedMetric.audience }
+      ? { type: expandedMetric.audience } // Rolling - no fiscal year filter
       : 'skip'
   );
   const advanceDetails = useQuery(
     api.dashboard.getAdvancePaymentsDetails,
     expandedMetric && expandedMetric.metric === 'advance'
-      ? { fiscalYear: dashboardFiscalYear, type: expandedMetric.audience }
+      ? { type: expandedMetric.audience } // Rolling - no fiscal year filter
       : 'skip'
   );
   const revenueDetails = useQuery(
@@ -171,7 +171,7 @@ export default function LocalClientsPage() {
   const pendingOrdersDetails = useQuery(
     api.dashboard.getPendingOrdersDetails,
     expandedMetric && expandedMetric.metric === 'pending'
-      ? { fiscalYear: dashboardFiscalYear, type: expandedMetric.audience }
+      ? { type: expandedMetric.audience } // Rolling - no fiscal year filter
       : 'skip'
   );
   
