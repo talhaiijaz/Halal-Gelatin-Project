@@ -232,7 +232,7 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                   <span className="font-medium text-orange-800">{formatCurrency(payment.amount, payment.currency as any)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-orange-700">Income Tax Withheld ({payment.withheldTaxRate}%):</span>
+                  <span className="text-sm text-orange-700">Tax Withheld ({payment.withheldTaxRate}%):</span>
                   <span className="font-medium text-orange-800">-{formatCurrency(payment.withheldTaxAmount, payment.currency as any)}</span>
                 </div>
                 <div className="border-t border-orange-200 pt-2">

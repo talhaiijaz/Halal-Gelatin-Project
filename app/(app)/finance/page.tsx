@@ -770,7 +770,7 @@ export default function FinancePage() {
                           if (hasConversionFields && currencyMismatch && payment.convertedAmountUSD) {
                             return (
                               <div className="text-xs text-gray-500">
-                                ≈ {formatCurrency(payment.convertedAmountUSD, 'USD')}
+                                ≈ {formatCurrency(payment.convertedAmountUSD, bankAccount.currency as SupportedCurrency)}
                               </div>
                             );
                           }

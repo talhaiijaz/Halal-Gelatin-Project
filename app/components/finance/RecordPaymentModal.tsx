@@ -114,7 +114,20 @@ export default function RecordPaymentModal({
       // Calculate withholding rate
       const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
       const isLocalClient = selectedClient?.type === "local";
-      const rate = formData.applyWithholding && isLocalClient ? Math.max(0, parseFloat(formData.withholdingRate || "0")) : 0;
+      const isInternationalClient = selectedClient?.type === "international";
+      
+      // Check if withholding applies (local clients OR international clients using local bank accounts)
+      let rate = 0;
+      if (formData.applyWithholding) {
+        if (isLocalClient) {
+          rate = Math.max(0, parseFloat(formData.withholdingRate || "0"));
+        } else if (isInternationalClient && selectedBankAccountId && bankAccounts) {
+          const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+          if (selectedBank?.currency === "PKR") {
+            rate = Math.max(0, parseFloat(formData.withholdingRate || "0"));
+          }
+        }
+      }
 
       await recordPayment({
         type: isAdvancePayment ? "advance" : "invoice",
@@ -167,10 +180,32 @@ export default function RecordPaymentModal({
   
   const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
   const isLocalClient = selectedClient?.type === "local";
+  const isInternationalClient = selectedClient?.type === "international";
   const gross = parseFloat(formData.amount || "0") || 0;
-  const rate = formData.applyWithholding && isLocalClient ? Math.max(0, parseFloat(formData.withholdingRate || "0")) : 0;
+  
+  // Check if withholding applies (local clients OR international clients using local bank accounts)
+  let rate = 0;
+  if (formData.applyWithholding) {
+    if (isLocalClient) {
+      rate = Math.max(0, parseFloat(formData.withholdingRate || "0"));
+    } else if (isInternationalClient && selectedBankAccountId && bankAccounts) {
+      const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+      if (selectedBank?.currency === "PKR") {
+        rate = Math.max(0, parseFloat(formData.withholdingRate || "0"));
+      }
+    }
+  }
+  
   const withheld = rate > 0 ? Math.round((gross * rate) / 100) : 0;
   const netCash = Math.max(0, gross - withheld);
+
+  // Check if withholding should be shown (local clients OR international clients using local bank accounts)
+  let isInternationalUsingLocalBank = false;
+  if (selectedClient?.type === 'international' && selectedBankAccountId && bankAccounts) {
+    const selectedBank = bankAccounts.find(bank => bank._id === selectedBankAccountId);
+    isInternationalUsingLocalBank = selectedBank?.currency === 'PKR';
+  }
+  const shouldShowWithholding = isLocalClient || isInternationalUsingLocalBank;
 
   return (
     <Modal
@@ -298,11 +333,13 @@ export default function RecordPaymentModal({
 
               {/* Payment Method intentionally removed — only Bank Transfer is supported */}
 
-              {/* Withholding (local clients) */}
-              {isLocalClient && (
+              {/* Withholding (local clients OR international clients using local bank accounts) */}
+              {shouldShowWithholding && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Income Tax Withheld?</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {isLocalClient ? 'Income Tax Withheld?' : 'Tax Withheld?'}
+                    </label>
                     <input
                       type="checkbox"
                       checked={formData.applyWithholding}
@@ -323,6 +360,7 @@ export default function RecordPaymentModal({
                       />
                       <div className="text-xs text-gray-500">Custom rate allowed</div>
                     </div>
+                    
                   )}
                   {/* Preview */}
                   {formData.applyWithholding && (

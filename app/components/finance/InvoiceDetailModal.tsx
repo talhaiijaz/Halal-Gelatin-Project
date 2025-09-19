@@ -185,7 +185,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                                   if (hasConversionFields && currencyMismatch) {
                                     return (
                                       <div className="text-xs text-blue-600 mt-1">
-                                        = {formatCurrency(p.convertedAmountUSD, 'USD' as SupportedCurrency)}
+                                        = {formatCurrency(p.convertedAmountUSD, bankAccount.currency as SupportedCurrency)}
                                       </div>
                                     );
                                   }
@@ -238,11 +238,11 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-gray-600">Conversion Rate:</span>
-                                <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
+                                <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} {payment.bankAccount.currency}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-gray-600">Converted to USD:</span>
-                                <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, 'USD' as SupportedCurrency)}</span>
+                                <span className="text-gray-600">Converted to {payment.bankAccount.currency}:</span>
+                                <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD, payment.bankAccount.currency as SupportedCurrency)}</span>
                               </div>
                             </div>
                           </div>

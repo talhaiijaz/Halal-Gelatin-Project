@@ -672,11 +672,11 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-gray-600">Conversion Rate:</span>
-                                    <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
+                                    <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} {payment.bankAccount?.currency}</span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-gray-600">Converted to USD:</span>
-                                    <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD || 0, 'USD')}</span>
+                                    <span className="text-gray-600">Converted to {payment.bankAccount?.currency}:</span>
+                                    <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD || 0, payment.bankAccount?.currency as SupportedCurrency)}</span>
                                   </div>
                                 </div>
                               ))}

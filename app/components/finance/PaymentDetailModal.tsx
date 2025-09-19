@@ -9,7 +9,7 @@ import ActivityLog from "../ActivityLog";
 import EditPaymentModal from "./EditPaymentModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
-import { formatCurrency } from "@/app/utils/currencyFormat";
+import { formatCurrency, SupportedCurrency } from "@/app/utils/currencyFormat";
 
 interface PaymentDetailModalProps {
   paymentId: Id<"payments"> | null;
@@ -174,11 +174,11 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-gray-600">Conversion Rate:</span>
-                                  <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} USD</span>
+                                  <span className="font-medium">1 {payment.currency} = {payment.conversionRateToUSD} {bankAccount.currency}</span>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                  <span className="text-gray-600">Converted to USD:</span>
-                                  <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD || 0, 'USD')}</span>
+                                  <span className="text-gray-600">Converted to {bankAccount.currency}:</span>
+                                  <span className="font-medium text-blue-800">{formatCurrency(payment.convertedAmountUSD || 0, bankAccount.currency as any)}</span>
                                 </div>
                               </div>
                             </div>
@@ -234,7 +234,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                       <div>
                         <label className="text-xs font-medium text-gray-500">Amount</label>
                         <p className="text-sm text-gray-600">
-                          {formatCurrency((payment as any).invoice?.amount || 0, payment.currency)}
+                          {formatCurrency((payment as any).invoice?.amount || 0, payment.currency as SupportedCurrency)}
                         </p>
                       </div>
                     </div>
@@ -271,11 +271,11 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-500">Cash Received</label>
-                        <p className="mt-1 text-sm text-gray-900">{formatCurrency(payment.cashReceived || 0, payment.currency)}</p>
+                        <p className="mt-1 text-sm text-gray-900">{formatCurrency(payment.cashReceived || 0, payment.currency as SupportedCurrency)}</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Tax Withheld</label>
-                        <p className="mt-1 text-sm text-gray-900">{formatCurrency(payment.withheldTaxAmount, payment.currency)}</p>
+                        <p className="mt-1 text-sm text-gray-900">{formatCurrency(payment.withheldTaxAmount, payment.currency as SupportedCurrency)}</p>
                       </div>
                       <div>
                         <label className="text-sm font-medium text-gray-500">Tax Rate</label>

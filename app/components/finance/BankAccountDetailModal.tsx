@@ -182,7 +182,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                               </div>
                               {payment.convertedAmountUSD && payment.convertedAmountUSD !== payment.amount && (
                                 <div className="text-xs text-blue-600">
-                                  ≈ {formatCurrency(payment.convertedAmountUSD, 'USD')}
+                                  ≈ {formatCurrency(payment.convertedAmountUSD, payment.bankAccount?.currency as any)}
                                 </div>
                               )}
                             </div>

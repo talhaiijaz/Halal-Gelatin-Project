@@ -112,7 +112,22 @@ export const recordPayment = mutation({
       // Determine if client is local and withholding applies
       const clientOfInvoice = await ctx.db.get(invoice.clientId);
       const isLocalClient = clientOfInvoice?.type === "local";
-      const rate = isLocalClient && args.withheldTaxRate ? Math.max(0, args.withheldTaxRate) : 0;
+      const isInternationalClient = clientOfInvoice?.type === "international";
+      
+      // Check if withholding applies (local clients OR international clients using local bank accounts)
+      let rate = 0;
+      if (isLocalClient && args.withheldTaxRate) {
+        rate = Math.max(0, args.withheldTaxRate);
+      } else if (isInternationalClient && args.withheldTaxRate) {
+        // For international clients, check if they're using a local bank account (PKR)
+        if (args.bankAccountId) {
+          const bank = await ctx.db.get(args.bankAccountId);
+          if (bank && bank.currency === "PKR") {
+            rate = Math.max(0, args.withheldTaxRate);
+          }
+        }
+      }
+      
       const withheldAmount = rate > 0 ? Math.round((args.amount * rate) / 100) : 0;
       const netCash = Math.max(0, args.amount - withheldAmount);
 
@@ -206,7 +221,7 @@ export const recordPayment = mutation({
           entityTable: "banks",
           entityId: String(args.bankAccountId),
           action: "update",
-          message: `Payment received${bank ? ` to ${bank.accountName}` : ""}: ${formatCurrency(args.amount, currency)}${client ? ` from ${client.name}` : ""}`,
+          message: `Payment received${bank ? ` to ${bank.accountName}` : ""}: ${formatCurrency(args.amount, currency)}${client ? ` from ${(client as any).name}` : ""}`,
           metadata: {
             paymentId,
             invoiceId: args.invoiceId,
@@ -227,23 +242,23 @@ export const recordPayment = mutation({
         let bankTransactionAmount = args.amount;
         let bankTransactionCurrency = currency;
         
-        // For local clients with withholding, bank transaction should be the net amount
-        if (isLocalClient && rate > 0) {
+        // For clients with withholding (local OR international using local bank), bank transaction should be the net amount
+        if (rate > 0) {
           bankTransactionAmount = netCash; // Use net amount after withholding
         }
         
-        if (needsConversion && bank) {
+        if (needsConversion && bank && conversionRateToUSD) {
           // If payment currency differs from bank account currency, we need to convert
-          // For now, we'll store the original payment amount and currency
-          // The conversion will be handled in the UI display
-          bankTransactionAmount = isLocalClient && rate > 0 ? netCash : args.amount;
-          bankTransactionCurrency = currency;
+          // Store the converted amount in the bank account's currency
+          const convertedAmount = rate > 0 ? netCash * conversionRateToUSD : args.amount * conversionRateToUSD;
+          bankTransactionAmount = convertedAmount;
+          bankTransactionCurrency = bank.currency;
         }
         
-        // Create description that shows gross amount, withholding, and net amount for local payments
-        let description = `Payment received from ${client?.name || "Customer"}: ${args.reference}`;
-        if (isLocalClient && rate > 0) {
-          description = `Payment received from ${client?.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldAmount, currency)}, Net: ${formatCurrency(netCash, currency)})`;
+        // Create description that shows gross amount, withholding, and net amount for payments with withholding
+        let description = `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference}`;
+        if (rate > 0) {
+          description = `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldAmount, currency)}, Net: ${formatCurrency(netCash, currency)})`;
         }
         
         const bankTransactionData: any = {
@@ -324,7 +339,20 @@ export const recordPayment = mutation({
     clientId = args.clientId;
     paymentType = "advance";
 
-    const rateForAdvance = client.type === "local" && args.withheldTaxRate ? Math.max(0, args.withheldTaxRate) : 0;
+    // Check if withholding applies (local clients OR international clients using local bank accounts)
+    let rateForAdvance = 0;
+    if (client.type === "local" && args.withheldTaxRate) {
+      rateForAdvance = Math.max(0, args.withheldTaxRate);
+    } else if (client.type === "international" && args.withheldTaxRate) {
+      // For international clients, check if they're using a local bank account (PKR)
+      if (args.bankAccountId) {
+        const bank = await ctx.db.get(args.bankAccountId);
+        if (bank && bank.currency === "PKR") {
+          rateForAdvance = Math.max(0, args.withheldTaxRate);
+        }
+      }
+    }
+    
     const withheldForAdvance = rateForAdvance > 0 ? Math.round((args.amount * rateForAdvance) / 100) : 0;
     const netCashAdvance = Math.max(0, args.amount - withheldForAdvance);
 
@@ -394,7 +422,7 @@ export const recordPayment = mutation({
       entityTable: "payments",
       entityId: String(paymentId),
       action: "create",
-      message: `Advance payment recorded for client ${client.name || String(client._id)}: ${args.amount}`,
+      message: `Advance payment recorded for client ${(client as any).name || String(client._id)}: ${args.amount}`,
       metadata: { clientId, netCashAdvance, withheldForAdvance, rateForAdvance },
     });
     // If linked to a bank account, also log activity under that bank account and update balance
@@ -404,7 +432,7 @@ export const recordPayment = mutation({
         entityTable: "banks",
         entityId: String(args.bankAccountId),
         action: "update",
-        message: `Advance payment received${bank ? ` to ${bank.accountName}` : ""}: ${formatCurrency(args.amount, currency)} (Client: ${client.name || String(client._id)})`,
+        message: `Advance payment received${bank ? ` to ${bank.accountName}` : ""}: ${formatCurrency(args.amount, currency)} (Client: ${(client as any).name || String(client._id)})`,
         metadata: {
           paymentId,
           clientId,
@@ -419,23 +447,32 @@ export const recordPayment = mutation({
       // Create bank transaction for the advance payment
       const now = Date.now();
       
-      // For local clients with withholding, bank transaction should be the net amount
+      // For clients with withholding (local OR international using local bank), bank transaction should be the net amount
       let bankTransactionAmount = args.amount;
-      if (client.type === "local" && rateForAdvance > 0) {
+      let bankTransactionCurrency = currency;
+      
+      if (rateForAdvance > 0) {
         bankTransactionAmount = netCashAdvance; // Use net amount after withholding
       }
       
-      // Create description that shows gross amount, withholding, and net amount for local payments
-      let description = `Advance payment received from ${client.name || "Customer"}: ${args.reference}`;
-      if (client.type === "local" && rateForAdvance > 0) {
-        description = `Advance payment received from ${client.name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldForAdvance, currency)}, Net: ${formatCurrency(netCashAdvance, currency)})`;
+      // Handle currency conversion for advance payments
+      if (needsConversion && conversionRateToUSD && convertedAmountUSD) {
+        const convertedAmount = rateForAdvance > 0 ? netCashAdvance * conversionRateToUSD : args.amount * conversionRateToUSD;
+        bankTransactionAmount = convertedAmount;
+        bankTransactionCurrency = bankCurrency!;
+      }
+      
+      // Create description that shows gross amount, withholding, and net amount for payments with withholding
+      let description = `Advance payment received from ${(client as any).name || "Customer"}: ${args.reference}`;
+      if (rateForAdvance > 0) {
+        description = `Advance payment received from ${(client as any).name || "Customer"}: ${args.reference} (Gross: ${formatCurrency(args.amount, currency)}, Tax: ${formatCurrency(withheldForAdvance, currency)}, Net: ${formatCurrency(netCashAdvance, currency)})`;
       }
       
       const bankTransactionData: any = {
         bankAccountId: args.bankAccountId,
         transactionType: "payment_received",
         amount: bankTransactionAmount,
-        currency: currency,
+        currency: bankTransactionCurrency,
         description: description,
         reference: args.reference,
         paymentId: paymentId,
@@ -812,7 +849,7 @@ export const deletePayment = mutation({
           entityTable: "banks",
           entityId: String(payment.bankAccountId),
           action: "update",
-          message: `Payment deleted${bankAccount ? ` from ${bankAccount.accountName}` : ""}: ${formatCurrency(payment.amount, payment.currency)}${client ? ` from ${client.name}` : ""}`,
+          message: `Payment deleted${bankAccount ? ` from ${bankAccount.accountName}` : ""}: ${formatCurrency(payment.amount, payment.currency)}${client ? ` from ${(client as any).name}` : ""}`,
           metadata: {
             paymentId: args.paymentId,
             bankTransactionId: bankTransaction._id,
@@ -856,7 +893,7 @@ export const deletePayment = mutation({
     
     // Create detailed log message
     const paymentDetails = `${formatCurrency(payment.amount, payment.currency)} - ${payment.reference}`;
-    const clientName = client ? ` from ${client.name}` : '';
+    const clientName = client ? ` from ${(client as any).name}` : '';
     const logMessage = `Payment deleted: ${paymentDetails}${clientName}`;
     
     await logEvent(ctx, {
@@ -992,7 +1029,7 @@ export const updatePayment = mutation({
               transactionType: "payment_received",
               amount: args.amount,
               currency: existing.currency,
-              description: `Payment received from ${client?.name || "Customer"}: ${args.reference}`,
+              description: `Payment received from ${(client as any)?.name || "Customer"}: ${args.reference}`,
               reference: args.reference,
               paymentId: args.paymentId,
               transactionDate: args.paymentDate,
@@ -1010,7 +1047,7 @@ export const updatePayment = mutation({
               entityTable: "banks",
               entityId: String(newBankAccountId),
               action: "update",
-              message: `Payment updated${newBankAccount ? ` in ${newBankAccount.accountName}` : ""}: ${formatCurrency(args.amount, existing.currency)}${client ? ` from ${client.name}` : ""}`,
+              message: `Payment updated${newBankAccount ? ` in ${newBankAccount.accountName}` : ""}: ${formatCurrency(args.amount, existing.currency)}${client ? ` from ${(client as any).name}` : ""}`,
               metadata: {
                 paymentId: args.paymentId,
                 oldBankAccountId,
@@ -1025,7 +1062,7 @@ export const updatePayment = mutation({
           // Just update the amount in the existing transaction
           await ctx.db.patch(existingBankTransaction._id, {
             amount: args.amount,
-            description: `Payment received from ${(await ctx.db.get(existing.clientId))?.name || "Customer"}: ${args.reference}`,
+            description: `Payment received from ${((await ctx.db.get(existing.clientId)) as any)?.name || "Customer"}: ${args.reference}`,
             reference: args.reference,
             notes: args.notes,
           });
@@ -1065,7 +1102,7 @@ export const updatePayment = mutation({
     const invoice = existing.invoiceId ? await ctx.db.get(existing.invoiceId) : null;
     const bankAccount = args.bankAccountId ? await ctx.db.get(args.bankAccountId) : null;
     
-    const clientName = client?.name || "Unknown Client";
+    const clientName = (client as any)?.name || "Unknown Client";
     const invoiceNumber = invoice?.invoiceNumber || "N/A";
     const bankName = bankAccount?.accountName || "N/A";
     

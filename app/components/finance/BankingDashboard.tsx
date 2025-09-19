@@ -21,7 +21,6 @@ import {
 } from "lucide-react";
 import BankTransactionModal from "./BankTransactionModal";
 import BankTransactionDetailModal from "@/app/components/finance/BankTransactionDetailModal";
-import { formatCurrencyAmount } from "@/app/utils/currencyConversion";
 import { formatCurrency } from "@/app/utils/currencyFormat";
 
 interface BankingDashboardProps {
@@ -338,8 +337,8 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                             <span className="font-medium">Currency Conversion:</span>
                           </div>
                           <div className="mt-1 text-blue-600">
-                            {formatCurrencyAmount(transaction.originalAmount, transaction.originalCurrency)} 
-                            → {formatCurrencyAmount(Math.abs(transaction.amount), transaction.currency)}
+                            {formatCurrency(transaction.originalAmount, transaction.originalCurrency as any)} 
+                            → {formatCurrency(Math.abs(transaction.amount), transaction.currency as any)}
                             <span className="ml-2 text-blue-500">
                               (Rate: {transaction.exchangeRate.toFixed(4)})
                             </span>
@@ -355,7 +354,7 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <span className={`${transaction.amount >= 0 ? "text-green-600" : "text-red-600"} ${transaction.status === "cancelled" || transaction.isReversed ? "line-through opacity-60" : ""}`}>
-                        {transaction.amount >= 0 ? "+" : ""}{formatCurrencyAmount(Math.abs(transaction.amount), transaction.currency)}
+                        {transaction.amount >= 0 ? "+" : ""}{formatCurrency(Math.abs(transaction.amount), transaction.currency as any)}
                       </span>
                     </td>
                   </tr>
