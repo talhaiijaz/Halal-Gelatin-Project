@@ -17,6 +17,7 @@ interface ShipmentEntry {
   quantity: number;
   orderStatus: string;
   orderId: string;
+  hasAdvancePayment: boolean;
 }
 
 import { BLOOM_RANGES, BLOOM_INDIVIDUAL_VALUES } from "@/app/utils/bloomRanges";
@@ -141,6 +142,10 @@ export default function ShipmentsPage() {
       
       console.log(`  Calculated fiscalYear: ${fiscalYear}, fiscalMonth: ${fiscalMonth}`);
 
+      // Check if order has advance payments
+      const payments = (order as any).payments || [];
+      const hasAdvancePayment = payments.some((payment: any) => payment.type === "advance" && payment.amount > 0);
+      
       // Get items for this order
       const items = (itemsByOrderId[order._id] || []) as Record<string, unknown>[];
       
@@ -156,7 +161,8 @@ export default function ShipmentsPage() {
           companyName: clientName,
           quantity: item.quantityKg as number || 0,
           orderStatus: order.status,
-          orderId: order._id
+          orderId: order._id,
+          hasAdvancePayment
         });
         
         entryId++;
@@ -232,6 +238,16 @@ export default function ShipmentsPage() {
     return entry?.quantity || 0;
   };
 
+  // Get individual entries for specific bloom and company in selected fiscal month
+  const getIndividualEntries = (bloom: string, company: string, fiscalYear: number, fiscalMonth: string) => {
+    return shipmentData.filter(item => 
+      item.bloom === bloom && 
+      item.companyName === company && 
+      item.fiscalYear === fiscalYear &&
+      item.fiscalMonth === fiscalMonth
+    );
+  };
+
   // Calculate total quantity for bloom in selected fiscal month
   const getBloomTotal = (bloom: string, fiscalYear: number, fiscalMonth: string) => {
     return shipmentData
@@ -264,6 +280,31 @@ export default function ShipmentsPage() {
     
     if (entries.length === 0) return false;
     return entries.every(entry => entry.orderStatus === "delivered");
+  };
+
+  // Check if orders for a specific bloom/company combination have advance payments
+  const isBloomCompanyWithAdvancePayment = (bloom: string, company: string, fiscalYear: number, fiscalMonth: string) => {
+    const entries = shipmentData.filter(item => 
+      item.bloom === bloom && 
+      item.companyName === company && 
+      item.fiscalYear === fiscalYear &&
+      item.fiscalMonth === fiscalMonth
+    );
+    
+    if (entries.length === 0) return false;
+    return entries.some(entry => entry.hasAdvancePayment);
+  };
+
+  // Check if orders for a specific bloom range have advance payments
+  const isBloomWithAdvancePayment = (bloom: string, fiscalYear: number, fiscalMonth: string) => {
+    const entries = shipmentData.filter(item => 
+      item.bloom === bloom && 
+      item.fiscalYear === fiscalYear &&
+      item.fiscalMonth === fiscalMonth
+    );
+    
+    if (entries.length === 0) return false;
+    return entries.some(entry => entry.hasAdvancePayment);
   };
 
   // Check if all orders for a specific bloom range are delivered
@@ -440,13 +481,29 @@ export default function ShipmentsPage() {
                       {bloom}
                     </td>
                     {activeCompanies.map((company) => {
-                      const quantity = getQuantity(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                      const entries = getIndividualEntries(bloom, company, selectedFiscalYear, selectedFiscalMonth);
                       const isCellDelivered = isBloomCompanyDelivered(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                      const hasAdvancePayment = isBloomCompanyWithAdvancePayment(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                      
                       return (
                         <td key={company} className="text-center py-3 px-2">
-                          {quantity > 0 ? (
-                            <div className={`font-medium ${isCellDelivered ? 'text-green-700' : 'text-blue-600'}`}>
-                              {quantity.toLocaleString()} kg
+                          {entries.length > 0 ? (
+                            <div className="space-y-1">
+                              {entries.map((entry, index) => {
+                                // Determine cell color based on status and payment for each entry
+                                let cellColor = 'text-blue-600'; // Default blue
+                                if (entry.orderStatus === "delivered") {
+                                  cellColor = 'text-green-700'; // Green for delivered
+                                } else if (entry.hasAdvancePayment) {
+                                  cellColor = 'text-yellow-700'; // Yellow for advance payment
+                                }
+                                
+                                return (
+                                  <div key={`${entry.orderId}-${index}`} className={`font-medium ${cellColor}`}>
+                                    {entry.quantity.toLocaleString()} kg
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="text-gray-400">-</span>
@@ -520,24 +577,41 @@ export default function ShipmentsPage() {
                 const sortedBloomRanges = sortBloomRanges(Array.from(allBloomRanges));
                 
                 return sortedBloomRanges.map((bloom) => {
-                  // Check if bloom is delivered across any of the 3 months
-                  const isAnyMonthDelivered = next3Months.some(monthData => 
-                    isBloomDelivered(bloom, monthData.fiscalYear, monthData.fiscalMonth)
-                  );
+                  // Check if bloom is delivered only in the current month (index 0)
+                  const isCurrentMonthDelivered = next3Months.length > 0 && 
+                    isBloomDelivered(bloom, next3Months[0].fiscalYear, next3Months[0].fiscalMonth);
                   
                   return (
-                    <tr key={bloom} className={`border-b hover:bg-gray-50 ${isAnyMonthDelivered ? 'bg-green-50' : ''}`}>
-                      <td className={`py-3 px-4 font-medium sticky left-0 z-10 ${isAnyMonthDelivered ? 'bg-green-50 text-green-800' : 'bg-white text-gray-900'}`}>
+                    <tr key={bloom} className={`border-b hover:bg-gray-50 ${isCurrentMonthDelivered ? 'bg-green-50' : ''}`}>
+                      <td className={`py-3 px-4 font-medium sticky left-0 z-10 ${isCurrentMonthDelivered ? 'bg-green-50 text-green-800' : 'bg-white text-gray-900'}`}>
                         {bloom}
                       </td>
                       {next3Months.map((monthData) => {
-                        const monthTotal = getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth);
-                        const isMonthDelivered = isBloomDelivered(bloom, monthData.fiscalYear, monthData.fiscalMonth);
+                        const monthEntries = shipmentData.filter(item => 
+                          item.bloom === bloom && 
+                          item.fiscalYear === monthData.fiscalYear &&
+                          item.fiscalMonth === monthData.fiscalMonth
+                        );
+                        
                         return (
                           <td key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="text-center py-3 px-4">
-                            {monthTotal > 0 ? (
-                              <div className={`font-medium ${isMonthDelivered ? 'text-green-700' : 'text-blue-600'}`}>
-                                {monthTotal.toLocaleString()} kg
+                            {monthEntries.length > 0 ? (
+                              <div className="space-y-1">
+                                {monthEntries.map((entry, index) => {
+                                  // Determine cell color based on status and payment for each entry
+                                  let cellColor = 'text-blue-600'; // Default blue
+                                  if (entry.orderStatus === "delivered") {
+                                    cellColor = 'text-green-700'; // Green for delivered
+                                  } else if (entry.hasAdvancePayment) {
+                                    cellColor = 'text-yellow-700'; // Yellow for advance payment
+                                  }
+                                  
+                                  return (
+                                    <div key={`${entry.orderId}-${index}`} className={`font-medium ${cellColor}`}>
+                                      {entry.quantity.toLocaleString()} kg
+                                    </div>
+                                  );
+                                })}
                               </div>
                             ) : (
                               <span className="text-gray-400">-</span>
@@ -545,7 +619,7 @@ export default function ShipmentsPage() {
                           </td>
                         );
                       })}
-                      <td className={`text-center py-3 px-4 font-bold ${isAnyMonthDelivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-900'}`}>
+                      <td className={`text-center py-3 px-4 font-bold ${isCurrentMonthDelivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-900'}`}>
                         {(() => {
                           const threeMonthTotal = next3Months.reduce((sum, monthData) => 
                             sum + getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth), 0);
