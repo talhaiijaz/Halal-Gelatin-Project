@@ -482,6 +482,8 @@ export default function EditOrderModal({
           errorMessage = "You don't have permission to update orders. Please contact your administrator.";
         } else if (errorStr.includes("not found") || errorStr.includes("doesn't exist")) {
           errorMessage = "Order not found. The order may have been deleted or you don't have access to it.";
+        } else if (errorStr.includes("order creation date must be within fiscal year")) {
+          errorMessage = error.message; // Use the specific error message from the server
         } else if (errorStr.includes("fiscal year") || errorStr.includes("year")) {
           errorMessage = "Fiscal year information is invalid. Please select a valid fiscal year.";
         } else {

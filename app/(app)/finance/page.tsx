@@ -189,23 +189,10 @@ export default function FinancePage() {
     return true;
   });
 
-  // Sort filtered invoices: first by fiscal year, then by order status, then by creation date
-  const statusPriority = {
-    pending: 1,
-    in_production: 2,
-    shipped: 3,
-    delivered: 4,
-    cancelled: 5
-  };
+  // Sort filtered invoices by issue date (latest first)
 
   const sortedInvoices = filteredInvoices?.sort((a, b) => {
-    // First sort by order status priority (pending first, then in_production, shipped, delivered, cancelled)
-    const statusA = statusPriority[a.order?.status as keyof typeof statusPriority] || 6;
-    const statusB = statusPriority[b.order?.status as keyof typeof statusPriority] || 6;
-    if (statusA !== statusB) {
-      return statusA - statusB;
-    }
-    // Then sort by invoice creation date (descending - latest first)
+    // Sort by issue date (descending - latest first)
     return b.issueDate - a.issueDate;
   });
   return (
