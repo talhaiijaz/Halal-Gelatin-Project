@@ -587,31 +587,23 @@ export default function ShipmentsPage() {
                         {bloom}
                       </td>
                       {next3Months.map((monthData) => {
-                        const monthEntries = shipmentData.filter(item => 
-                          item.bloom === bloom && 
-                          item.fiscalYear === monthData.fiscalYear &&
-                          item.fiscalMonth === monthData.fiscalMonth
-                        );
+                        const monthTotal = getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth);
+                        const isMonthDelivered = isBloomDelivered(bloom, monthData.fiscalYear, monthData.fiscalMonth);
+                        const hasAdvancePayment = isBloomWithAdvancePayment(bloom, monthData.fiscalYear, monthData.fiscalMonth);
+                        
+                        // Determine cell color based on status and payment
+                        let cellColor = 'text-blue-600'; // Default blue
+                        if (isMonthDelivered) {
+                          cellColor = 'text-green-700'; // Green for delivered
+                        } else if (hasAdvancePayment) {
+                          cellColor = 'text-yellow-700'; // Yellow for advance payment
+                        }
                         
                         return (
                           <td key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className="text-center py-3 px-4">
-                            {monthEntries.length > 0 ? (
-                              <div className="space-y-1">
-                                {monthEntries.map((entry, index) => {
-                                  // Determine cell color based on status and payment for each entry
-                                  let cellColor = 'text-blue-600'; // Default blue
-                                  if (entry.orderStatus === "delivered") {
-                                    cellColor = 'text-green-700'; // Green for delivered
-                                  } else if (entry.hasAdvancePayment) {
-                                    cellColor = 'text-yellow-700'; // Yellow for advance payment
-                                  }
-                                  
-                                  return (
-                                    <div key={`${entry.orderId}-${index}`} className={`font-medium ${cellColor}`}>
-                                      {entry.quantity.toLocaleString()} kg
-                                    </div>
-                                  );
-                                })}
+                            {monthTotal > 0 ? (
+                              <div className={`font-medium ${cellColor}`}>
+                                {monthTotal.toLocaleString()} kg
                               </div>
                             ) : (
                               <span className="text-gray-400">-</span>
