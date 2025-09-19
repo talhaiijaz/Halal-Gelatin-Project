@@ -260,11 +260,40 @@ export const reverseTransaction = mutation({
 
     const now = Date.now();
     
+    // Reverse the original transaction
     await ctx.db.patch(args.id, {
       isReversed: true,
       reversedAt: now,
       reversalReason: args.reason || "Manual reversal",
     });
+
+    // Check if this transaction is linked to another transaction (inter-bank transfer)
+    if (original.linkedTransactionId) {
+      const linkedTransaction = await ctx.db.get(original.linkedTransactionId);
+      if (linkedTransaction && !linkedTransaction.isReversed) {
+        // Reverse the linked transaction as well
+        await ctx.db.patch(original.linkedTransactionId, {
+          isReversed: true,
+          reversedAt: now,
+          reversalReason: `Linked reversal: ${args.reason || "Manual reversal"}`,
+        });
+
+        // Update the linked transaction's bank account balance
+        await updateBankAccountBalance(ctx, linkedTransaction.bankAccountId);
+
+        // Log the linked reversal
+        await logBankTransactionEvent(ctx, {
+          entityId: String(original.linkedTransactionId),
+          action: "update",
+          message: `Linked transaction reversed: ${linkedTransaction.description} - Linked reversal: ${args.reason || "Manual reversal"}`,
+          metadata: { 
+            originalId: args.id, 
+            linkedId: original.linkedTransactionId,
+            reason: args.reason 
+          },
+        });
+      }
+    }
 
     // Update bank account balance (reversed transactions don't contribute to balance)
     await updateBankAccountBalance(ctx, original.bankAccountId);
@@ -273,7 +302,11 @@ export const reverseTransaction = mutation({
       entityId: String(args.id),
       action: "update",
       message: `Transaction reversed: ${original.description}${args.reason ? ` - ${args.reason}` : ""}`,
-      metadata: { originalId: args.id, reason: args.reason },
+      metadata: { 
+        originalId: args.id, 
+        linkedId: original.linkedTransactionId,
+        reason: args.reason 
+      },
     });
 
     return { success: true };
