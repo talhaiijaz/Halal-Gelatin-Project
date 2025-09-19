@@ -144,7 +144,7 @@ export const generateOrderPDF = async (order: OrderData) => {
   // Order Title
   doc.setFontSize(16);
   doc.setTextColor(40, 40, 40);
-  doc.text(`Order Details - ${order.invoiceNumber}`, 20, headerY + 5);
+  doc.text(`Order Details - ${order.invoice?.invoiceNumber || order.orderNumber}`, 20, headerY + 5);
   
   // Order Info Section
   let yPosition = headerY + 20;
@@ -159,7 +159,7 @@ export const generateOrderPDF = async (order: OrderData) => {
   doc.setTextColor(80, 80, 80);
   
   const orderInfo = [
-    ['Invoice Number:', order.invoiceNumber],
+    ['Invoice Number:', order.invoice?.invoiceNumber || order.orderNumber],
     ['Status:', order.status.toUpperCase().replace('_', ' ')],
     ['Order Date:', new Date(order.factoryDepartureDate || order.orderCreationDate || order.createdAt).toLocaleDateString()],
     ['Expected Delivery:', new Date(order.expectedDeliveryDate).toLocaleDateString()],
@@ -443,7 +443,7 @@ export const generateOrderPDF = async (order: OrderData) => {
   }
   
   // Save the PDF
-  doc.save(`Order-${order.invoiceNumber}.pdf`);
+  doc.save(`Order-${order.invoice?.invoiceNumber || order.orderNumber}.pdf`);
   } catch (error) {
     console.error('Error generating PDF:', error);
     throw new Error('Failed to generate PDF. Please try again.');

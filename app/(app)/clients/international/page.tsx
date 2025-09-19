@@ -489,7 +489,7 @@ export default function InternationalClientsPage() {
                           .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                           .map(([currency, amount]) => (
                             <div key={currency} className="text-lg">
-                              {formatCurrency(amount as number, currency)}
+                              {formatCurrency(amount as number, currency as SupportedCurrency)}
                             </div>
                           ))
                         : formatCurrency(((stats as any).currentPendingOrdersValue) || stats.totalOrderValue || 0, 'USD')
@@ -523,7 +523,7 @@ export default function InternationalClientsPage() {
                           .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                           .map(([currency, amount]) => (
                             <div key={currency} className="text-lg">
-                              {formatCurrency(amount as number, currency)}
+                              {formatCurrency(amount as number, currency as SupportedCurrency)}
                             </div>
                           ))
                         : formatCurrency(stats.advancePayments || 0, 'USD')
@@ -556,7 +556,7 @@ export default function InternationalClientsPage() {
                           .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                           .map(([currency, amount]) => (
                             <div key={currency} className="text-lg">
-                              {formatCurrency(amount as number, currency)}
+                              {formatCurrency(amount as number, currency as SupportedCurrency)}
                             </div>
                           ))
                         : formatCurrency(stats.outstandingAmount || 0, 'USD')
@@ -663,10 +663,10 @@ export default function InternationalClientsPage() {
                                 .filter(([currency, amount]) => (amount as number) > 0 && (currency === 'USD' || currency === 'EUR' || currency === 'AED'))
                                 .map(([currency, amount]) => (
                                   <div key={currency} className="mb-1">
-                                    {formatCurrency(amount as number, currency)}
+                                    {formatCurrency(amount as number, currency as SupportedCurrency)}
                                   </div>
                                 ))
-                              : formatCurrency(client.outstandingAmount, client.outstandingCurrency)
+                              : formatCurrency(client.outstandingAmount, client.outstandingCurrency as SupportedCurrency)
                             }
                           </div>
                           {client.outstandingAmount > 0 && (
@@ -1295,19 +1295,19 @@ export default function InternationalClientsPage() {
                           <td className="px-4 py-4 text-center">
                             <div className="space-y-1">
                               <div className="text-sm font-medium text-gray-900">
-                                {formatCurrency(metrics.total, order.currency)}
+                                {formatCurrency(metrics.total, order.currency as SupportedCurrency)}
                               </div>
                               <div className="text-xs text-gray-600">
-                                Paid: {formatCurrency(metrics.paid, order.currency)}
+                                Paid: {formatCurrency(metrics.paid, order.currency as SupportedCurrency)}
                                 {metrics.advancePaid > 0 && (
                                   <span className="text-blue-600">
-                                    {" "}({formatCurrency(metrics.advancePaid, order.currency)} advance)
+                                    {" "}({formatCurrency(metrics.advancePaid, order.currency as SupportedCurrency)} advance)
                                   </span>
                                 )}
                               </div>
                               <div className={`text-xs font-medium ${metrics.outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                                Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency) : 
-                                             order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency) : 
+                                Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency as SupportedCurrency) : 
+                                             order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as SupportedCurrency) : 
                                              "Not due"}
                               </div>
                             </div>

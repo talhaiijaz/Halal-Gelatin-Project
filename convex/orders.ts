@@ -178,6 +178,7 @@ export const list = query({
             amount: invoice.amount,
             totalPaid: invoice.totalPaid,
             outstandingBalance: invoice.outstandingBalance,
+            currency: invoice.currency,
           } : null,
           payments,
         };
