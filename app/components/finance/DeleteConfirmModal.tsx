@@ -109,7 +109,7 @@ export default function DeleteConfirmModal({
               Are you sure you want to delete this payment?
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              This action cannot be undone. The payment "{paymentReference}" will be permanently deleted.
+              This action cannot be undone. The payment &quot;{paymentReference}&quot; will be permanently deleted.
             </p>
             <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
               <p className="text-sm text-red-700">

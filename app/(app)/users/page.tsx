@@ -3,12 +3,12 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState } from "react";
-import { Plus, Edit, Trash2, Shield, User } from "lucide-react";
+import { Plus, Edit, Shield, User } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function UsersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<Record<string, unknown> | null>(null);
   const [formData, setFormData] = useState({
     email: "",
     name: "",
@@ -51,12 +51,12 @@ export default function UsersPage() {
   };
 
   // Handle edit user
-  const handleEdit = (user: any) => {
+  const handleEdit = (user: Record<string, unknown>) => {
     setEditingUser(user);
     setFormData({
-      email: user.email,
-      name: user.name,
-      role: user.role,
+      email: user.email as string,
+      name: user.name as string,
+      role: user.role as "admin" | "sales" | "finance" | "operations",
     });
     setShowAddModal(true);
   };

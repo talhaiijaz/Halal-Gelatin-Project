@@ -91,7 +91,7 @@ export default function ClientDetailPage() {
         status: client.status === "active" ? "inactive" : "active",
       });
       toast.success(`Client ${client.status === "active" ? "deactivated" : "activated"} successfully`);
-    } catch (error) {
+    } catch {
       toast.error("Failed to update client status");
     }
   };
@@ -345,7 +345,7 @@ export default function ClientDetailPage() {
                 {client.outstandingByCurrency && Object.keys(client.outstandingByCurrency).length > 0 ? (
                   <div className="mt-1 space-y-1">
                     {Object.entries(client.outstandingByCurrency)
-                      .filter(([_, amount]) => (amount as number) > 0)
+                      .filter(([, amount]) => (amount as number) > 0)
                       .map(([currency, amount]) => (
                         <div key={currency} className="text-sm font-semibold text-gray-900">
                           {formatCurrency(amount as number, currency as SupportedCurrency)}
@@ -472,7 +472,7 @@ export default function ClientDetailPage() {
                 <Package className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900">No orders yet</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  This client hasn't placed any orders yet.
+                  This client hasn&apos;t placed any orders yet.
                 </p>
                 <div className="mt-4">
                   <button

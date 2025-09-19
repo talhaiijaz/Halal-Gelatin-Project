@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
 import toast from "react-hot-toast";
 import {
   MessageSquare,
@@ -34,7 +35,7 @@ export default function HelpCenterPage() {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    category: "general_feedback" as const,
+    category: "general_feedback" as "general_feedback" | "bug_report" | "feature_request",
   });
 
   // Convex mutations and queries
@@ -74,7 +75,7 @@ export default function HelpCenterPage() {
     if (!confirm("Are you sure you want to delete this ticket?")) return;
 
     try {
-      await deleteFeedback({ feedbackId: ticketId as any });
+      await deleteFeedback({ feedbackId: ticketId as Id<"feedback"> });
       toast.success("Ticket deleted successfully!");
     } catch (error) {
       toast.error("Failed to delete ticket");
@@ -130,7 +131,7 @@ export default function HelpCenterPage() {
                   </label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as "general_feedback" | "bug_report" | "feature_request" })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   >
                     <option value="general_feedback">General Feedback</option>

@@ -118,7 +118,7 @@ export default function DeleteConfirmModal({ isOpen, onClose, client, onSuccess 
                 Are you sure?
               </h3>
               <p className="text-sm text-gray-600 mt-1">
-                This action cannot be undone. This will permanently delete the customer "{client.name}" and all associated data.
+                This action cannot be undone. This will permanently delete the customer &quot;{client.name}&quot; and all associated data.
               </p>
             </div>
           </div>

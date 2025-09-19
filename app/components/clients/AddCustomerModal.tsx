@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Search, Loader2, Upload, User, Camera, X } from "lucide-react";
+import { Search, Loader2, User, Camera, X } from "lucide-react";
 import Modal from "@/app/components/ui/Modal";
 
 interface AddCustomerModalProps {

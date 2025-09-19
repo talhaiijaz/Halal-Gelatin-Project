@@ -13,13 +13,13 @@ import {
   PieChart,
   ArrowUp,
   ArrowDown,
-  Filter
+  // Filter
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { formatCurrency } from "@/app/utils/currencyFormat";
-import { getCurrentFiscalYear, getFiscalYearRange, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { getCurrentFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 
 export default function ReportsPage() {
@@ -89,8 +89,8 @@ export default function ReportsPage() {
       revenueGrowth,
       paymentMethods: paymentStats.methodStats,
       outstandingAmount: financeStats.totalOutstanding,
-      paidInvoices: (Array.isArray(invoices) ? invoices : invoices?.page || []).filter((inv: any) => inv.status === "paid").length,
-      unpaidInvoices: (Array.isArray(invoices) ? invoices : invoices?.page || []).filter((inv: any) => inv.status !== "paid").length,
+      paidInvoices: (Array.isArray(invoices) ? invoices : invoices?.page || []).filter((inv: Record<string, unknown>) => inv.status === "paid").length,
+      unpaidInvoices: (Array.isArray(invoices) ? invoices : invoices?.page || []).filter((inv: Record<string, unknown>) => inv.status !== "paid").length,
     };
   };
 
@@ -228,7 +228,7 @@ export default function ReportsPage() {
       <div className="mb-6">
         <select
           value={dateRange}
-          onChange={(e) => setDateRange(e.target.value as any)}
+          onChange={(e) => setDateRange(e.target.value as "thisMonth" | "lastMonth" | "thisQuarter" | "thisFiscalYear" | "all")}
           className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
         >
           <option value="thisMonth">This Month</option>

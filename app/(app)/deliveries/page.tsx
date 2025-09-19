@@ -10,10 +10,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  Calendar,
   Download,
   Search,
-  Filter,
   Navigation
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -74,10 +72,10 @@ export default function DeliveriesPage() {
     try {
       await updateStatus({
         deliveryId,
-        status: newStatus as any,
+        status: newStatus as "pending" | "shipped" | "delivered" | "preparing" | "in_transit" | "failed",
       });
       toast.success("Delivery status updated successfully");
-    } catch (error) {
+    } catch {
       toast.error("Failed to update delivery status");
     }
   };
@@ -243,7 +241,7 @@ export default function DeliveriesPage() {
 
         <select
           value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value as any)}
+          onChange={(e) => setDateFilter(e.target.value as "all" | "today" | "thisWeek" | "thisMonth")}
           className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
         >
           <option value="all">All Time</option>

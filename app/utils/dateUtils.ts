@@ -4,7 +4,7 @@
  */
 
 // Pakistan timezone offset: UTC+5 (5 hours ahead of UTC)
-const PAKISTAN_TIMEZONE_OFFSET = 5 * 60; // 5 hours in minutes
+// const PAKISTAN_TIMEZONE_OFFSET = 5 * 60; // 5 hours in minutes
 
 /**
  * Converts a date string (YYYY-MM-DD format from HTML date input) to a timestamp

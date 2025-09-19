@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, Users, DollarSign, FileText, User } from "lucide-react";
+import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, DollarSign, FileText, User } from "lucide-react";
 import toast from "react-hot-toast";
-import Skeleton from "react-loading-skeleton";
+// import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
 export default function SettingsPage() {

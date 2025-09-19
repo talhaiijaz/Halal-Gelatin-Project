@@ -34,12 +34,12 @@ export const getBloomDisplayValue = (bloom: string | number | undefined): string
 
 // Helper function to check if a bloom value is a range
 export const isBloomRange = (bloom: string): boolean => {
-  return BLOOM_RANGES.includes(bloom as any);
+  return BLOOM_RANGES.includes(bloom as typeof BLOOM_RANGES[number]);
 };
 
 // Helper function to check if a bloom value is an individual value
 export const isBloomIndividual = (bloom: string): boolean => {
-  return BLOOM_INDIVIDUAL_VALUES.includes(bloom as any);
+  return BLOOM_INDIVIDUAL_VALUES.includes(bloom as typeof BLOOM_INDIVIDUAL_VALUES[number]);
 };
 
 // Helper function to get bloom type

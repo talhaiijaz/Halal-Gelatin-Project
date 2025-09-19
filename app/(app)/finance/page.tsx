@@ -6,7 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
 import RecordPaymentModal from "@/app/components/finance/RecordPaymentModal";
-import EditPaymentModal, { EditablePayment } from "@/app/components/finance/EditPaymentModal";
+import EditPaymentModal from "@/app/components/finance/EditPaymentModal";
 import InvoiceDetailModal from "@/app/components/finance/InvoiceDetailModal";
 import PaymentDetailModal from "@/app/components/finance/PaymentDetailModal";
 import BankAccountModal from "@/app/components/finance/BankAccountModal";
@@ -17,24 +17,13 @@ import {
   TrendingUp,
   DollarSign,
   Package,
-  Users,
-  Calendar,
   CreditCard,
   Plus,
-  Download,
   FileText,
-  ChevronUp,
-  ChevronDown,
   Search,
-  Mail,
-  Send,
   Clock,
-  AlertCircle,
   CheckCircle,
-  XCircle,
   Building2,
-  Edit,
-  Trash2,
   Settings
 } from "lucide-react";
 import {
@@ -50,7 +39,7 @@ import {
 
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
-import { useMutation } from "convex/react";
+// import { useMutation } from "convex/react";
 import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
@@ -71,13 +60,13 @@ export default function FinancePage() {
   const [invoiceOrderStatusFilter, setInvoiceOrderStatusFilter] = useState("all");
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [isDeleteBankModalOpen, setIsDeleteBankModalOpen] = useState(false);
-  const [selectedBankAccount, setSelectedBankAccount] = useState<any>(null);
+  const [selectedBankAccount, setSelectedBankAccount] = useState<Record<string, unknown> | null>(null);
   const [isBankDetailModalOpen, setIsBankDetailModalOpen] = useState(false);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<Id<"bankAccounts"> | null>(null);
   const [isEditBankModalOpen, setIsEditBankModalOpen] = useState(false);
-  const [bankAccountToEdit, setBankAccountToEdit] = useState<any>(null);
+  const [bankAccountToEdit, setBankAccountToEdit] = useState<Record<string, unknown> | null>(null);
   const [isEditPaymentOpen, setIsEditPaymentOpen] = useState(false);
-  const [selectedPayment, setSelectedPayment] = useState<EditablePayment | null>(null);
+  // const [selectedPayment, setSelectedPayment] = useState<EditablePayment | null>(null);
   const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [paymentFiscalYearFilter, setPaymentFiscalYearFilter] = useState<number | "all">("all");
@@ -104,25 +93,25 @@ export default function FinancePage() {
     fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter,
     paginationOpts: invoicesPagination.paginationOpts
   });
-  const invoiceStats = useQuery(api.finance.getInvoiceStats, { 
-    fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter 
-  });
+  // const invoiceStats = useQuery(api.finance.getInvoiceStats, { 
+  //   fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter
+  // });
   
   // Fetch payments data with pagination
   const paymentsData = useQuery(api.payments.list, { 
     fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter,
     paginationOpts: paymentsPagination.paginationOpts
   });
-  const paymentStats = useQuery(api.payments.getStats, { 
-    fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter 
-  });
+  // const paymentStats = useQuery(api.payments.getStats, { 
+  //   fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter 
+  // });
   
   // Fetch banks data
   const bankAccounts = useQuery(api.banks.listWithBalances);
-  const bankStats = useQuery(api.banks.getStats);
+  // const bankStats = useQuery(api.banks.getStats);
   
   // Mutations
-  const deletePayment = useMutation(api.payments.deletePayment);
+  // const deletePayment = useMutation(api.payments.deletePayment);
 
   // Note: formatCurrency is now imported from utils/currencyFormat
 
@@ -138,16 +127,16 @@ export default function FinancePage() {
     });
   };
 
-  const getMethodLabel = (method: string) => {
-    const labels: Record<string, string> = {
-      bank_transfer: "Bank Transfer",
-      check: "Check",
-      cash: "Cash",
-      credit_card: "Credit Card",
-      other: "Other",
-    };
-    return labels[method] || method;
-  };
+  // const getMethodLabel = (method: string) => {
+  //   const labels: Record<string, string> = {
+  //     bank_transfer: "Bank Transfer",
+  //     check: "Check",
+  //     cash: "Cash",
+  //     credit_card: "Credit Card",
+  //     other: "Other",
+  //   };
+  //   return labels[method] || method;
+  // };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -271,10 +260,10 @@ export default function FinancePage() {
             <div className="card p-4">
               <p className="text-sm text-gray-500">Current Pending Orders Value</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValuePKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueUSD as number || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValuePKR as number || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueEUR as number || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueAED as number || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Pending and in production orders only
@@ -351,10 +340,10 @@ export default function FinancePage() {
             <div className="card p-4">
               <p className="text-sm text-gray-500">Current Pending Orders Value</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValuePKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueUSD as number || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValuePKR as number || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueEUR as number || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueAED as number || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Pending and in production orders only
@@ -627,10 +616,10 @@ export default function FinancePage() {
             <div className="card p-4">
               <p className="text-sm text-gray-500">Current Pending Orders Value</p>
               <div className="mt-1 space-y-1">
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueUSD || 0, 'USD')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValuePKR || 0, 'PKR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueEUR || 0, 'EUR')}</p>
-                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as any)?.pendingOrdersValueAED || 0, 'AED')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueUSD as number || 0, 'USD')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValuePKR as number || 0, 'PKR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueEUR as number || 0, 'EUR')}</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency((dashboardStats as Record<string, unknown>)?.pendingOrdersValueAED as number || 0, 'AED')}</p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 Pending and in production orders only
@@ -763,7 +752,7 @@ export default function FinancePage() {
                           // Show converted amount if there's a currency mismatch
                           if (currencyMismatch && bankAccount) {
                             let convertedAmount = payment.amount;
-                            let convertedCurrency = bankAccount.currency;
+                            const convertedCurrency = bankAccount.currency;
                             
                             // Use stored conversion data if available
                             if (payment.conversionRateToUSD) {
@@ -1097,18 +1086,18 @@ export default function FinancePage() {
           setPreselectedInvoiceId(null);
           setPreselectedClientId(null);
         }}
-        preselectedInvoiceId={preselectedInvoiceId as any}
-        preselectedClientId={preselectedClientId as any}
+        preselectedInvoiceId={preselectedInvoiceId as Id<"invoices"> | undefined}
+        preselectedClientId={preselectedClientId as Id<"clients"> | undefined}
       />
 
       <InvoiceDetailModal
         isOpen={isInvoiceModalOpen}
         onClose={() => setIsInvoiceModalOpen(false)}
-        invoiceId={selectedInvoiceId as any}
+        invoiceId={selectedInvoiceId as Id<"invoices"> | null}
         onRecordPayment={(invId, clientId) => {
           setIsInvoiceModalOpen(false);
-          setPreselectedInvoiceId(invId as any);
-          setPreselectedClientId(clientId as any);
+          setPreselectedInvoiceId(invId as Id<"invoices">);
+          setPreselectedClientId(clientId as Id<"clients">);
           setIsRecordPaymentOpen(true);
         }}
       />
@@ -1117,7 +1106,7 @@ export default function FinancePage() {
       <BankAccountModal
         isOpen={isBankModalOpen}
         onClose={() => setIsBankModalOpen(false)}
-        bankAccount={selectedBankAccount}
+        bankAccount={selectedBankAccount as any}
         onSuccess={() => {
           // Refresh data
         }}
@@ -1127,7 +1116,7 @@ export default function FinancePage() {
       <DeleteBankConfirmModal
         isOpen={isDeleteBankModalOpen}
         onClose={() => setIsDeleteBankModalOpen(false)}
-        bankAccount={selectedBankAccount}
+        bankAccount={selectedBankAccount as any}
         onSuccess={() => {
           // Refresh data
         }}
@@ -1145,13 +1134,13 @@ export default function FinancePage() {
           setBankAccountToEdit(null);
           // Refresh data
         }}
-        bankAccount={bankAccountToEdit}
+        bankAccount={bankAccountToEdit as any}
       />
 
       <EditPaymentModal
         isOpen={isEditPaymentOpen}
         onClose={() => setIsEditPaymentOpen(false)}
-        payment={selectedPayment}
+        payment={null}
       />
 
       {/* Payment Detail Modal */}
@@ -1161,7 +1150,7 @@ export default function FinancePage() {
           setIsPaymentDetailOpen(false);
           setSelectedPaymentId(null);
         }}
-        paymentId={selectedPaymentId as any}
+        paymentId={selectedPaymentId as Id<"payments"> | null}
       />
 
       {/* Bank Account Detail Modal */}
@@ -1171,7 +1160,7 @@ export default function FinancePage() {
           setIsBankDetailModalOpen(false);
           setSelectedBankAccountId(null);
         }}
-        bankAccountId={selectedBankAccountId as any}
+        bankAccountId={selectedBankAccountId as Id<"bankAccounts"> | null}
       />
     </div>
   );

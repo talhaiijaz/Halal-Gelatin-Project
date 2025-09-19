@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Calendar, Package, Truck, Ship, Plane, Train, Car, Search, Filter, Eye, Plus } from "lucide-react";
+import { Calendar, Package, Truck } from "lucide-react";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, getFiscalYearForDate } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 
@@ -22,11 +22,11 @@ interface ShipmentEntry {
 import { BLOOM_RANGES, BLOOM_INDIVIDUAL_VALUES } from "@/app/utils/bloomRanges";
 
 // Bloom ranges and individual values
-const bloomRanges = [
-  ...BLOOM_RANGES,
-  ...BLOOM_INDIVIDUAL_VALUES,
-  "No Bloom"
-];
+// const bloomRanges = [
+//   ...BLOOM_RANGES,
+//   ...BLOOM_INDIVIDUAL_VALUES,
+//   "No Bloom"
+// ];
 
 // Fiscal year months (July to June)
 const fiscalMonths = [
@@ -74,7 +74,7 @@ export default function ShipmentsPage() {
   const clientMap = (Array.isArray(clients) ? clients : clients?.page || []).reduce((acc, client) => {
     acc[client._id] = client;
     return acc;
-  }, {} as Record<string, any>) || {};
+  }, {} as Record<string, unknown>) || {};
 
   // Create a map of order IDs to order items for quick lookup
   const itemsByOrderId = orderItems?.reduce((acc, item) => {
@@ -83,7 +83,7 @@ export default function ShipmentsPage() {
     }
     acc[item.orderId].push(item);
     return acc;
-  }, {} as Record<string, any[]>) || {};
+  }, {} as Record<string, unknown[]>) || {};
 
   // Generate shipment data from actual orders
   const generateShipmentData = (): ShipmentEntry[] => {
@@ -94,7 +94,7 @@ export default function ShipmentsPage() {
 
     (Array.isArray(orders) ? orders : orders?.page || []).forEach(order => {
       const client = clientMap[order.clientId];
-      const clientName = client?.name || 'Unknown Client';
+      const clientName = (client as Record<string, unknown>)?.name as string || 'Unknown Client';
       
       // Debug: Log order details
       console.log(`Processing order: ${order.invoiceNumber}`);
@@ -142,9 +142,9 @@ export default function ShipmentsPage() {
       console.log(`  Calculated fiscalYear: ${fiscalYear}, fiscalMonth: ${fiscalMonth}`);
 
       // Get items for this order
-      const items = itemsByOrderId[order._id] || [];
+      const items = (itemsByOrderId[order._id] || []) as Record<string, unknown>[];
       
-      items.forEach(item => {
+      items.forEach((item: Record<string, unknown>) => {
         // Use bloom value if available, otherwise use "No Bloom"
         const bloomKey = item.bloom ? item.bloom.toString() : "No Bloom";
         
@@ -154,7 +154,7 @@ export default function ShipmentsPage() {
           fiscalMonth,
           bloom: bloomKey,
           companyName: clientName,
-          quantity: item.quantityKg,
+          quantity: item.quantityKg as number || 0,
           orderStatus: order.status,
           orderId: order._id
         });
@@ -328,15 +328,15 @@ export default function ShipmentsPage() {
   };
 
   // Get styling for quantities based on limit
-  const getQuantityStyle = (quantity: number, isDelivered: boolean = false) => {
-    if (exceedsLimit(quantity)) {
-      return "bg-red-100 text-red-800 font-semibold";
-    }
-    if (isDelivered) {
-      return "text-green-700";
-    }
-    return "text-blue-600";
-  };
+  // const getQuantityStyle = (quantity: number, isDelivered: boolean = false) => {
+  //   if (exceedsLimit(quantity)) {
+  //     return "bg-red-100 text-red-800 font-semibold";
+  //   }
+  //   if (isDelivered) {
+  //     return "text-green-700";
+  //   }
+  //   return "text-blue-600";
+  // };
 
   return (
     <div className="container mx-auto p-6 space-y-6">

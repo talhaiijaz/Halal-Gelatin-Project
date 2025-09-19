@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Clock, User, Edit, Plus, Trash2, FileText, Eye, Upload, ChevronDown, ChevronRight } from "lucide-react";
+import { Clock, User, Edit, Plus, Trash2, Eye, Upload, ChevronDown, ChevronRight } from "lucide-react";
 
 interface ActivityLogProps {
   entityId: string;
@@ -27,7 +27,7 @@ export default function ActivityLog({ entityId, entityTable, limit = 10, title =
       : { entityId, limit }
   );
 
-  const getActionIcon = (action: string, metadata?: any) => {
+  const getActionIcon = (action: string, metadata?: Record<string, unknown>) => {
     // Check if this is a document activity
     if (metadata?.action === "document_upload") {
       return <Upload className="h-4 w-4 text-green-600" />;
@@ -52,7 +52,7 @@ export default function ActivityLog({ entityId, entityTable, limit = 10, title =
     }
   };
 
-  const getActionColor = (action: string, metadata?: any) => {
+  const getActionColor = (action: string, metadata?: Record<string, unknown>) => {
     // Check if this is a document activity
     if (metadata?.action === "document_upload") {
       return "bg-green-100 text-green-800";

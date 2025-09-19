@@ -212,7 +212,7 @@ export async function handleAsync<T>(
  * @returns Validation result
  */
 export function validateRequiredFields(
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   requiredFields: string[]
 ): { isValid: boolean; missingFields: string[] } {
   const missingFields = requiredFields.filter(field => {

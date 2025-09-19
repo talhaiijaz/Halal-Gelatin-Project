@@ -287,7 +287,7 @@ export const generateOrderPDF = async (order: OrderData) => {
     }
   });
   
-  yPosition = (doc as any).lastAutoTable.finalY + 15;
+  yPosition = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
   
   // Add Order Summary
   if (hasGSTData) {

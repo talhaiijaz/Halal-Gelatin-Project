@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Plus, Eye, Package, Clock, CheckCircle, CheckCircle2, XCircle, Truck, Archive, Download, Search } from "lucide-react";
+import { Plus, Package, Clock, CheckCircle2, XCircle, Truck, Download, Search } from "lucide-react";
 import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 
@@ -11,15 +11,15 @@ import { Id } from "@/convex/_generated/dataModel";
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-import { useSearchParams } from "next/navigation";
-import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+// import { useSearchParams } from "next/navigation";
+import { getFiscalYearOptions } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrency } from "@/app/utils/currencyFormat";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
 
 function OrdersPageContent() {
-  const searchParams = useSearchParams();
+  // const searchParams = useSearchParams();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -36,7 +36,7 @@ function OrdersPageContent() {
 
 
   // Helper function to calculate financial metrics for an order
-  const calculateFinancialMetrics = (order: any) => {
+  const calculateFinancialMetrics = (order: Record<string, unknown>) => {
     if (!order.invoice) {
       return {
         total: order.totalAmount,
@@ -47,24 +47,24 @@ function OrdersPageContent() {
       };
     }
 
-    const payments = order.payments || [];
+    const payments = Array.isArray(order.payments) ? order.payments : [];
     const advancePaid = payments
-      .filter((p: any) => p.type === "advance")
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      .filter((p: Record<string, unknown>) => p.type === "advance")
+      .reduce((sum: number, p: Record<string, unknown>) => sum + ((p.amount as number) || 0), 0);
     
     const invoicePaid = payments
-      .filter((p: any) => p.type !== "advance")
-      .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+      .filter((p: Record<string, unknown>) => p.type !== "advance")
+      .reduce((sum: number, p: Record<string, unknown>) => sum + ((p.amount as number) || 0), 0);
     
     const totalPaid = advancePaid + invoicePaid;
     
     // Outstanding balance should only be calculated for shipped/delivered orders
-    const outstanding = (order.status === "shipped" || order.status === "delivered") 
-      ? Math.max(0, order.invoice.amount - totalPaid)
+    const outstanding = (order.status === "shipped" || order.status === "delivered")
+      ? Math.max(0, ((order.invoice as Record<string, unknown>)?.amount as number || 0) - totalPaid)
       : 0;
     
     return {
-      total: order.invoice.amount,
+      total: (order.invoice as Record<string, unknown>)?.amount as number || 0,
       paid: totalPaid,
       advancePaid: advancePaid,
       invoicePaid: invoicePaid,
@@ -120,9 +120,9 @@ function OrdersPageContent() {
           order.invoiceNumber,
           order.client?.name || "",
           order.status,
-          metrics.total.toFixed(2),
-          metrics.paid.toFixed(2),
-          metrics.outstanding.toFixed(2),
+          (metrics.total as number).toFixed(2),
+          (metrics.paid as number).toFixed(2),
+          (metrics.outstanding as number).toFixed(2),
           order.currency,
           order.items?.reduce((total, item) => total + (item.quantityKg || 0), 0).toFixed(2) || "0",
           order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : "Not set",
@@ -318,19 +318,19 @@ function OrdersPageContent() {
                       <td className="px-4 py-4 text-center">
                         <div className="space-y-1">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(metrics.total, order.currency as any)}
+                            {formatCurrency(metrics.total as number, order.currency as "USD" | "EUR" | "PKR" | "AED")}
                           </div>
                           <div className="text-xs text-gray-600">
-                            Paid: {formatCurrency(metrics.paid, order.currency as any)}
-                            {metrics.advancePaid > 0 && (
+                            Paid: {formatCurrency(metrics.paid as number, order.currency as "USD" | "EUR" | "PKR" | "AED")}
+                            {(metrics.advancePaid as number) > 0 && (
                               <span className="text-blue-600">
-                                {" "}({formatCurrency(metrics.advancePaid, order.currency as any)} advance)
+                                {" "}({formatCurrency(metrics.advancePaid as number, order.currency as "USD" | "EUR" | "PKR" | "AED")} advance)
                               </span>
                             )}
                           </div>
-                          <div className={`text-xs font-medium ${metrics.outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                            Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding, order.currency as any) : 
-                                         order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as any) : 
+                          <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                            Receivables: {(metrics.outstanding as number) > 0 ? formatCurrency(metrics.outstanding as number, order.currency as "USD" | "EUR" | "PKR" | "AED") : 
+                                         order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as "USD" | "EUR" | "PKR" | "AED") : 
                                          "Not due"}
                           </div>
                         </div>

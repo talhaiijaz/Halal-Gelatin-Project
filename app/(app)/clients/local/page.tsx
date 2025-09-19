@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
-import CustomerCard from "@/app/components/clients/CustomerCard";
+// import CustomerCard from "@/app/components/clients/CustomerCard";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import AddCustomerModal from "@/app/components/clients/AddCustomerModal";
 import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
@@ -14,9 +14,6 @@ import {
   LayoutGrid, 
   Package, 
   TrendingUp,
-  Filter,
-  Calendar,
-  ChevronDown,
   Building2,
   Mail,
   Phone,
@@ -29,10 +26,10 @@ import {
 import { Id } from "@/convex/_generated/dataModel";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { useRouter } from "next/navigation";
-import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, formatFiscalYear } from "@/app/utils/fiscalYear";
+// import { useRouter } from "next/navigation";
+import { getCurrentFiscalYear, getFiscalYearOptions, formatFiscalYear } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
-import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { formatCurrency } from "@/app/utils/currencyFormat";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { usePagination } from "@/app/hooks/usePagination";
@@ -44,8 +41,8 @@ export default function LocalClientsPage() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [selectedClientForOrder, setSelectedClientForOrder] = useState<Id<"clients"> | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("");
-  const [customerFilter, setCustomerFilter] = useState<string>("");
+  // const [statusFilter, setStatusFilter] = useState<string>("");
+  // const [customerFilter, setCustomerFilter] = useState<string>("");
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | undefined>(undefined);
   
   // Pagination hook
@@ -99,7 +96,7 @@ export default function LocalClientsPage() {
     };
   }, []);
 
-  const router = useRouter();
+  // const router = useRouter();
 
 
 
@@ -262,9 +259,9 @@ export default function LocalClientsPage() {
   });
 
   // Get unique values for filters
-  const uniqueCustomers = orders 
-    ? Array.from(new Set(orders.map(o => o.client?.name).filter(Boolean) as string[])).sort()
-    : [];
+  // const uniqueCustomers = orders 
+  //   ? Array.from(new Set(orders.map(o => o.client?.name).filter(Boolean) as string[])).sort()
+  //   : [];
 
 
   const formatDate = (timestamp: number) => {
@@ -286,17 +283,17 @@ export default function LocalClientsPage() {
     return colors[status] || "bg-gray-100 text-gray-800";
   };
 
-  const getPaymentStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      draft: "bg-gray-100 text-gray-800",
-      sent: "bg-blue-100 text-blue-800",
-      due: "bg-yellow-100 text-yellow-800",
-      partially_paid: "bg-orange-100 text-orange-800",
-      paid: "bg-green-100 text-green-800",
-      overdue: "bg-red-100 text-red-800",
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
-  };
+  // const getPaymentStatusColor = (status: string) => {
+  //   const colors: Record<string, string> = {
+  //     draft: "bg-gray-100 text-gray-800",
+  //     sent: "bg-blue-100 text-blue-800",
+  //     due: "bg-yellow-100 text-yellow-800",
+  //     partially_paid: "bg-orange-100 text-orange-800",
+  //     paid: "bg-green-100 text-green-800",
+  //     overdue: "bg-red-100 text-red-800",
+  //   };
+  //   return colors[status] || "bg-gray-100 text-gray-800";
+  // };
 
   return (
     <div>
@@ -491,7 +488,7 @@ export default function LocalClientsPage() {
                 <div>
                   <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
                   <p className="text-2xl font-bold text-blue-900">
-                    {stats ? formatCurrency(((stats as any).currentPendingOrdersValue) || stats.totalOrderValue || 0) : <Skeleton width={100} height={32} />}
+                    {stats ? formatCurrency(((stats as Record<string, unknown>).currentPendingOrdersValue as number) || stats.totalOrderValue || 0) : <Skeleton width={100} height={32} />}
                   </p>
                   <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
                 </div>
@@ -761,7 +758,7 @@ export default function LocalClientsPage() {
                   ) : (sortedOrders && sortedOrders.length > 0) ? (
                     sortedOrders.map((order) => {
                       // Calculate financial metrics for local orders
-                      const calculateFinancialMetrics = (order: any) => {
+                      const calculateFinancialMetrics = (order: Record<string, unknown>) => {
                         if (!order.invoice) {
                           return {
                             total: order.totalAmount,
@@ -772,24 +769,24 @@ export default function LocalClientsPage() {
                           };
                         }
 
-                        const payments = order.payments || [];
+                        const payments = Array.isArray(order.payments) ? order.payments : [];
                         const advancePaid = payments
-                          .filter((p: any) => p.type === "advance")
-                          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+                          .filter((p: Record<string, unknown>) => p.type === "advance")
+                          .reduce((sum: number, p: Record<string, unknown>) => sum + ((p.amount as number) || 0), 0);
                         
                         const invoicePaid = payments
-                          .filter((p: any) => p.type !== "advance")
-                          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+                          .filter((p: Record<string, unknown>) => p.type !== "advance")
+                          .reduce((sum: number, p: Record<string, unknown>) => sum + ((p.amount as number) || 0), 0);
                         
                         const totalPaid = advancePaid + invoicePaid;
                         
                         // Outstanding balance should only be calculated for shipped/delivered orders
-                        const outstanding = (order.status === "shipped" || order.status === "delivered") 
-                          ? Math.max(0, order.invoice.amount - totalPaid)
+                        const outstanding = (order.status === "shipped" || order.status === "delivered")
+                          ? Math.max(0, ((order.invoice as Record<string, unknown>)?.amount as number || 0) - totalPaid)
                           : 0;
                         
                         return {
-                          total: order.invoice.amount,
+                          total: (order.invoice as Record<string, unknown>)?.amount as number || 0,
                           paid: totalPaid,
                           advancePaid: advancePaid,
                           invoicePaid: invoicePaid,
@@ -822,18 +819,18 @@ export default function LocalClientsPage() {
                           <td className="px-4 py-4 text-center">
                             <div className="space-y-1">
                               <div className="text-sm font-medium text-gray-900">
-                                {formatCurrency(metrics.total)}
+                                {formatCurrency(metrics.total as number)}
                               </div>
                               <div className="text-xs text-gray-600">
-                                Paid: {formatCurrency(metrics.paid)}
-                                {metrics.advancePaid > 0 && (
+                                Paid: {formatCurrency(metrics.paid as number)}
+                                {(metrics.advancePaid as number) > 0 && (
                                   <span className="text-blue-600">
-                                    {" "}({formatCurrency(metrics.advancePaid)} advance)
+                                    {" "}({formatCurrency(metrics.advancePaid as number)} advance)
                                   </span>
                                 )}
                               </div>
-                              <div className={`text-xs font-medium ${metrics.outstanding > 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                                Receivables: {metrics.outstanding > 0 ? formatCurrency(metrics.outstanding) : 
+                              <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                                Receivables: {(metrics.outstanding as number) > 0 ? formatCurrency(metrics.outstanding as number) : 
                                              order.status === "shipped" || order.status === "delivered" ? formatCurrency(0) : 
                                              "Not due"}
                               </div>

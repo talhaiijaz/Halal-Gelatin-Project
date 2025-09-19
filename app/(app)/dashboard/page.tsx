@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { 
-  Users, 
   Package, 
   DollarSign, 
   TrendingUp,
@@ -24,14 +23,14 @@ import "react-loading-skeleton/dist/skeleton.css";
 import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
 import { getUsdRates, type UsdRates } from "@/app/utils/fx";
-import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
 
 export default function DashboardPage() {
   console.log("DashboardPage rendering...");
   const router = useRouter();
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
-  const [clientType, setClientType] = useState<"local" | "international">("local");
+  const [clientType] = useState<"local" | "international">("local");
   const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
   const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables'; audience: 'local' | 'international' }>(null);
 
@@ -41,7 +40,7 @@ export default function DashboardPage() {
   const currentFiscalYear = getCurrentFiscalYear();
   
   // Fetch real data from Convex
-  const dashboardStats = useQuery(api.dashboard.getStats, { fiscalYear: currentFiscalYear });
+  // const dashboardStats = useQuery(api.dashboard.getStats, { fiscalYear: currentFiscalYear });
   const ordersData = useQuery(api.orders.list, {}); // Orders are rolling, no fiscal year filter
   
   // Extract orders array (handle both paginated and non-paginated responses)
@@ -52,7 +51,7 @@ export default function DashboardPage() {
   // Fetch client-specific stats for accurate local/international breakdown
   const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: currentFiscalYear });
   const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: currentFiscalYear });
-  const [usdRates, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
+  const [, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
   // USD total and info toggles removed per request
   useEffect(() => {
     const ac = new AbortController();
@@ -219,44 +218,44 @@ export default function DashboardPage() {
   const hasLimitExceeded = monthsData.some(month => month.exceedsLimit);
 
   // Helper function to get client currency
-  const getClientCurrency = (clientType: string): SupportedCurrency => {
-    return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');
-  };
+  // const getClientCurrency = (clientType: string): SupportedCurrency => {
+  //   return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');
+  // };
 
   // Create stats array with real data - simplified since we now have separate financial sections
-  const stats = dashboardStats && localStats && internationalStats ? [
-    {
-      name: "Total Clients",
-      value: dashboardStats.totalClients.value.toString(),
-      icon: Users,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-    },
-    {
-      name: "Active Orders",
-      value: dashboardStats.activeOrders.value.toString(),
-      icon: Package,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-      subtitle: `Total Orders: ${(localStats.totalOrders + internationalStats.totalOrders).toString()}`,
-    },
-    {
-      name: "Local Clients",
-      value: dashboardStats.localClients.toString(),
-      icon: Users,
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
-      subtitle: `Active Orders: ${localStats.activeOrders}`,
-    },
-    {
-      name: "International Clients",
-      value: dashboardStats.internationalClients.toString(),
-      icon: Users,
-      color: "text-green-600",
-      bgColor: "bg-green-100",
-      subtitle: `Active Orders: ${internationalStats.activeOrders}`,
-    },
-  ] : [];
+  // const stats = dashboardStats && localStats && internationalStats ? [
+  //   {
+  //     name: "Total Clients",
+  //     value: dashboardStats.totalClients.value.toString(),
+  //     icon: Users,
+  //     color: "text-blue-600",
+  //     bgColor: "bg-blue-100",
+  //   },
+  //   {
+  //     name: "Active Orders",
+  //     value: dashboardStats.activeOrders.value.toString(),
+  //     icon: Package,
+  //     color: "text-green-600",
+  //     bgColor: "bg-green-100",
+  //     subtitle: `Total Orders: ${(localStats.totalOrders + internationalStats.totalOrders).toString()}`,
+  //   },
+  //   {
+  //     name: "Local Clients",
+  //     value: dashboardStats.localClients.toString(),
+  //     icon: Users,
+  //     color: "text-blue-600",
+  //     bgColor: "bg-blue-100",
+  //     subtitle: `Active Orders: ${localStats.activeOrders}`,
+  //   },
+  //   {
+  //     name: "International Clients",
+  //     value: dashboardStats.internationalClients.toString(),
+  //     icon: Users,
+  //     color: "text-green-600",
+  //     bgColor: "bg-green-100",
+  //     subtitle: `Active Orders: ${internationalStats.activeOrders}`,
+  //   },
+  // ] : [];
 
 
   return (
@@ -269,7 +268,7 @@ export default function DashboardPage() {
             <div>
               <h3 className="text-sm font-medium text-red-800">Monthly Shipment Limit Exceeded</h3>
               <div className="mt-2 text-sm text-red-700">
-                {monthsData.filter(month => month.exceedsLimit).map((month, index) => (
+                {monthsData.filter(month => month.exceedsLimit).map((month) => (
                   <div key={`${month.fiscalYear}-${month.fiscalMonth}`} className="mb-1">
                     <strong>{month.displayName}:</strong> {month.totalQuantity.toLocaleString()} kg 
                     (exceeds limit of {(monthlyLimit || 150000).toLocaleString()} kg)
@@ -296,7 +295,7 @@ export default function DashboardPage() {
           Welcome back!
         </h1>
         <p className="mt-1 text-sm text-gray-600">
-          Here's what's happening with your business today.
+          Here&apos;s what&apos;s happening with your business today.
         </p>
       </div>
 
@@ -352,7 +351,7 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm font-medium text-blue-700 mb-1">Current Pending Orders Value</p>
                 <p className="text-2xl font-bold text-blue-900">
-                  {localStats ? formatCurrency((localStats as any).currentPendingOrdersValue || localStats.totalOrderValue || 0, 'PKR') : <Skeleton width={100} height={32} />}
+                  {localStats ? formatCurrency((localStats as Record<string, unknown>).currentPendingOrdersValue as number || localStats.totalOrderValue || 0, 'PKR') : <Skeleton width={100} height={32} />}
                 </p>
                 <p className="text-xs text-blue-600 mt-1">Local orders in pipeline</p>
               </div>
@@ -464,9 +463,9 @@ export default function DashboardPage() {
                 <div className="text-2xl font-bold text-blue-900 space-y-1">
                   {internationalStats ? (
                     <>
-                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.USD) || internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
-                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.EUR) || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
-                      <div className="text-lg">{formatCurrency(((internationalStats as any).currentPendingValueByCurrency?.AED) || internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as Record<string, unknown>).currentPendingValueByCurrency as Record<string, number>)?.USD || internationalStats.orderValueByCurrency?.USD || 0, 'USD')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as Record<string, unknown>).currentPendingValueByCurrency as Record<string, number>)?.EUR || internationalStats.orderValueByCurrency?.EUR || 0, 'EUR')}</div>
+                      <div className="text-lg">{formatCurrency(((internationalStats as Record<string, unknown>).currentPendingValueByCurrency as Record<string, number>)?.AED || internationalStats.orderValueByCurrency?.AED || 0, 'AED')}</div>
                       {/* USD Total removed per request */}
                     </>
                   ) : <Skeleton width={100} height={32} />}
@@ -625,7 +624,7 @@ export default function DashboardPage() {
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(row.totalAmount, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
                               </tr>
@@ -668,7 +667,7 @@ export default function DashboardPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
@@ -712,7 +711,7 @@ export default function DashboardPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
@@ -756,7 +755,7 @@ export default function DashboardPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.amount, row.currency as any)}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.amount, row.currency as SupportedCurrency)}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.method}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference}</td>
