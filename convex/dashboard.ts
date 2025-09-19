@@ -1,6 +1,54 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+// Exchange rate type
+export type UsdRates = {
+  USD: number;
+  EUR: number;
+  AED: number;
+};
+
+const DEFAULT_RATES: UsdRates = {
+  USD: 1,
+  EUR: 1.08, // fallback approx
+  AED: 0.2723, // 1 AED ≈ 0.2723 USD
+};
+
+// Get live USD exchange rates
+export const getUsdRates = query({
+  args: {},
+  returns: v.object({
+    USD: v.number(),
+    EUR: v.number(),
+    AED: v.number(),
+  }),
+  handler: async (ctx) => {
+    try {
+      const res = await fetch(
+        "https://api.exchangerate.host/latest?base=USD&symbols=EUR,AED"
+      );
+      if (!res.ok) return DEFAULT_RATES;
+      const data = await res.json();
+      const eur = typeof data?.rates?.EUR === "number" ? data.rates.EUR : DEFAULT_RATES.EUR;
+      const aed = typeof data?.rates?.AED === "number" ? data.rates.AED : DEFAULT_RATES.AED;
+      // API returns how many EUR per USD; we need 1 of foreign to USD
+      return {
+        USD: 1,
+        EUR: 1 / eur,
+        AED: 1 / aed,
+      };
+    } catch {
+      return DEFAULT_RATES;
+    }
+  },
+});
+
+// Helper function to convert to USD
+function toUSD(amount: number, currency: keyof UsdRates, rates: UsdRates): number {
+  const r = rates[currency] ?? 1;
+  return amount * r;
+}
+
 // Universal logs queries
 export const listLogs = query({
   args: {
@@ -638,6 +686,7 @@ export const getReceivablesDetails = query({
       orderNumber: v.string(),
       currency: v.string(),
       outstandingBalance: v.number(),
+      outstandingBalanceUSD: v.number(),
       issueDate: v.number(),
       dueDate: v.number(),
     })
@@ -647,10 +696,30 @@ export const getReceivablesDetails = query({
     const orders = await ctx.db.query("orders").collect();
     const invoices = await ctx.db.query("invoices").collect();
 
+    // Get live exchange rates
+    let rates: UsdRates = DEFAULT_RATES;
+    try {
+      const res = await fetch(
+        "https://api.exchangerate.host/latest?base=USD&symbols=EUR,AED"
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const eur = typeof data?.rates?.EUR === "number" ? data.rates.EUR : DEFAULT_RATES.EUR;
+        const aed = typeof data?.rates?.AED === "number" ? data.rates.AED : DEFAULT_RATES.AED;
+        rates = {
+          USD: 1,
+          EUR: 1 / eur,
+          AED: 1 / aed,
+        };
+      }
+    } catch {
+      // Use default rates
+    }
+
     // Receivables are rolling - no fiscal year filtering
     // Only shipped/delivered orders and positive outstanding
     const result = [] as Array<{
-      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; outstandingBalance: number; issueDate: number; dueDate: number;
+      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; outstandingBalance: number; outstandingBalanceUSD: number; issueDate: number; dueDate: number;
     }>;
 
     for (const inv of invoices) {
@@ -660,6 +729,8 @@ export const getReceivablesDetails = query({
       if (inv.outstandingBalance <= 0) continue;
       const client = clients.find((c) => c._id === inv.clientId);
       if (args.type && client?.type !== args.type) continue;
+      const outstandingBalanceUSD = toUSD(inv.outstandingBalance, inv.currency as keyof UsdRates, rates);
+      
       result.push({
         invoiceId: inv._id,
         invoiceNumber: inv.invoiceNumber || null,
@@ -669,6 +740,7 @@ export const getReceivablesDetails = query({
         orderNumber: (order as any).orderNumber,
         currency: inv.currency,
         outstandingBalance: inv.outstandingBalance,
+        outstandingBalanceUSD,
         issueDate: inv.issueDate,
         dueDate: inv.dueDate,
       });
@@ -694,6 +766,7 @@ export const getAdvancePaymentsDetails = query({
       orderNumber: v.string(),
       currency: v.string(),
       advancePaid: v.number(),
+      advancePaidUSD: v.number(),
       issueDate: v.number(),
       dueDate: v.number(),
     })
@@ -703,10 +776,30 @@ export const getAdvancePaymentsDetails = query({
     const orders = await ctx.db.query("orders").collect();
     const invoices = await ctx.db.query("invoices").collect();
 
+    // Get live exchange rates
+    let rates: UsdRates = DEFAULT_RATES;
+    try {
+      const res = await fetch(
+        "https://api.exchangerate.host/latest?base=USD&symbols=EUR,AED"
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const eur = typeof data?.rates?.EUR === "number" ? data.rates.EUR : DEFAULT_RATES.EUR;
+        const aed = typeof data?.rates?.AED === "number" ? data.rates.AED : DEFAULT_RATES.AED;
+        rates = {
+          USD: 1,
+          EUR: 1 / eur,
+          AED: 1 / aed,
+        };
+      }
+    } catch {
+      // Use default rates
+    }
+
     // Advance payments are rolling - no fiscal year filtering
 
     const result = [] as Array<{
-      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; advancePaid: number; issueDate: number; dueDate: number;
+      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; advancePaid: number; advancePaidUSD: number; issueDate: number; dueDate: number;
     }>;
     for (const inv of invoices) {
       const order = orders.find((o) => o._id === inv.orderId);
@@ -715,6 +808,8 @@ export const getAdvancePaymentsDetails = query({
       if (inv.totalPaid <= 0) continue;
       const client = clients.find((c) => c._id === inv.clientId);
       if (args.type && client?.type !== args.type) continue;
+      const advancePaidUSD = toUSD(inv.totalPaid, inv.currency as keyof UsdRates, rates);
+      
       result.push({
         invoiceId: inv._id,
         invoiceNumber: inv.invoiceNumber || null,
@@ -724,6 +819,7 @@ export const getAdvancePaymentsDetails = query({
         orderNumber: (order as any).orderNumber,
         currency: inv.currency,
         advancePaid: inv.totalPaid,
+        advancePaidUSD,
         issueDate: inv.issueDate,
         dueDate: inv.dueDate,
       });
@@ -745,6 +841,7 @@ export const getRevenueDetails = query({
       clientId: v.id("clients"),
       clientName: v.union(v.string(), v.null()),
       amount: v.number(),
+      amountUSD: v.number(),
       currency: v.string(),
       paymentDate: v.number(),
       method: v.string(),
@@ -758,6 +855,26 @@ export const getRevenueDetails = query({
     const orders = await ctx.db.query("orders").collect();
     const invoices = await ctx.db.query("invoices").collect();
     let payments = await ctx.db.query("payments").order("desc").collect();
+
+    // Get live exchange rates
+    let rates: UsdRates = DEFAULT_RATES;
+    try {
+      const res = await fetch(
+        "https://api.exchangerate.host/latest?base=USD&symbols=EUR,AED"
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const eur = typeof data?.rates?.EUR === "number" ? data.rates.EUR : DEFAULT_RATES.EUR;
+        const aed = typeof data?.rates?.AED === "number" ? data.rates.AED : DEFAULT_RATES.AED;
+        rates = {
+          USD: 1,
+          EUR: 1 / eur,
+          AED: 1 / aed,
+        };
+      }
+    } catch {
+      // Use default rates
+    }
 
     if (args.type) {
       payments = payments.filter((p) => {
@@ -779,11 +896,14 @@ export const getRevenueDetails = query({
     const result = payments.map((p) => {
       const client = clients.find((c) => c._id === p.clientId);
       const invoice = p.invoiceId ? invoices.find((i) => i._id === p.invoiceId) : null;
+      const amountUSD = toUSD(p.amount, p.currency as keyof UsdRates, rates);
+      
       return {
         paymentId: p._id,
         clientId: p.clientId,
         clientName: (client as any)?.name || null,
         amount: p.amount,
+        amountUSD,
         currency: p.currency,
         paymentDate: p.paymentDate,
         method: p.method,
@@ -811,6 +931,7 @@ export const getPendingOrdersDetails = query({
       clientName: v.union(v.string(), v.null()),
       status: v.string(),
       totalAmount: v.number(),
+      totalAmountUSD: v.number(),
       currency: v.string(),
       totalQuantity: v.number(),
       factoryDepartureDate: v.union(v.number(), v.null()),
@@ -828,6 +949,26 @@ export const getPendingOrdersDetails = query({
       .collect();
     orders = orders.concat(inProd);
 
+    // Get live exchange rates
+    let rates: UsdRates = DEFAULT_RATES;
+    try {
+      const res = await fetch(
+        "https://api.exchangerate.host/latest?base=USD&symbols=EUR,AED"
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const eur = typeof data?.rates?.EUR === "number" ? data.rates.EUR : DEFAULT_RATES.EUR;
+        const aed = typeof data?.rates?.AED === "number" ? data.rates.AED : DEFAULT_RATES.AED;
+        rates = {
+          USD: 1,
+          EUR: 1 / eur,
+          AED: 1 / aed,
+        };
+      }
+    } catch {
+      // Use default rates
+    }
+
     if (args.type) {
       orders = orders.filter((o) => {
         const client = clients.find((c) => c._id === o.clientId);
@@ -836,7 +977,7 @@ export const getPendingOrdersDetails = query({
     }
     // Pending orders are rolling - no fiscal year filtering
 
-    const result = [] as Array<{ orderId: any; orderNumber: string; invoiceNumber: string | null; clientId: any; clientName: string | null; status: string; totalAmount: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
+    const result = [] as Array<{ orderId: any; orderNumber: string; invoiceNumber: string | null; clientId: any; clientName: string | null; status: string; totalAmount: number; totalAmountUSD: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
 
     for (const order of orders) {
       const client = clients.find((c) => c._id === order.clientId);
@@ -845,6 +986,8 @@ export const getPendingOrdersDetails = query({
         .withIndex("by_order", (q) => q.eq("orderId", order._id))
         .collect();
       const totalQuantity = items.reduce((sum, it) => sum + it.quantityKg, 0);
+      const totalAmountUSD = toUSD(order.totalAmount, order.currency as keyof UsdRates, rates);
+      
       result.push({
         orderId: order._id,
         orderNumber: order.orderNumber,
@@ -853,6 +996,7 @@ export const getPendingOrdersDetails = query({
         clientName: (client as any)?.name || null,
         status: order.status,
         totalAmount: order.totalAmount,
+        totalAmountUSD,
         currency: order.currency,
         totalQuantity,
         factoryDepartureDate: order.factoryDepartureDate || null,

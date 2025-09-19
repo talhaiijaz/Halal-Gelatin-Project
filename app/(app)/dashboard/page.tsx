@@ -33,6 +33,7 @@ export default function DashboardPage() {
   const [clientType] = useState<"local" | "international">("local");
   const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
   const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables'; audience: 'local' | 'international' }>(null);
+  const [showUsdView, setShowUsdView] = useState(false);
 
   // Get dashboard order limit from localStorage
   const [dashboardOrderLimit, setDashboardOrderLimit] = useState<number>(5);
@@ -51,7 +52,7 @@ export default function DashboardPage() {
   // Fetch client-specific stats for accurate local/international breakdown
   const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: currentFiscalYear });
   const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: currentFiscalYear });
-  const [, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
+  const [usdRates, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
   // USD total and info toggles removed per request
   useEffect(() => {
     const ac = new AbortController();
@@ -69,7 +70,10 @@ export default function DashboardPage() {
 
   // Close modal on Escape and prevent body scroll
   useEffect(() => {
-    if (!expandedMetric) return;
+    if (!expandedMetric) {
+      setShowUsdView(false); // Reset USD view when modal closes
+      return;
+    }
     
     // Prevent body scroll when modal is open
     document.body.style.overflow = 'hidden';
@@ -221,6 +225,11 @@ export default function DashboardPage() {
   // const getClientCurrency = (clientType: string): SupportedCurrency => {
   //   return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');
   // };
+
+  // Helper function to convert to USD
+  const convertToUsd = (amount: number, currency: string) => {
+    return amount * (usdRates[currency as keyof UsdRates] || 1);
+  };
 
   // Create stats array with real data - simplified since we now have separate financial sections
   // const stats = dashboardStats && localStats && internationalStats ? [
@@ -572,15 +581,25 @@ export default function DashboardPage() {
                       {expandedMetric.audience === 'local' ? 'Local' : 'International'} Clients • {formatFiscalYear(currentFiscalYear)} Fiscal Year
                     </p>
                   </div>
-                  <button
-                    onClick={() => setExpandedMetric(null)}
-                    className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
-                    aria-label="Close"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {expandedMetric.audience === 'international' && (
+                      <button
+                        onClick={() => setShowUsdView(!showUsdView)}
+                        className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        {showUsdView ? 'Back to original view' : 'See total in dollars'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setExpandedMetric(null)}
+                      className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                      aria-label="Close"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -606,8 +625,10 @@ export default function DashboardPage() {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {showUsdView ? 'Amount (USD)' : 'Amount'}
+                              </th>
+                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                             </tr>
                           </thead>
@@ -624,13 +645,28 @@ export default function DashboardPage() {
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {showUsdView ? formatCurrency(row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency), 'USD') : formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}
+                                </td>
+                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                        {showUsdView && (
+                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                              <span className="text-lg font-bold text-gray-900">
+                                {formatCurrency(
+                                  pendingOrdersDetails.reduce((sum, row) => sum + (row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency)), 0),
+                                  'USD'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -655,8 +691,10 @@ export default function DashboardPage() {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advance Paid</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {showUsdView ? 'Advance Paid (USD)' : 'Advance Paid'}
+                              </th>
+                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                             </tr>
@@ -667,14 +705,29 @@ export default function DashboardPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                  {showUsdView ? formatCurrency(row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency), 'USD') : formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}
+                                </td>
+                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                        {showUsdView && (
+                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                              <span className="text-lg font-bold text-gray-900">
+                                {formatCurrency(
+                                  advanceDetails.reduce((sum, row) => sum + (row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency)), 0),
+                                  'USD'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -699,8 +752,10 @@ export default function DashboardPage() {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {showUsdView ? 'Outstanding (USD)' : 'Outstanding'}
+                              </th>
+                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                             </tr>
@@ -711,14 +766,29 @@ export default function DashboardPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
+                                  {showUsdView ? formatCurrency(row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency), 'USD') : formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}
+                                </td>
+                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                        {showUsdView && (
+                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                              <span className="text-lg font-bold text-gray-900">
+                                {formatCurrency(
+                                  receivablesDetails.reduce((sum, row) => sum + (row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency)), 0),
+                                  'USD'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -743,8 +813,10 @@ export default function DashboardPage() {
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {showUsdView ? 'Amount (USD)' : 'Amount'}
+                              </th>
+                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
                               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
                             </tr>
@@ -755,14 +827,29 @@ export default function DashboardPage() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.amount, row.currency as SupportedCurrency)}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                  {showUsdView ? formatCurrency(row.amountUSD || convertToUsd(row.amount, row.currency), 'USD') : formatCurrency(row.amount, row.currency as SupportedCurrency)}
+                                </td>
+                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.method}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference}</td>
                               </tr>
                             ))}
                           </tbody>
                         </table>
+                        {showUsdView && (
+                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                              <span className="text-lg font-bold text-gray-900">
+                                {formatCurrency(
+                                  revenueDetails.reduce((sum, row) => sum + (row.amountUSD || convertToUsd(row.amount, row.currency)), 0),
+                                  'USD'
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
