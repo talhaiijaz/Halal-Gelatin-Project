@@ -112,7 +112,7 @@ export default function RecordPaymentModal({
     setIsSubmitting(true);
     try {
       // Calculate withholding rate
-      const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
+      const selectedClient = (Array.isArray(clients) ? clients : clients?.page || []).find(c => c._id === (selectedClientId as any));
       const isLocalClient = selectedClient?.type === "local";
       const isInternationalClient = selectedClient?.type === "international";
       
@@ -178,7 +178,7 @@ export default function RecordPaymentModal({
     return (currency || invoice?.currency || getCurrencyForClientType(selectedClient?.type as 'local' | 'international', 'USD')) as SupportedCurrency;
   };
   
-  const selectedClient = clients?.find(c => c._id === (selectedClientId as any));
+  const selectedClient = (Array.isArray(clients) ? clients : clients?.page || []).find(c => c._id === (selectedClientId as any));
   const isLocalClient = selectedClient?.type === "local";
   const isInternationalClient = selectedClient?.type === "international";
   const gross = parseFloat(formData.amount || "0") || 0;
@@ -255,7 +255,7 @@ export default function RecordPaymentModal({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary disabled:bg-gray-50"
                 >
                   <option value="">Select a customer</option>
-                  {clients?.map(client => (
+                  {(Array.isArray(clients) ? clients : clients?.page || []).map(client => (
                     <option key={client._id} value={client._id}>
                       {client.name} ({client.type === "international" ? "International" : "Local"})
                     </option>

@@ -35,6 +35,8 @@ import { formatDateForDisplay } from "@/app/utils/dateUtils";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import { usePagination } from "@/app/hooks/usePagination";
+import Pagination from "@/app/components/ui/Pagination";
 
 export default function LocalClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,6 +47,9 @@ export default function LocalClientsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [customerFilter, setCustomerFilter] = useState<string>("");
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | undefined>(undefined);
+  
+  // Pagination hook
+  const clientsPagination = usePagination({ pageSize: 10 });
   
   // Get fiscal year for dashboard display (from settings or smart default)
   const [dashboardFiscalYear, setDashboardFiscalYear] = useState<number>(Math.max(2025, getCurrentFiscalYear()));
@@ -107,16 +112,20 @@ export default function LocalClientsPage() {
 
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
 
-  // Fetch data
-  const clients = useQuery(api.clients.list, { 
+  // Fetch data with pagination
+  const clientsData = useQuery(api.clients.list, { 
     type: "local",
     search: searchQuery || undefined,
+    paginationOpts: clientsPagination.paginationOpts,
   });
 
-  const orders = useQuery(api.orders.list, { 
+  const ordersData = useQuery(api.orders.list, { 
     clientType: "local",
     fiscalYear: selectedFiscalYear,
   });
+  
+  // Extract orders array (handle both paginated and non-paginated responses)
+  const orders = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
 
   const stats = useQuery(api.clients.getStats, { 
     type: "local",
@@ -176,26 +185,35 @@ export default function LocalClientsPage() {
   );
   
   // Specific order views
-  const totalOrdersDetails = useQuery(
+  const totalOrdersDetailsData = useQuery(
     api.orders.list,
     expandedMetric && (expandedMetric.metric === 'total_orders' || expandedMetric.metric === 'total_quantity')
       ? { clientType: 'local', fiscalYear: dashboardFiscalYear }
       : 'skip'
   );
   
-  const activeOrdersDetails = useQuery(
+  // Extract orders array (handle both paginated and non-paginated responses)
+  const totalOrdersDetails = Array.isArray(totalOrdersDetailsData) ? totalOrdersDetailsData : totalOrdersDetailsData?.page || [];
+  
+  const activeOrdersDetailsData = useQuery(
     api.orders.list,
     expandedMetric && expandedMetric.metric === 'active_orders'
       ? { clientType: 'local', status: 'in_production', fiscalYear: dashboardFiscalYear }
       : 'skip'
   );
   
-  const pendingQuantityDetails = useQuery(
+  // Extract orders array (handle both paginated and non-paginated responses)
+  const activeOrdersDetails = Array.isArray(activeOrdersDetailsData) ? activeOrdersDetailsData : activeOrdersDetailsData?.page || [];
+  
+  const pendingQuantityDetailsData = useQuery(
     api.orders.list,
     expandedMetric && expandedMetric.metric === 'pending_quantity'
       ? { clientType: 'local', fiscalYear: dashboardFiscalYear }
       : 'skip'
   );
+  
+  // Extract orders array (handle both paginated and non-paginated responses)
+  const pendingQuantityDetails = Array.isArray(pendingQuantityDetailsData) ? pendingQuantityDetailsData : pendingQuantityDetailsData?.page || [];
 
   // Filter orders
   const filteredOrders = orders?.filter(order => {
@@ -903,7 +921,7 @@ export default function LocalClientsPage() {
 
           {/* Customer Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {clients?.map((client) => (
+            {(Array.isArray(clientsData) ? clientsData : clientsData?.page || []).map((client) => (
               <div key={client._id} className="card-hover p-6 flex flex-col h-full">
                 {/* Header with profile picture, name and status */}
                 <div className="flex items-start justify-between mb-4">
@@ -996,7 +1014,16 @@ export default function LocalClientsPage() {
             ))}
           </div>
 
-          {clients?.length === 0 && (
+          {clientsData && !Array.isArray(clientsData) && clientsData.page && clientsData.page.length > 0 && (
+            <Pagination
+              currentPage={clientsPagination.currentPage}
+              totalPages={Array.isArray(clientsData) ? 1 : (clientsData?.isDone ? clientsPagination.currentPage : clientsPagination.currentPage + 1)}
+              onPageChange={clientsPagination.goToPage}
+              isLoading={!clientsData}
+            />
+          )}
+
+          {(Array.isArray(clientsData) ? clientsData : clientsData?.page || []).length === 0 && (
             <div className="text-center py-12 card">
               <p className="text-gray-500 mb-4">No customers found</p>
               <button

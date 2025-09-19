@@ -48,7 +48,10 @@ export default function ClientDetailPage() {
   const updateClient = useMutation(api.clients.update);
   
   // Fetch all orders for this client
-  const allOrders = useQuery(api.orders.list, { clientId });
+  const allOrdersData = useQuery(api.orders.list, { clientId });
+  
+  // Extract orders array (handle both paginated and non-paginated responses)
+  const allOrders = Array.isArray(allOrdersData) ? allOrdersData : allOrdersData?.page || [];
 
   const getClientCurrency = (clientType: string): SupportedCurrency => {
     return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');

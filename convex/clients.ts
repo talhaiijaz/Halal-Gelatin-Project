@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { paginationOptsValidator } from "convex/server";
 
 async function logClientEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
@@ -16,12 +17,13 @@ async function logClientEvent(ctx: any, params: { entityId: string; action: "cre
 }
 import { v } from "convex/values";
 
-// List all clients with optional filtering
+// List all clients with optional filtering and pagination
 export const list = query({
   args: {
     type: v.optional(v.union(v.literal("local"), v.literal("international"))),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     search: v.optional(v.string()),
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     // Apply filters
@@ -49,7 +51,20 @@ export const list = query({
     // Sort by creation date (newest first)
     filtered.sort((a, b) => b.createdAt - a.createdAt);
 
-    return filtered;
+    // Apply pagination (if paginationOpts provided) or return all clients
+    if (args.paginationOpts) {
+      const startIndex = args.paginationOpts.cursor ? parseInt(args.paginationOpts.cursor) : 0;
+      const endIndex = startIndex + args.paginationOpts.numItems;
+      const paginatedClients = filtered.slice(startIndex, endIndex);
+
+      return {
+        page: paginatedClients,
+        isDone: endIndex >= filtered.length,
+        continueCursor: endIndex < filtered.length ? endIndex.toString() : null,
+      };
+    } else {
+      return filtered;
+    }
   },
 });
 

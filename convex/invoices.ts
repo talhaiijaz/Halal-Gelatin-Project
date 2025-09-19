@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { paginationOptsValidator } from "convex/server";
 
 async function logInvoiceEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
@@ -83,7 +84,7 @@ export const createForOrder = mutation({
   },
 });
 
-// List invoices with filters
+// List invoices with filters and pagination
 export const list = query({
   args: {
     status: v.optional(v.string()),
@@ -92,6 +93,7 @@ export const list = query({
     endDate: v.optional(v.number()),
     search: v.optional(v.string()),
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     let invoices = await ctx.db.query("invoices").collect();
@@ -130,9 +132,33 @@ export const list = query({
       );
     }
 
+    // Sort by issue date (newest first), then by creation order for same dates
+    invoices.sort((a, b) => {
+      const dateDiff = b.issueDate - a.issueDate;
+      if (dateDiff !== 0) return dateDiff;
+      // Same date: preserve entry order (oldest first)
+      return a.createdAt - b.createdAt;
+    });
+
+    // Apply pagination (if paginationOpts provided) or return all invoices
+    let invoicesToProcess = invoices;
+    let paginationResult = null;
+    
+    if (args.paginationOpts) {
+      const startIndex = args.paginationOpts.cursor ? parseInt(args.paginationOpts.cursor) : 0;
+      const endIndex = startIndex + args.paginationOpts.numItems;
+      invoicesToProcess = invoices.slice(startIndex, endIndex);
+      
+      paginationResult = {
+        page: null, // Will be set after enrichment
+        isDone: endIndex >= invoices.length,
+        continueCursor: endIndex < invoices.length ? endIndex.toString() : null,
+      };
+    }
+
     // Fetch related data for each invoice
     const invoicesWithDetails = await Promise.all(
-      invoices.map(async (invoice) => {
+      invoicesToProcess.map(async (invoice) => {
         const client = await ctx.db.get(invoice.clientId);
         const order = await ctx.db.get(invoice.orderId);
         const payments = await ctx.db
@@ -178,15 +204,16 @@ export const list = query({
       })
     );
 
-    // Sort by issue date (newest first), then by creation order for same dates
-    invoicesWithDetails.sort((a, b) => {
-      const dateDiff = b.issueDate - a.issueDate;
-      if (dateDiff !== 0) return dateDiff;
-      // Same date: preserve entry order (oldest first)
-      return a.createdAt - b.createdAt;
-    });
-
-    return invoicesWithDetails;
+    // Return paginated result if paginationOpts was provided, otherwise return all invoices
+    if (args.paginationOpts) {
+      return {
+        page: invoicesWithDetails,
+        isDone: paginationResult!.isDone,
+        continueCursor: paginationResult!.continueCursor,
+      };
+    } else {
+      return invoicesWithDetails;
+    }
   },
 });
 

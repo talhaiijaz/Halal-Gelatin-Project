@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { updateBankAccountBalance, calculateBankAccountBalance } from "./bankUtils";
+import { paginationOptsValidator } from "convex/server";
 
 // Helper function to format currency with proper locale and symbol support
 function formatCurrency(amount: number, currency: string) {
@@ -501,11 +502,12 @@ export const transferBetweenAccounts = mutation({
   },
 });
 
-// Get bank account with current balance and recent transactions
+// Get bank account with current balance and paginated transactions
 export const getAccountWithTransactions = query({
   args: {
     bankAccountId: v.id("bankAccounts"),
     transactionLimit: v.optional(v.number()),
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     const bankAccount = await ctx.db.get(args.bankAccountId);
@@ -513,35 +515,56 @@ export const getAccountWithTransactions = query({
       return null;
     }
 
-    // Get recent transactions
+    // Get all transactions
     const transactions = await ctx.db
       .query("bankTransactions")
       .filter(q => q.eq(q.field("bankAccountId"), args.bankAccountId))
       .collect();
 
+    // Sort transactions
+    transactions.sort((a, b) => {
+      // Sort by transaction date (most recent first)
+      const dateDiff = b.transactionDate - a.transactionDate;
+      if (dateDiff !== 0) return dateDiff;
+      
+      // If transaction dates are the same, sort by creation time (most recent first)
+      // This ensures the most recently created transaction appears at the top
+      return b.createdAt - a.createdAt;
+    });
 
-    const sortedTransactions = transactions
-      .sort((a, b) => {
-        // Sort by transaction date (most recent first)
-        const dateDiff = b.transactionDate - a.transactionDate;
-        if (dateDiff !== 0) return dateDiff;
-        
-        // If transaction dates are the same, sort by creation time (most recent first)
-        // This ensures the most recently created transaction appears at the top
-        return b.createdAt - a.createdAt;
-      })
-      .slice(0, args.transactionLimit || 50);
+    // Apply pagination (if paginationOpts provided) or return all transactions
+    let transactionsToReturn = transactions;
+    let paginationResult = null;
+    
+    if (args.paginationOpts) {
+      const startIndex = args.paginationOpts.cursor ? parseInt(args.paginationOpts.cursor) : 0;
+      const endIndex = startIndex + args.paginationOpts.numItems;
+      transactionsToReturn = transactions.slice(startIndex, endIndex);
+      
+      paginationResult = {
+        page: transactionsToReturn,
+        isDone: endIndex >= transactions.length,
+        continueCursor: endIndex < transactions.length ? endIndex.toString() : null,
+      };
+    }
 
     // Calculate current balance using utility function
     const openingBalance = bankAccount.openingBalance || 0;
     const currentBalance = calculateBankAccountBalance(openingBalance, transactions, bankAccount.currency);
 
-    return {
+    const result = {
       ...bankAccount,
       currentBalance: currentBalance,
-      recentTransactions: sortedTransactions,
+      recentTransactions: transactionsToReturn,
       totalTransactions: transactions.length,
     };
+
+    // Add pagination info if pagination was used
+    if (args.paginationOpts) {
+      (result as any).pagination = paginationResult;
+    }
+
+    return result;
   },
 });
 

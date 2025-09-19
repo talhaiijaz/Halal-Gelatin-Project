@@ -42,7 +42,10 @@ export default function DashboardPage() {
   
   // Fetch real data from Convex
   const dashboardStats = useQuery(api.dashboard.getStats, { fiscalYear: currentFiscalYear });
-  const orders = useQuery(api.orders.list, {}); // Orders are rolling, no fiscal year filter
+  const ordersData = useQuery(api.orders.list, {}); // Orders are rolling, no fiscal year filter
+  
+  // Extract orders array (handle both paginated and non-paginated responses)
+  const orders = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
   const orderItems = useQuery(api.orders.listItems, {});
   const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
   
@@ -91,7 +94,7 @@ export default function DashboardPage() {
   }, []);
 
   // Fetch orders by status - use rolling data (no fiscal year filter for orders)
-  const ordersData = useQuery(api.dashboard.getOrdersByStatus, { limit: dashboardOrderLimit });
+  const ordersByStatusData = useQuery(api.dashboard.getOrdersByStatus, { limit: dashboardOrderLimit });
 
   // Detail queries (lazy-loaded when a metric is expanded)
   const receivablesDetails = useQuery(
@@ -782,18 +785,18 @@ export default function DashboardPage() {
             <Clock className="h-5 w-5 text-orange-500" />
           </div>
           <div>
-            {!ordersData ? (
+            {!ordersByStatusData ? (
               <div className="space-y-4">
                 <Skeleton count={5} height={120} />
               </div>
-            ) : ordersData.pendingOrders.length === 0 ? (
+            ) : ordersByStatusData.pendingOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                 <p>No pending orders</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {ordersData.pendingOrders.map((order) => (
+                {ordersByStatusData.pendingOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-orange-50 rounded-lg border border-orange-200">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
@@ -829,18 +832,18 @@ export default function DashboardPage() {
             <Package className="h-5 w-5 text-blue-500" />
           </div>
           <div>
-            {!ordersData ? (
+            {!ordersByStatusData ? (
               <div className="space-y-4">
                 <Skeleton count={5} height={120} />
               </div>
-            ) : ordersData.inProductionOrders.length === 0 ? (
+            ) : ordersByStatusData.inProductionOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                 <p>No orders in production</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {ordersData.inProductionOrders.map((order) => (
+                {ordersByStatusData.inProductionOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
@@ -876,18 +879,18 @@ export default function DashboardPage() {
             <TrendingUp className="h-5 w-5 text-purple-500" />
           </div>
           <div>
-            {!ordersData ? (
+            {!ordersByStatusData ? (
               <div className="space-y-4">
                 <Skeleton count={5} height={120} />
               </div>
-            ) : ordersData.shippedOrders.length === 0 ? (
+            ) : ordersByStatusData.shippedOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                 <p>No shipped orders</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {ordersData.shippedOrders.map((order) => (
+                {ordersByStatusData.shippedOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>
@@ -923,18 +926,18 @@ export default function DashboardPage() {
             <CheckCircle className="h-5 w-5 text-green-500" />
           </div>
           <div>
-            {!ordersData ? (
+            {!ordersByStatusData ? (
               <div className="space-y-4">
                 <Skeleton count={5} height={120} />
               </div>
-            ) : ordersData.deliveredOrders.length === 0 ? (
+            ) : ordersByStatusData.deliveredOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
                 <p>No delivered orders</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {ordersData.deliveredOrders.map((order) => (
+                {ordersByStatusData.deliveredOrders.map((order) => (
                   <div key={order._id} className="p-4 bg-green-50 rounded-lg border border-green-200">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
                       <div>

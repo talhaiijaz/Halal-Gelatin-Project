@@ -148,11 +148,11 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                   </h3>
                   {payments === undefined ? (
                     <div className="text-center py-4 text-gray-500">Loading payments...</div>
-                  ) : payments.length === 0 ? (
+                  ) : (Array.isArray(payments) ? payments : payments?.page || []).length === 0 ? (
                     <div className="text-center py-4 text-gray-500">No payments received yet</div>
                   ) : (
                     <div className="space-y-3">
-                      {payments.map((payment: any) => (
+                      {(Array.isArray(payments) ? payments : payments?.page || []).map((payment: any) => (
                         <div key={payment._id} className="border border-gray-200 rounded-lg p-3">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { updateBankAccountBalance, calculateBankAccountBalance } from "./bankUtils";
+import { paginationOptsValidator } from "convex/server";
 
 
 async function logBankEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
@@ -186,10 +187,11 @@ export const update = mutation({
   },
 });
 
-// Get all payments for a specific bank account
+// Get all payments for a specific bank account with pagination
 export const getPayments = query({
   args: {
     bankAccountId: v.id("bankAccounts"),
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     const payments = await ctx.db
@@ -198,12 +200,27 @@ export const getPayments = query({
       .collect();
 
     // Sort by payment date (most recent first), then by creation time (most recent first)
-    return payments.sort((a, b) => {
+    payments.sort((a, b) => {
       const dateDiff = b.paymentDate - a.paymentDate;
       if (dateDiff !== 0) return dateDiff;
       // Same date: most recent creation time first
       return b.createdAt - a.createdAt;
     });
+
+    // Apply pagination (if paginationOpts provided) or return all payments
+    if (args.paginationOpts) {
+      const startIndex = args.paginationOpts.cursor ? parseInt(args.paginationOpts.cursor) : 0;
+      const endIndex = startIndex + args.paginationOpts.numItems;
+      const paginatedPayments = payments.slice(startIndex, endIndex);
+
+      return {
+        page: paginatedPayments,
+        isDone: endIndex >= payments.length,
+        continueCursor: endIndex < payments.length ? endIndex.toString() : null,
+      };
+    } else {
+      return payments;
+    }
   },
 });
 

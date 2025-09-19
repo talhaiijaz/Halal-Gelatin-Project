@@ -22,6 +22,8 @@ import {
 import BankTransactionModal from "./BankTransactionModal";
 import BankTransactionDetailModal from "@/app/components/finance/BankTransactionDetailModal";
 import { formatCurrency } from "@/app/utils/currencyFormat";
+import { usePagination } from "@/app/hooks/usePagination";
+import Pagination from "@/app/components/ui/Pagination";
 
 interface BankingDashboardProps {
   bankAccountId: Id<"bankAccounts"> | null;
@@ -36,8 +38,15 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
   const [isTxDetailOpen, setIsTxDetailOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Pagination hook
+  const transactionsPagination = usePagination({ pageSize: 10 });
+
   const bankAccount = useQuery(api.bankTransactions.getAccountWithTransactions, 
-    bankAccountId ? { bankAccountId, transactionLimit: 50 } : "skip"
+    bankAccountId ? { 
+      bankAccountId, 
+      transactionLimit: 50,
+      paginationOpts: transactionsPagination.paginationOpts
+    } : "skip"
   );
   const transactionStats = useQuery(api.bankTransactions.getTransactionStats,
     bankAccountId ? { bankAccountId } : "skip"
@@ -418,6 +427,14 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
             </tbody>
           </table>
         </div>
+        {bankAccount && (bankAccount as any).pagination && (bankAccount as any).pagination.page && (bankAccount as any).pagination.page.length > 0 && (
+          <Pagination
+            currentPage={transactionsPagination.currentPage}
+            totalPages={(bankAccount as any).pagination.isDone ? transactionsPagination.currentPage : transactionsPagination.currentPage + 1}
+            onPageChange={transactionsPagination.goToPage}
+            isLoading={!bankAccount}
+          />
+        )}
       </div>
 
       {/* Transaction Modal */}

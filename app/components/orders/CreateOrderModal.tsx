@@ -95,7 +95,7 @@ export default function CreateOrderModal({
   const createOrder = useMutation(api.orders.create);
 
   // Currency helpers
-  const selectedClient = clients?.find(c => c._id === selectedClientId);
+  const selectedClient = (Array.isArray(clients) ? clients : clients?.page || []).find(c => c._id === selectedClientId);
   const currentCurrency: string = selectedClient?.type === 'local' ? 'PKR' : selectedCurrency;
 
   // Date validation helper
@@ -540,7 +540,7 @@ export default function CreateOrderModal({
 
   // Filter and sort clients
   const filteredAndSortedClients = clients
-    ? clients
+    ? (Array.isArray(clients) ? clients : clients?.page || [])
         .filter(client => {
           const q = clientSearchQuery.toLowerCase();
           return (
@@ -680,7 +680,7 @@ export default function CreateOrderModal({
                 {/* Results count */}
                 {filteredAndSortedClients.length > 0 && (
                   <div className="mt-3 text-sm text-gray-600 text-center">
-                    Showing {filteredAndSortedClients.length} of {clients?.length || 0} clients
+                    Showing {filteredAndSortedClients.length} of {(Array.isArray(clients) ? clients : clients?.page || []).length} clients
                   </div>
                 )}
               </div>

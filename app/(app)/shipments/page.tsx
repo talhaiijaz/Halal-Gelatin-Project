@@ -71,7 +71,7 @@ export default function ShipmentsPage() {
   const fiscalYearOptions = getFiscalYearOptions();
   
   // Create a map of client IDs to client names for quick lookup
-  const clientMap = clients?.reduce((acc, client) => {
+  const clientMap = (Array.isArray(clients) ? clients : clients?.page || []).reduce((acc, client) => {
     acc[client._id] = client;
     return acc;
   }, {} as Record<string, any>) || {};
@@ -92,7 +92,7 @@ export default function ShipmentsPage() {
     const shipmentEntries: ShipmentEntry[] = [];
     let entryId = 1;
 
-    orders.forEach(order => {
+    (Array.isArray(orders) ? orders : orders?.page || []).forEach(order => {
       const client = clientMap[order.clientId];
       const clientName = client?.name || 'Unknown Client';
       

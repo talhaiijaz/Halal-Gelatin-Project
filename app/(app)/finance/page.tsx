@@ -52,6 +52,8 @@ import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
 import { useMutation } from "convex/react";
 import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { usePagination } from "@/app/hooks/usePagination";
+import Pagination from "@/app/components/ui/Pagination";
 
 // Note: formatCurrency is now imported from utils/currencyFormat
 
@@ -79,6 +81,10 @@ export default function FinancePage() {
   const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   const [paymentFiscalYearFilter, setPaymentFiscalYearFilter] = useState<number | "all">("all");
+  
+  // Pagination hooks
+  const paymentsPagination = usePagination({ pageSize: 10 });
+  const invoicesPagination = usePagination({ pageSize: 10 });
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <TrendingUp className="h-4 w-4" /> },
@@ -93,17 +99,19 @@ export default function FinancePage() {
   const dashboardStats = useQuery(api.finance.getDashboardStats, { year: currentFiscalYear });
   const monthlyStats = useQuery(api.finance.getMonthlyOrderStats, { year: currentFiscalYear });
   
-  // Fetch invoices data
-  const invoices = useQuery(api.invoices.list, { 
-    fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter 
+  // Fetch invoices data with pagination
+  const invoicesData = useQuery(api.invoices.list, { 
+    fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter,
+    paginationOpts: invoicesPagination.paginationOpts
   });
   const invoiceStats = useQuery(api.finance.getInvoiceStats, { 
     fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter 
   });
   
-  // Fetch payments data
-  const payments = useQuery(api.payments.list, { 
-    fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter 
+  // Fetch payments data with pagination
+  const paymentsData = useQuery(api.payments.list, { 
+    fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter,
+    paginationOpts: paymentsPagination.paginationOpts
   });
   const paymentStats = useQuery(api.payments.getStats, { 
     fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter 
@@ -167,8 +175,8 @@ export default function FinancePage() {
     }
   };
 
-  // Filter invoices
-  const filteredInvoices = invoices?.filter(invoice => {
+  // Filter invoices (now working with paginated data)
+  const filteredInvoices = (Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || []).filter(invoice => {
     if (invoiceSearchQuery) {
       const searchLower = invoiceSearchQuery.toLowerCase();
       const matchesSearch = 
@@ -190,7 +198,6 @@ export default function FinancePage() {
   });
 
   // Sort filtered invoices by issue date (latest first)
-
   const sortedInvoices = filteredInvoices?.sort((a, b) => {
     // Sort by issue date (descending - latest first)
     return b.issueDate - a.issueDate;
@@ -460,7 +467,7 @@ export default function FinancePage() {
             </div>
             
             <div className="mt-4 flex items-center text-sm text-gray-600">
-              {invoices ? `${sortedInvoices?.length || 0} invoices found` : <div className="w-20 h-4 bg-gray-200 rounded animate-pulse" />}
+              {invoicesData ? `${sortedInvoices?.length || 0} invoices found` : <div className="w-20 h-4 bg-gray-200 rounded animate-pulse" />}
             </div>
           </div>
 
@@ -491,7 +498,7 @@ export default function FinancePage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {!invoices ? (
+                  {!invoicesData ? (
                     // Loading skeletons
                     [...Array(5)].map((_, i) => (
                       <tr key={i}>
@@ -600,6 +607,14 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
+            {invoicesData && (Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || []).length > 0 && (
+              <Pagination
+                currentPage={invoicesPagination.currentPage}
+                totalPages={Array.isArray(invoicesData) ? 1 : (invoicesData?.isDone ? invoicesPagination.currentPage : invoicesPagination.currentPage + 1)}
+                onPageChange={invoicesPagination.goToPage}
+                isLoading={!invoicesData}
+              />
+            )}
           </div>
         </div>
       )}
@@ -678,7 +693,7 @@ export default function FinancePage() {
                 </select>
               </div>
               <div className="flex items-center text-sm text-gray-600 mb-1">
-                {payments ? `${payments.length} payments found` : <div className="w-20 h-4 bg-gray-200 rounded animate-pulse" />}
+                {paymentsData ? `${(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length} payments found` : <div className="w-20 h-4 bg-gray-200 rounded animate-pulse" />}
               </div>
             </div>
           </div>
@@ -703,7 +718,7 @@ export default function FinancePage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {payments?.map((payment) => (
+                  {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).map((payment) => (
                     <tr 
                       key={payment._id} 
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -802,10 +817,18 @@ export default function FinancePage() {
                   ))}
                 </tbody>
               </table>
-              {payments?.length === 0 && (
+              {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length === 0 && (
                 <div className="text-center py-8 text-gray-500">No payments recorded yet</div>
               )}
             </div>
+            {paymentsData && (Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length > 0 && (
+              <Pagination
+                currentPage={paymentsPagination.currentPage}
+                totalPages={Array.isArray(paymentsData) ? 1 : (paymentsData?.isDone ? paymentsPagination.currentPage : paymentsPagination.currentPage + 1)}
+                onPageChange={paymentsPagination.goToPage}
+                isLoading={!paymentsData}
+              />
+            )}
           </div>
         </div>
       )}

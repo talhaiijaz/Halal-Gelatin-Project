@@ -2,6 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { updateBankAccountBalance } from "./bankUtils";
+import { paginationOptsValidator } from "convex/server";
 
 
 // Helper function to format currency with proper locale and symbol support
@@ -602,7 +603,7 @@ export const recordPayment = mutation({
   },
 });
 
-// List payments with filters
+// List payments with filters and pagination
 export const list = query({
   args: {
     invoiceId: v.optional(v.id("invoices")),
@@ -611,6 +612,7 @@ export const list = query({
     endDate: v.optional(v.number()),
     method: v.optional(v.string()),
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     let payments = await ctx.db.query("payments").collect();
@@ -656,9 +658,33 @@ export const list = query({
       });
     }
 
+    // Sort by payment date (newest first), then by creation time (most recent first)
+    payments.sort((a, b) => {
+      const dateDiff = b.paymentDate - a.paymentDate;
+      if (dateDiff !== 0) return dateDiff;
+      // Same date: most recent creation time first
+      return b.createdAt - a.createdAt;
+    });
+
+    // Apply pagination (if paginationOpts provided) or return all payments
+    let paymentsToProcess = payments;
+    let paginationResult = null;
+    
+    if (args.paginationOpts) {
+      const startIndex = args.paginationOpts.cursor ? parseInt(args.paginationOpts.cursor) : 0;
+      const endIndex = startIndex + args.paginationOpts.numItems;
+      paymentsToProcess = payments.slice(startIndex, endIndex);
+      
+      paginationResult = {
+        page: null, // Will be set after enrichment
+        isDone: endIndex >= payments.length,
+        continueCursor: endIndex < payments.length ? endIndex.toString() : null,
+      };
+    }
+
     // Enrich with invoice and client data
     const enrichedPayments = await Promise.all(
-      payments.map(async (payment) => {
+      paymentsToProcess.map(async (payment) => {
         const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
         const client = await ctx.db.get(payment.clientId);
         let order = null;
@@ -700,15 +726,16 @@ export const list = query({
       })
     );
 
-    // Sort by payment date (newest first), then by creation time (most recent first)
-    enrichedPayments.sort((a, b) => {
-      const dateDiff = b.paymentDate - a.paymentDate;
-      if (dateDiff !== 0) return dateDiff;
-      // Same date: most recent creation time first
-      return b.createdAt - a.createdAt;
-    });
-
-    return enrichedPayments;
+    // Return paginated result if paginationOpts was provided, otherwise return all payments
+    if (args.paginationOpts) {
+      return {
+        page: enrichedPayments,
+        isDone: paginationResult!.isDone,
+        continueCursor: paginationResult!.continueCursor,
+      };
+    } else {
+      return enrichedPayments;
+    }
   },
 });
 

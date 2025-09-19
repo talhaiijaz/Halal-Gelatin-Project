@@ -15,6 +15,8 @@ import { useSearchParams } from "next/navigation";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrency } from "@/app/utils/currencyFormat";
+import { usePagination } from "@/app/hooks/usePagination";
+import Pagination from "@/app/components/ui/Pagination";
 
 function OrdersPageContent() {
   const searchParams = useSearchParams();
@@ -23,10 +25,13 @@ function OrdersPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | undefined>(undefined);
 
+  // Pagination hook
+  const ordersPagination = usePagination({ pageSize: 10 });
 
-  // Fetch orders with filters
-  const orders = useQuery(api.orders.list, {
+  // Fetch orders with filters and pagination
+  const ordersData = useQuery(api.orders.list, {
     fiscalYear: selectedFiscalYear,
+    paginationOpts: ordersPagination.paginationOpts,
   });
 
 
@@ -104,7 +109,8 @@ function OrdersPageContent() {
 
 
   const exportToCSV = () => {
-    if (!orders) return;
+    const orders = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
+    if (!orders.length) return;
 
     const csvContent = [
       ["Invoice Number", "Client", "Status", "Total Amount", "Paid Amount", "Receivables Amount", "Currency", "Quantity (kg)", "Delivery Date", "Factory Departure Date"],
@@ -136,8 +142,8 @@ function OrdersPageContent() {
     toast.success("Orders exported successfully");
   };
 
-  // Filter orders based on search term
-  const filteredOrders = orders?.filter(order => {
+  // Filter orders based on search term (now working with paginated data)
+  const filteredOrders = (Array.isArray(ordersData) ? ordersData : ordersData?.page || []).filter(order => {
     if (!searchTerm) return true;
     const searchLower = searchTerm.toLowerCase();
     return (
@@ -271,7 +277,7 @@ function OrdersPageContent() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {!orders ? (
+              {!ordersData ? (
                 // Loading state
                 Array.from({ length: 5 }).map((_, index) => (
                   <tr key={index}>
@@ -375,6 +381,14 @@ function OrdersPageContent() {
             </tbody>
           </table>
         </div>
+        {ordersData && (Array.isArray(ordersData) ? ordersData : ordersData?.page || []).length > 0 && (
+          <Pagination
+            currentPage={ordersPagination.currentPage}
+            totalPages={Array.isArray(ordersData) ? 1 : (ordersData?.isDone ? ordersPagination.currentPage : ordersPagination.currentPage + 1)}
+            onPageChange={ordersPagination.goToPage}
+            isLoading={!ordersData}
+          />
+        )}
       </div>
 
       {/* Create Order Modal */}

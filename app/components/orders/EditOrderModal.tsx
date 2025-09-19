@@ -503,7 +503,7 @@ export default function EditOrderModal({
 
   // Filter and sort clients
   const filteredAndSortedClients = clients
-    ? clients
+    ? (Array.isArray(clients) ? clients : clients?.page || [])
         .filter(client => 
           client.name?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
           client.contactPerson?.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
@@ -513,7 +513,7 @@ export default function EditOrderModal({
         .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     : [];
 
-  const selectedClient = clients?.find(c => c._id === selectedClientId);
+  const selectedClient = (Array.isArray(clients) ? clients : clients?.page || []).find(c => c._id === selectedClientId);
 
   if (!isOpen || !orderId) return null;
 

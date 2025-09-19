@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { paginationOptsValidator } from "convex/server";
 
 async function logOrderEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
@@ -57,7 +58,7 @@ const generateOrderNumber = async (ctx: any, selectedFiscalYear?: number) => {
   return orderNumber;
 };
 
-// List orders with filters
+// List orders with filters and pagination
 export const list = query({
   args: {
     clientId: v.optional(v.id("clients")),
@@ -66,6 +67,7 @@ export const list = query({
     endDate: v.optional(v.number()),
     clientType: v.optional(v.union(v.literal("local"), v.literal("international"))),
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
+    paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
     
@@ -137,9 +139,25 @@ export const list = query({
       return dateA - dateB;
     });
 
-    // Fetch client data for each order
+    // Apply pagination (if paginationOpts provided) or return all orders
+    let paginatedOrders = orders;
+    let paginationResult = null;
+    
+    if (args.paginationOpts) {
+      const startIndex = args.paginationOpts.cursor ? parseInt(args.paginationOpts.cursor) : 0;
+      const endIndex = startIndex + args.paginationOpts.numItems;
+      paginatedOrders = orders.slice(startIndex, endIndex);
+      
+      paginationResult = {
+        page: null, // Will be set after enrichment
+        isDone: endIndex >= orders.length,
+        continueCursor: endIndex < orders.length ? endIndex.toString() : null,
+      };
+    }
+
+    // Fetch client data for each order (only for paginated results)
     const ordersWithClients = await Promise.all(
-      orders.map(async (order) => {
+      paginatedOrders.map(async (order) => {
         const client = await ctx.db.get(order.clientId);
         const items = await ctx.db
           .query("orderItems")
@@ -185,7 +203,16 @@ export const list = query({
       })
     );
 
-    return ordersWithClients;
+    // Return paginated result if paginationOpts was provided, otherwise return all orders
+    if (args.paginationOpts) {
+      return {
+        page: ordersWithClients,
+        isDone: paginationResult!.isDone,
+        continueCursor: paginationResult!.continueCursor,
+      };
+    } else {
+      return ordersWithClients;
+    }
   },
 });
 

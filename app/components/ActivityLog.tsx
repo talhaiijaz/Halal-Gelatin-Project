@@ -18,9 +18,14 @@ export default function ActivityLog({ entityId, entityTable, limit = 10, title =
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   
   // Prefer indexed query when entityTable provided
-  const logs = entityTable
-    ? useQuery(api.dashboard.listEntityLogs, { entityTable, entityId })
-    : useQuery(api.dashboard.getEntityActivityLogs, { entityId, limit });
+  const logs = useQuery(
+    entityTable 
+      ? api.dashboard.listEntityLogs 
+      : api.dashboard.getEntityActivityLogs, 
+    entityTable 
+      ? { entityTable, entityId }
+      : { entityId, limit }
+  );
 
   const getActionIcon = (action: string, metadata?: any) => {
     // Check if this is a document activity

@@ -65,7 +65,7 @@ export default function ReportsPage() {
   const calculateMetrics = () => {
     if (!financeStats || !paymentStats || !invoices || !orders || !clients) return null;
 
-    const filteredOrders = orders.filter(order => {
+    const filteredOrders = (Array.isArray(orders) ? orders : orders?.page || []).filter(order => {
       const orderDate = order.factoryDepartureDate || order.orderCreationDate || order.createdAt;
       if (startDate && orderDate < startDate) return false;
       if (endDate && orderDate > endDate) return false;
@@ -74,8 +74,8 @@ export default function ReportsPage() {
 
     const totalRevenue = paymentStats.totalAmount;
     const totalOrders = filteredOrders.length;
-    const totalClients = clients.length;
-    const activeClients = clients.filter(c => c.status === "active").length;
+    const totalClients = (Array.isArray(clients) ? clients : clients?.page || []).length;
+    const activeClients = (Array.isArray(clients) ? clients : clients?.page || []).filter(c => c.status === "active").length;
 
     // Calculate growth rates (mock data for demonstration)
     const previousRevenue = totalRevenue * 0.85; // Simulated previous period
@@ -89,8 +89,8 @@ export default function ReportsPage() {
       revenueGrowth,
       paymentMethods: paymentStats.methodStats,
       outstandingAmount: financeStats.totalOutstanding,
-      paidInvoices: invoices.filter((inv: any) => inv.status === "paid").length,
-      unpaidInvoices: invoices.filter((inv: any) => inv.status !== "paid").length,
+      paidInvoices: (Array.isArray(invoices) ? invoices : invoices?.page || []).filter((inv: any) => inv.status === "paid").length,
+      unpaidInvoices: (Array.isArray(invoices) ? invoices : invoices?.page || []).filter((inv: any) => inv.status !== "paid").length,
     };
   };
 
