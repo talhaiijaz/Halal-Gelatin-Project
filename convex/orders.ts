@@ -150,6 +150,7 @@ export const list = query({
       
       paginationResult = {
         page: null, // Will be set after enrichment
+        totalCount: orders.length,
         isDone: endIndex >= orders.length,
         continueCursor: endIndex < orders.length ? endIndex.toString() : null,
       };
@@ -207,6 +208,7 @@ export const list = query({
     if (args.paginationOpts) {
       return {
         page: ordersWithClients,
+        totalCount: paginationResult!.totalCount,
         isDone: paginationResult!.isDone,
         continueCursor: paginationResult!.continueCursor,
       };

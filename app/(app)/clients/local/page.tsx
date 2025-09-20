@@ -1014,8 +1014,7 @@ export default function LocalClientsPage() {
           {clientsData && !Array.isArray(clientsData) && clientsData.page && clientsData.page.length > 0 && (
             <Pagination
               currentPage={clientsPagination.currentPage}
-              totalPages={clientsPagination.currentPage}
-              hasMore={!Array.isArray(clientsData) && !clientsData?.isDone}
+              totalPages={Math.ceil((!Array.isArray(clientsData) ? clientsData.totalCount || 0 : 0) / clientsPagination.pageSize)}
               onPageChange={clientsPagination.goToPage}
               isLoading={!clientsData}
             />

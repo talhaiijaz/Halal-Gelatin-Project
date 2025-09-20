@@ -599,8 +599,7 @@ export default function FinancePage() {
             {invoicesData && (Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || []).length > 0 && (
               <Pagination
                 currentPage={invoicesPagination.currentPage}
-                totalPages={invoicesPagination.currentPage}
-                hasMore={!Array.isArray(invoicesData) && !invoicesData?.isDone}
+              totalPages={Math.ceil((!Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize)}
                 onPageChange={invoicesPagination.goToPage}
                 isLoading={!invoicesData}
               />
@@ -814,8 +813,7 @@ export default function FinancePage() {
             {paymentsData && (Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length > 0 && (
               <Pagination
                 currentPage={paymentsPagination.currentPage}
-                totalPages={paymentsPagination.currentPage}
-                hasMore={!Array.isArray(paymentsData) && !paymentsData?.isDone}
+              totalPages={Math.ceil((!Array.isArray(paymentsData) ? paymentsData.totalCount || 0 : 0) / paymentsPagination.pageSize)}
                 onPageChange={paymentsPagination.goToPage}
                 isLoading={!paymentsData}
               />

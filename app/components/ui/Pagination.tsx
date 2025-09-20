@@ -7,17 +7,15 @@ interface PaginationProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   isLoading?: boolean;
-  hasMore?: boolean; // New prop to indicate if there are more pages available
 }
 
 export default function Pagination({ 
   currentPage, 
   totalPages, 
   onPageChange, 
-  isLoading = false,
-  hasMore = false
+  isLoading = false
 }: PaginationProps) {
-  if (totalPages <= 1 && !hasMore) return null;
+  if (totalPages <= 1) return null;
 
   const getVisiblePages = () => {
     const delta = 2; // Number of pages to show on each side of current page
@@ -45,13 +43,6 @@ export default function Pagination({
     } else {
       rangeWithDots.push(totalPages);
     }
-    
-    // If hasMore is true and we're showing all pages up to totalPages, add "..." to indicate more
-    if (hasMore && currentPage + delta >= totalPages - 1) {
-      if (rangeWithDots[rangeWithDots.length - 1] !== "...") {
-        rangeWithDots.push("...");
-      }
-    }
 
     return rangeWithDots;
   };
@@ -70,7 +61,7 @@ export default function Pagination({
         </button>
         <button
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={(currentPage === totalPages && !hasMore) || isLoading}
+          disabled={currentPage === totalPages || isLoading}
           className="relative ml-3 inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Next
@@ -80,7 +71,7 @@ export default function Pagination({
         <div>
           <p className="text-sm text-gray-700">
             Showing page <span className="font-medium">{currentPage}</span> of{" "}
-            <span className="font-medium">{hasMore ? `${totalPages}+` : totalPages}</span>
+            <span className="font-medium">{totalPages}</span>
           </p>
         </div>
         <div>
@@ -127,7 +118,7 @@ export default function Pagination({
 
             <button
               onClick={() => onPageChange(currentPage + 1)}
-              disabled={(currentPage === totalPages && !hasMore) || isLoading}
+              disabled={currentPage === totalPages || isLoading}
               className="relative inline-flex items-center px-2 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="sr-only">Next</span>

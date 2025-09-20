@@ -578,6 +578,7 @@ export const getAccountWithTransactions = query({
       
       paginationResult = {
         page: transactionsToReturn,
+        totalCount: transactions.length,
         isDone: endIndex >= transactions.length,
         continueCursor: endIndex < transactions.length ? endIndex.toString() : null,
       };

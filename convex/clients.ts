@@ -59,6 +59,7 @@ export const list = query({
 
       return {
         page: paginatedClients,
+        totalCount: filtered.length,
         isDone: endIndex >= filtered.length,
         continueCursor: endIndex < filtered.length ? endIndex.toString() : null,
       };

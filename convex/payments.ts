@@ -677,6 +677,7 @@ export const list = query({
       
       paginationResult = {
         page: null, // Will be set after enrichment
+        totalCount: payments.length,
         isDone: endIndex >= payments.length,
         continueCursor: endIndex < payments.length ? endIndex.toString() : null,
       };
@@ -730,6 +731,7 @@ export const list = query({
     if (args.paginationOpts) {
       return {
         page: enrichedPayments,
+        totalCount: paginationResult!.totalCount,
         isDone: paginationResult!.isDone,
         continueCursor: paginationResult!.continueCursor,
       };
