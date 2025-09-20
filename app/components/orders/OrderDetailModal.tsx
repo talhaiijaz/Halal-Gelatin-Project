@@ -513,7 +513,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                                   }
                                   
                                   // Validate invoice number format (basic validation)
-                                  const invoiceRegex = /^[A-Z0-9][A-Z0-9-]{2,19}$/;
+                                  const invoiceRegex = /^[A-Za-z0-9][A-Za-z0-9-]{2,19}$/;
                                   if (!invoiceRegex.test(newInvoiceNumber.trim())) {
                                     displayError(new Error("Invoice number must be 3-20 characters long, start with a letter or number, and contain only letters, numbers, and hyphens"), 'alert');
                                     return;

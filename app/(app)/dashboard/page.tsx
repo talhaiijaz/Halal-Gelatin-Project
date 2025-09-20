@@ -22,7 +22,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
-import { getUsdRates, type UsdRates } from "@/app/utils/fx";
+import { getUsdRates, toUSD, type UsdRates } from "@/app/utils/fx";
 import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
 
 export default function DashboardPage() {
@@ -52,11 +52,20 @@ export default function DashboardPage() {
   // Fetch client-specific stats for accurate local/international breakdown
   const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: currentFiscalYear });
   const internationalStats = useQuery(api.clients.getStats, { type: "international", fiscalYear: currentFiscalYear });
-  const [usdRates, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 1.08, AED: 0.2723 });
+  const [usdRates, setUsdRates] = useState<UsdRates>({ USD: 1, EUR: 0.93, AED: 0.2723 });
   // USD total and info toggles removed per request
   useEffect(() => {
     const ac = new AbortController();
-    const fetchRates = () => getUsdRates(ac.signal).then(setUsdRates).catch(() => {});
+    const fetchRates = () => {
+      getUsdRates(ac.signal)
+        .then((rates) => {
+          console.log('Fetched USD rates:', rates);
+          setUsdRates(rates);
+        })
+        .catch((error) => {
+          console.error('Failed to fetch USD rates:', error);
+        });
+    };
     fetchRates();
     const intervalId = setInterval(fetchRates, 1000 * 60 * 60 * 6); // refresh every 6 hours
     const onFocus = () => fetchRates();
@@ -228,7 +237,7 @@ export default function DashboardPage() {
 
   // Helper function to convert to USD
   const convertToUsd = (amount: number, currency: string) => {
-    return amount * (usdRates[currency as keyof UsdRates] || 1);
+    return toUSD(amount, currency as keyof UsdRates, usdRates);
   };
 
   // Create stats array with real data - simplified since we now have separate financial sections

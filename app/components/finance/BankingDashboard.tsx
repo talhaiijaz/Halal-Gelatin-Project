@@ -430,7 +430,8 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
         {bankAccount && (bankAccount as any).pagination && (bankAccount as any).pagination.page && (bankAccount as any).pagination.page.length > 0 && (
           <Pagination
             currentPage={transactionsPagination.currentPage}
-            totalPages={(bankAccount as any).pagination.isDone ? transactionsPagination.currentPage : transactionsPagination.currentPage + 1}
+            totalPages={transactionsPagination.currentPage}
+            hasMore={!(bankAccount as any).pagination.isDone}
             onPageChange={transactionsPagination.goToPage}
             isLoading={!bankAccount}
           />

@@ -1507,7 +1507,8 @@ export default function InternationalClientsPage() {
           {clientsData && !Array.isArray(clientsData) && clientsData.page && clientsData.page.length > 0 && (
             <Pagination
               currentPage={clientsPagination.currentPage}
-              totalPages={Array.isArray(clientsData) ? 1 : (clientsData?.isDone ? clientsPagination.currentPage : clientsPagination.currentPage + 1)}
+              totalPages={clientsPagination.currentPage}
+              hasMore={!Array.isArray(clientsData) && !clientsData?.isDone}
               onPageChange={clientsPagination.goToPage}
               isLoading={!clientsData}
             />

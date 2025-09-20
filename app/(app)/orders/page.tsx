@@ -384,7 +384,8 @@ function OrdersPageContent() {
         {ordersData && (Array.isArray(ordersData) ? ordersData : ordersData?.page || []).length > 0 && (
           <Pagination
             currentPage={ordersPagination.currentPage}
-            totalPages={Array.isArray(ordersData) ? 1 : (ordersData?.isDone ? ordersPagination.currentPage : ordersPagination.currentPage + 1)}
+            totalPages={ordersPagination.currentPage}
+            hasMore={!Array.isArray(ordersData) && !ordersData?.isDone}
             onPageChange={ordersPagination.goToPage}
             isLoading={!ordersData}
           />
