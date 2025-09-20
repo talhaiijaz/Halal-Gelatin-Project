@@ -147,8 +147,11 @@ export const getTransactions = query({
 
     const transactions = await query.collect();
     
+    // Filter out cancelled transactions
+    const activeTransactions = transactions.filter((t: any) => t.status !== "cancelled");
+    
     // Sort by transaction date (most recent first), then by creation time (most recent first)
-    const sortedTransactions = transactions.sort((a: any, b: any) => {
+    const sortedTransactions = activeTransactions.sort((a: any, b: any) => {
       // Sort by transaction date (most recent first)
       const dateDiff = b.transactionDate - a.transactionDate;
       if (dateDiff !== 0) return dateDiff;
@@ -224,11 +227,35 @@ export const deleteTransaction = mutation({
       throw new Error("Transaction not found");
     }
 
-    // Soft delete: mark as cancelled and keep for audit
-    await ctx.db.patch(args.id, {
-      status: "cancelled",
-      notes: transaction.notes,
-    });
+    // Check if this transaction is linked to another transaction (inter-bank transfer)
+    let linkedTransaction = null;
+    if (transaction.linkedTransactionId) {
+      linkedTransaction = await ctx.db.get(transaction.linkedTransactionId);
+    }
+
+    // Hard delete: completely remove the transaction from the database
+    await ctx.db.delete(args.id);
+
+    // If there's a linked transaction, delete it as well
+    if (linkedTransaction && transaction.linkedTransactionId) {
+      await ctx.db.delete(transaction.linkedTransactionId);
+
+      // Update the linked transaction's bank account balance
+      await updateBankAccountBalance(ctx, linkedTransaction.bankAccountId);
+
+      // Log the linked deletion
+      await logBankTransactionEvent(ctx, {
+        entityId: String(transaction.linkedTransactionId),
+        action: "delete",
+        message: `Linked transaction deleted: ${linkedTransaction.description} - Linked deletion from interbank transfer`,
+        metadata: { 
+          originalId: args.id, 
+          linkedId: transaction.linkedTransactionId,
+          originalTransaction: transaction,
+          linkedTransaction: linkedTransaction
+        },
+      });
+    }
 
     // Recalculate bank account balance
     await updateBankAccountBalance(ctx, transaction.bankAccountId);
@@ -236,8 +263,13 @@ export const deleteTransaction = mutation({
     await logBankTransactionEvent(ctx, {
       entityId: String(args.id),
       action: "delete",
-      message: `Transaction cancelled: ${transaction.description}`,
-      metadata: { transactionId: args.id, transaction },
+      message: `Transaction deleted: ${transaction.description}${linkedTransaction ? ' (linked interbank transfer)' : ''}`,
+      metadata: { 
+        transactionId: args.id, 
+        transaction,
+        linkedTransactionId: transaction.linkedTransactionId,
+        linkedTransaction: linkedTransaction
+      },
     });
 
     return { success: true };
@@ -516,10 +548,13 @@ export const getAccountWithTransactions = query({
     }
 
     // Get all transactions
-    const transactions = await ctx.db
+    const allTransactions = await ctx.db
       .query("bankTransactions")
       .filter(q => q.eq(q.field("bankAccountId"), args.bankAccountId))
       .collect();
+
+    // Filter out cancelled transactions
+    const transactions = allTransactions.filter((t: any) => t.status !== "cancelled");
 
     // Sort transactions
     transactions.sort((a, b) => {
@@ -549,8 +584,9 @@ export const getAccountWithTransactions = query({
     }
 
     // Calculate current balance using utility function
+    // Use all transactions (including cancelled) for balance calculation
     const openingBalance = bankAccount.openingBalance || 0;
-    const currentBalance = calculateBankAccountBalance(openingBalance, transactions, bankAccount.currency);
+    const currentBalance = calculateBankAccountBalance(openingBalance, allTransactions, bankAccount.currency);
 
     const result = {
       ...bankAccount,

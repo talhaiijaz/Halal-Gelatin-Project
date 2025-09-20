@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, RotateCcw, Link2, AlertTriangle, Calendar, DollarSign, FileText, ArrowUpDown, ArrowUp, ArrowDown, CreditCard, Info } from "lucide-react";
+import { X, RotateCcw, Link2, AlertTriangle, Calendar, DollarSign, FileText, ArrowUpDown, ArrowUp, ArrowDown, CreditCard, Info, Trash2 } from "lucide-react";
 import Modal from "@/app/components/ui/Modal";
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/app/utils/currencyFormat";
@@ -18,12 +18,14 @@ interface Props {
 export default function BankTransactionDetailModal({ transactionId, isOpen, onClose }: Props) {
   const transaction = useQuery(api.bankTransactions.getTransaction, transactionId ? { id: transactionId } : "skip");
   const reverseTx = useMutation(api.bankTransactions.reverseTransaction);
+  const deleteTx = useMutation(api.bankTransactions.deleteTransaction);
   
   // Get the linked payment details if this is a payment-linked transaction
   const payment = useQuery(api.payments.get, transaction?.paymentId ? { id: transaction.paymentId } : "skip");
 
   const [reversalReason, setReversalReason] = useState("");
   const [showReversalInput, setShowReversalInput] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   if (!isOpen || !transactionId) return null;
 
@@ -88,6 +90,20 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
     } catch (error: any) {
       console.error("Error reversing transaction:", error);
       toast.error(error.message || "Failed to reverse transaction");
+    }
+  };
+
+  const onDelete = async () => {
+    if (!transaction || isPaymentLinked) return;
+    
+    try {
+      await deleteTx({ id: transaction._id as any });
+      setShowDeleteConfirm(false);
+      toast.success("Transaction deleted successfully");
+      onClose(); // Close the modal after successful deletion
+    } catch (error: any) {
+      console.error("Error deleting transaction:", error);
+      toast.error(error.message || "Failed to delete transaction");
     }
   };
 
@@ -295,46 +311,83 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-4">
+              <div className="space-y-4">
                 {!transaction.isReversed && transaction.status !== 'cancelled' && !isOpeningBalanceAdjustment && (
-                  <>
-                    {!showReversalInput ? (
-                      <button
-                        onClick={() => setShowReversalInput(true)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 border border-yellow-300 rounded-lg hover:bg-yellow-200 transition-colors"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                        Reverse Transaction
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <textarea
-                          value={reversalReason}
-                          onChange={(e) => setReversalReason(e.target.value)}
-                          rows={2}
-                          placeholder="Enter reason for reversal..."
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                        />
+                  <div>
+                    {!showReversalInput && !showDeleteConfirm && (
+                      <div className="flex items-center justify-center gap-4">
                         <button
-                          onClick={() => setShowReversalInput(false)}
-                          className="px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200"
+                          onClick={() => setShowReversalInput(true)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-yellow-700 bg-yellow-100 border border-yellow-300 rounded-lg hover:bg-yellow-200 transition-colors"
                         >
-                          Cancel
+                          <RotateCcw className="h-4 w-4" />
+                          Reverse Transaction
                         </button>
                         <button
-                          onClick={onReverse}
-                          className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition-colors"
+                          onClick={() => setShowDeleteConfirm(true)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-300 rounded-lg hover:bg-red-200 transition-colors"
                         >
-                          Confirm Reversal
+                          <Trash2 className="h-4 w-4" />
+                          Delete Transaction
                         </button>
                       </div>
                     )}
-                  </>
+                    
+                    {showReversalInput && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <textarea
+                            value={reversalReason}
+                            onChange={(e) => setReversalReason(e.target.value)}
+                            rows={2}
+                            placeholder="Enter reason for reversal..."
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          />
+                          <button
+                            onClick={() => setShowReversalInput(false)}
+                            className="px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={onReverse}
+                            className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition-colors"
+                          >
+                            Confirm Reversal
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {showDeleteConfirm && (
+                      <div className="space-y-4">
+                        <div className="text-center py-4">
+                          <div className="text-sm text-gray-600 mb-4">
+                            Are you sure you want to delete this transaction? This action cannot be undone.
+                          </div>
+                          <div className="flex items-center justify-center gap-3">
+                            <button
+                              onClick={() => setShowDeleteConfirm(false)}
+                              className="px-4 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={onDelete}
+                              className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                            >
+                              Confirm Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
                 
                 {isOpeningBalanceAdjustment && (
                   <div className="text-center py-2">
-                    <div className="text-sm text-gray-500">Opening balance adjustments cannot be reversed. Modify the opening balance in bank account settings instead.</div>
+                    <div className="text-sm text-gray-500">Opening balance adjustments cannot be reversed or deleted. Modify the opening balance in bank account settings instead.</div>
                   </div>
                 )}
                 

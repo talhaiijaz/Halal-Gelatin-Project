@@ -44,5 +44,15 @@
     input, select, textarea {
       @apply text-base; /* Prevents zoom on iOS */
     }
+    
+    /* Prevent horizontal overflow on mobile */
+    body {
+      overflow-x: hidden;
+    }
+    
+    /* Ensure tables are responsive */
+    .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+    }
   }
 }

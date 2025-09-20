@@ -319,7 +319,7 @@ export default function DashboardPage() {
           </div>
           
           {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             {/* Total Revenue */}
             <div
               className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition"
@@ -422,7 +422,7 @@ export default function DashboardPage() {
           </div>
           
           {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             {/* Total Revenue (USD/EUR/AED only) */}
             <div
               className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition"
@@ -564,7 +564,7 @@ export default function DashboardPage() {
               onClick={() => setExpandedMetric(null)} 
             />
             <div 
-              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-4 overflow-hidden border border-gray-200"
+              className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-2 sm:mx-4 overflow-hidden border border-gray-200"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -621,35 +621,35 @@ export default function DashboardPage() {
                         <table className="min-w-full">
                           <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 {showUsdView ? 'Amount (USD)' : 'Amount'}
                               </th>
-                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                              {!showUsdView && <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
+                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {pendingOrdersDetails.map((row) => (
                               <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                     row.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
                                   }`}>
                                     {row.status}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                   {showUsdView ? formatCurrency(row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency), 'USD') : formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}
                                 </td>
-                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                                {!showUsdView && <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
+                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -703,7 +703,7 @@ export default function DashboardPage() {
                             {advanceDetails.map((row) => (
                               <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
                                   {showUsdView ? formatCurrency(row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency), 'USD') : formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}
@@ -764,7 +764,7 @@ export default function DashboardPage() {
                             {receivablesDetails.map((row) => (
                               <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
                                   {showUsdView ? formatCurrency(row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency), 'USD') : formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}
@@ -825,7 +825,7 @@ export default function DashboardPage() {
                             {revenueDetails.map((row) => (
                               <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
+                                <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
                                   {showUsdView ? formatCurrency(row.amountUSD || convertToUsd(row.amount, row.currency), 'USD') : formatCurrency(row.amount, row.currency as SupportedCurrency)}
@@ -893,9 +893,9 @@ export default function DashboardPage() {
                         <p className="text-orange-600 font-medium mb-1">Quantity</p>
                         <p className="text-orange-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-orange-600 font-medium mb-1">Customer Name</p>
-                        <p className="text-orange-800 font-semibold">{order.clientName}</p>
+                        <p className="text-orange-800 font-semibold truncate" title={order.clientName}>{order.clientName}</p>
                       </div>
                       <div>
                         <p className="text-orange-600 font-medium mb-1">Fac. Dep. Date</p>
@@ -940,9 +940,9 @@ export default function DashboardPage() {
                         <p className="text-blue-600 font-medium mb-1">Quantity</p>
                         <p className="text-blue-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-blue-600 font-medium mb-1">Customer Name</p>
-                        <p className="text-blue-800 font-semibold">{order.clientName}</p>
+                        <p className="text-blue-800 font-semibold truncate" title={order.clientName}>{order.clientName}</p>
                       </div>
                       <div>
                         <p className="text-blue-600 font-medium mb-1">Fac. Dep. Date</p>
@@ -987,9 +987,9 @@ export default function DashboardPage() {
                         <p className="text-purple-600 font-medium mb-1">Quantity</p>
                         <p className="text-purple-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-purple-600 font-medium mb-1">Customer Name</p>
-                        <p className="text-purple-800 font-semibold">{order.clientName}</p>
+                        <p className="text-purple-800 font-semibold truncate" title={order.clientName}>{order.clientName}</p>
                       </div>
                       <div>
                         <p className="text-purple-600 font-medium mb-1">Fac. Dep. Date</p>
@@ -1034,9 +1034,9 @@ export default function DashboardPage() {
                         <p className="text-green-600 font-medium mb-1">Quantity</p>
                         <p className="text-green-800 font-semibold">{order.totalQuantity.toLocaleString()} kg</p>
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="text-green-600 font-medium mb-1">Customer Name</p>
-                        <p className="text-green-800 font-semibold">{order.clientName}</p>
+                        <p className="text-green-800 font-semibold truncate" title={order.clientName}>{order.clientName}</p>
                       </div>
                       <div>
                         <p className="text-green-600 font-medium mb-1">Fac. Dep. Date</p>

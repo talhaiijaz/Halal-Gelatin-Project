@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
@@ -340,7 +341,7 @@ export default function InternationalClientsPage() {
             </div>
             
             {/* Overview Metrics Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
               {/* Total Quantity */}
               <div
                 className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200 shadow-sm cursor-pointer hover:shadow-md transition"
@@ -452,7 +453,7 @@ export default function InternationalClientsPage() {
             </div>
             
             {/* Key Metrics Row - Order: Revenue, Pending, Advance, Receivables */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
               {/* Total Revenue (USD/EUR/AED only) */}
               <div
                 className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition"
@@ -609,13 +610,13 @@ export default function InternationalClientsPage() {
               <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[50%]">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[50%]">
                       Client
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
                       Receivables Amount
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
+                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
                       Total Quantity (kg)
                     </th>
                   </tr>
@@ -705,10 +706,10 @@ export default function InternationalClientsPage() {
           </div>
 
           {/* Modal for Details */}
-          {expandedMetric && (
-            <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4" style={{ width: '100vw', height: '100vh' }}>
+          {expandedMetric && createPortal(
+            <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4">
               <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
-              <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-4 overflow-hidden border border-gray-200">
+              <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-2 sm:mx-4 overflow-hidden border border-gray-200">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
                   <div className="flex items-center justify-between">
@@ -757,31 +758,31 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {pendingOrdersDetails.map((row) => (
                                 <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                       row.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
                                     }`}>
                                       {row.status}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -807,25 +808,25 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advance Paid</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Advance Paid</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {advanceDetails.map((row) => (
                                 <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -851,25 +852,25 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Outstanding</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {receivablesDetails.map((row) => (
                                 <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">{formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -895,25 +896,25 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {revenueDetails.map((row) => (
                                 <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.clientName || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.amount, row.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.method}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{formatCurrency(row.amount, row.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.method}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -940,21 +941,21 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {totalOrdersDetails.map((order) => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                       order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 
                                       order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
@@ -965,12 +966,12 @@ export default function InternationalClientsPage() {
                                       {order.status.replace('_', ' ')}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -997,33 +998,33 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {pendingQuantityDetails?.filter(order => order.status === 'pending' || order.status === 'in_production').map((order) => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                       order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
                                     }`}>
                                       {order.status.replace('_', ' ')}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1050,21 +1051,21 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {totalOrdersDetails.map((order) => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                       order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 
                                       order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
@@ -1075,12 +1076,12 @@ export default function InternationalClientsPage() {
                                       {order.status.replace('_', ' ')}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1107,31 +1108,31 @@ export default function InternationalClientsPage() {
                           <table className="min-w-full">
                             <thead className="bg-gray-50 border-b border-gray-200">
                               <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
                               {activeOrdersDetails.map((order) => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.client?.name || 'Unknown Client'}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
+                                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                     <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                                       {order.status.replace('_', ' ')}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
                                   </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
+                                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -1143,7 +1144,7 @@ export default function InternationalClientsPage() {
                 </div>
               </div>
             </div>
-          )}
+          , document.body)}
         </div>
       )}
 
@@ -1299,7 +1300,7 @@ export default function InternationalClientsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <div className="text-sm text-gray-900">{order.client?.name || "Unknown Client"}</div>
+                            <div className="text-sm text-gray-900 truncate max-w-[120px]" title={order.client?.name || "Unknown Client"}>{order.client?.name || "Unknown Client"}</div>
                           </td>
                           <td className="px-4 py-4">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>

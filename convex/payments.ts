@@ -967,8 +967,8 @@ export const deletePayment = mutation({
         .first();
 
       if (bankTransaction) {
-        // Soft cancel the bank transaction instead of deleting
-        await ctx.db.patch(bankTransaction._id, { status: "cancelled" });
+        // Hard delete the bank transaction to remove it from transaction history
+        await ctx.db.delete(bankTransaction._id);
 
         // Update bank account balance
         await updateBankAccountBalance(ctx, payment.bankAccountId);
