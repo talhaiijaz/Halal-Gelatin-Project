@@ -17,7 +17,7 @@ export default function Pagination({
   isLoading = false,
   hasMore = false
 }: PaginationProps) {
-  if (totalPages <= 1) return null;
+  if (totalPages <= 1 && !hasMore) return null;
 
   const getVisiblePages = () => {
     const delta = 2; // Number of pages to show on each side of current page
