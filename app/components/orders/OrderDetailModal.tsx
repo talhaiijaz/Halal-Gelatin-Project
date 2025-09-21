@@ -33,6 +33,7 @@ import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@
 import { displayError } from "@/app/utils/errorHandling";
 import { type OrderStatus, type Payment } from "@/app/types";
 import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { getFiscalYearForDate, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 
 interface OrderDetailModalProps {
   orderId: Id<"orders"> | null;
@@ -212,6 +213,12 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                       <p className="text-sm text-gray-500">Delivery Date</p>
                       <p className="font-medium text-gray-900">
                         {order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Fiscal Year</p>
+                      <p className="font-medium text-gray-900">
+                        {order.fiscalYear ? getFiscalYearLabel(order.fiscalYear) : getFiscalYearLabel(getFiscalYearForDate(order.factoryDepartureDate || order.orderCreationDate || order.createdAt))}
                       </p>
                     </div>
                     <div>

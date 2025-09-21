@@ -240,10 +240,22 @@ export const list = query({
 
     if (args.search) {
       const searchLower = args.search.toLowerCase();
-      invoices = invoices.filter(i =>
-        i.invoiceNumber?.toLowerCase().includes(searchLower) ||
-        i.orderId?.toLowerCase().includes(searchLower)
-      );
+      
+      // Get all clients for search (more efficient than individual queries)
+      const allClients = await ctx.db.query("clients").collect();
+      const clientMap = new Map(allClients.map(c => [c._id, c]));
+      
+      invoices = invoices.filter((invoice) => {
+        const client = clientMap.get(invoice.clientId);
+        return (
+          invoice.invoiceNumber?.toLowerCase().includes(searchLower) ||
+          invoice.orderId?.toLowerCase().includes(searchLower) ||
+          client?.name?.toLowerCase().includes(searchLower) ||
+          client?.email?.toLowerCase().includes(searchLower) ||
+          client?.city?.toLowerCase().includes(searchLower) ||
+          client?.country?.toLowerCase().includes(searchLower)
+        );
+      });
     }
 
     // Sort by issue date (newest first), then by creation order for same dates

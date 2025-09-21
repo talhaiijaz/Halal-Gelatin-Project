@@ -65,6 +65,13 @@ export default function FinancePage() {
   const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
   
+  // Search states
+  const [invoicesSearchTerm, setInvoicesSearchTerm] = useState("");
+  const [paymentsSearchTerm, setPaymentsSearchTerm] = useState("");
+  
+  // Filter states
+  const [invoicesStatusFilter, setInvoicesStatusFilter] = useState<string>("all");
+  
   // Pagination hooks
   const paymentsPagination = usePagination({ pageSize: 10 });
   const invoicesPagination = usePagination({ pageSize: 10 });
@@ -84,6 +91,8 @@ export default function FinancePage() {
   
   // Fetch invoices data with pagination
   const invoicesData = useQuery(api.invoices.list, { 
+    search: invoicesSearchTerm || undefined,
+    status: invoicesStatusFilter !== "all" ? invoicesStatusFilter : undefined,
     paginationOpts: invoicesPagination.paginationOpts
   });
   // const invoiceStats = useQuery(api.finance.getInvoiceStats, { 
@@ -92,6 +101,7 @@ export default function FinancePage() {
   
   // Fetch payments data with pagination
   const paymentsData = useQuery(api.payments.list, { 
+    searchTerm: paymentsSearchTerm || undefined,
     paginationOpts: paymentsPagination.paginationOpts
   });
   // const paymentStats = useQuery(api.payments.getStats, { 
@@ -360,6 +370,41 @@ export default function FinancePage() {
           
 
 
+          {/* Search and Filter Inputs for Invoices */}
+          <div className="card p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="invoices-search" className="block text-sm font-medium text-gray-700 mb-1">
+                  Search Invoices
+                </label>
+                <input
+                  id="invoices-search"
+                  type="text"
+                  placeholder="Search by invoice number, client name, email, city, country..."
+                  value={invoicesSearchTerm}
+                  onChange={(e) => setInvoicesSearchTerm(e.target.value)}
+                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label htmlFor="invoices-status-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter by Status
+                </label>
+                <select
+                  id="invoices-status-filter"
+                  value={invoicesStatusFilter}
+                  onChange={(e) => setInvoicesStatusFilter(e.target.value)}
+                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="partially_paid">Partially Paid</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
           {/* Invoices Table */}
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
@@ -565,6 +610,25 @@ export default function FinancePage() {
 
           
 
+
+          {/* Search Input for Payments */}
+          <div className="card p-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex-1">
+                <label htmlFor="payments-search" className="block text-sm font-medium text-gray-700 mb-1">
+                  Search Payments
+                </label>
+                <input
+                  id="payments-search"
+                  type="text"
+                  placeholder="Search by payment method, client name, email, city, country, invoice number, notes..."
+                  value={paymentsSearchTerm}
+                  onChange={(e) => setPaymentsSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Payments History */}
           <div className="card overflow-hidden">

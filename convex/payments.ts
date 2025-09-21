@@ -612,6 +612,7 @@ export const list = query({
     endDate: v.optional(v.number()),
     method: v.optional(v.string()),
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
+    searchTerm: v.optional(v.string()), // Add search term filter
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
@@ -655,6 +656,33 @@ export const list = query({
         if (!invoice) return false; // only invoice-linked payments participate in FY filter
         const order = allOrders.find(o => o._id === invoice.orderId);
         return order && order.fiscalYear === args.fiscalYear;
+      });
+    }
+
+    // Apply search filter if searchTerm is provided
+    if (args.searchTerm) {
+      const searchLower = args.searchTerm.toLowerCase();
+      
+      // Get all clients and invoices for search (more efficient than individual queries)
+      const allClients = await ctx.db.query("clients").collect();
+      const allInvoices = await ctx.db.query("invoices").collect();
+      const clientMap = new Map(allClients.map(c => [c._id, c]));
+      const invoiceMap = new Map(allInvoices.map(i => [i._id, i]));
+      
+      payments = payments.filter((payment) => {
+        const client = payment.clientId ? clientMap.get(payment.clientId) : null;
+        const invoice = payment.invoiceId ? invoiceMap.get(payment.invoiceId) : null;
+        
+        return (
+          payment.method?.toLowerCase().includes(searchLower) ||
+          payment.notes?.toLowerCase().includes(searchLower) ||
+          payment.currency?.toLowerCase().includes(searchLower) ||
+          client?.name?.toLowerCase().includes(searchLower) ||
+          client?.email?.toLowerCase().includes(searchLower) ||
+          client?.city?.toLowerCase().includes(searchLower) ||
+          client?.country?.toLowerCase().includes(searchLower) ||
+          invoice?.invoiceNumber?.toLowerCase().includes(searchLower)
+        );
       });
     }
 
