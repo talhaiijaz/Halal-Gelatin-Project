@@ -886,7 +886,7 @@ export default function FinancePage() {
                     >
                       <p className="text-sm text-gray-600 mb-1">{account.bankName}</p>
                       <p className="text-xs text-gray-500 mb-1">
-                        {account.country ? `📍 ${account.country}` : '📍 No Country'}
+                        {account.country ? `Country: ${account.country}` : 'Country: No Country'}
                       </p>
                       <p className="text-sm text-gray-500 mb-2">#{account.accountNumber}</p>
                       <p className="text-lg font-semibold text-gray-900">
@@ -1049,8 +1049,7 @@ export default function FinancePage() {
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">
                             {account.country ? (
-                              <span className="flex items-center">
-                                <span className="mr-1">📍</span>
+                              <span className="text-sm text-gray-900">
                                 {account.country}
                               </span>
                             ) : (
