@@ -122,6 +122,7 @@ export default function LocalClientsPage() {
   const ordersData = useQuery(api.orders.list, { 
     clientType: "local",
     fiscalYear: selectedFiscalYear,
+    searchTerm: searchQuery || undefined,
     paginationOpts: ordersPagination.paginationOpts,
   });
   
@@ -233,24 +234,8 @@ export default function LocalClientsPage() {
   // Extract orders array (handle both paginated and non-paginated responses)
   const processedQuantityDetails = Array.isArray(processedQuantityDetailsData) ? processedQuantityDetailsData : processedQuantityDetailsData?.page || [];
 
-  // Filter orders
-  const filteredOrders = orders?.filter(order => {
-    // Search filter
-    if (searchQuery) {
-      const searchLower = searchQuery.toLowerCase();
-      const matchesSearch = (
-        order.invoiceNumber?.toLowerCase().includes(searchLower) ||
-        order.client?.name?.toLowerCase().includes(searchLower) ||
-        order.client?.city?.toLowerCase().includes(searchLower) ||
-        order.client?.country?.toLowerCase().includes(searchLower) ||
-        order.status.toLowerCase().includes(searchLower) ||
-        order.currency.toLowerCase().includes(searchLower)
-      );
-      if (!matchesSearch) return false;
-    }
-    
-    return true;
-  });
+  // Orders are now filtered by the backend, no need for frontend filtering
+  const filteredOrders = orders || [];
 
   // Sort filtered orders by status priority
   const statusPriority = {

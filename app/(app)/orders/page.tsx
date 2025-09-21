@@ -31,6 +31,7 @@ function OrdersPageContent() {
   // Fetch orders with filters and pagination
   const ordersData = useQuery(api.orders.list, {
     fiscalYear: selectedFiscalYear,
+    searchTerm: searchTerm || undefined,
     paginationOpts: ordersPagination.paginationOpts,
   });
 
@@ -142,19 +143,8 @@ function OrdersPageContent() {
     toast.success("Orders exported successfully");
   };
 
-  // Filter orders based on search term (now working with paginated data)
-  const filteredOrders = (Array.isArray(ordersData) ? ordersData : ordersData?.page || []).filter(order => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      order.invoiceNumber?.toLowerCase().includes(searchLower) ||
-      order.client?.name?.toLowerCase().includes(searchLower) ||
-      order.client?.city?.toLowerCase().includes(searchLower) ||
-      order.client?.country?.toLowerCase().includes(searchLower) ||
-      order.status.toLowerCase().includes(searchLower) ||
-      order.currency.toLowerCase().includes(searchLower)
-    );
-  }) || [];
+  // Orders are now filtered by the backend, no need for frontend filtering
+  const filteredOrders = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
 
   // Sort filtered orders by status priority
   const statusPriority = {

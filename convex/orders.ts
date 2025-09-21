@@ -67,6 +67,7 @@ export const list = query({
     endDate: v.optional(v.number()),
     clientType: v.optional(v.union(v.literal("local"), v.literal("international"))),
     fiscalYear: v.optional(v.number()), // Add fiscal year filter
+    searchTerm: v.optional(v.string()), // Add search term filter
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
@@ -110,6 +111,27 @@ export const list = query({
 
     if (args.fiscalYear) {
       orders = orders.filter(o => o.fiscalYear === args.fiscalYear);
+    }
+
+    // Apply search filter if searchTerm is provided
+    if (args.searchTerm) {
+      const searchLower = args.searchTerm.toLowerCase();
+      
+      // Get all clients for search (more efficient than individual queries)
+      const allClients = await ctx.db.query("clients").collect();
+      const clientMap = new Map(allClients.map(c => [c._id, c]));
+      
+      orders = orders.filter((order) => {
+        const client = clientMap.get(order.clientId);
+        return (
+          order.invoiceNumber?.toLowerCase().includes(searchLower) ||
+          client?.name?.toLowerCase().includes(searchLower) ||
+          client?.city?.toLowerCase().includes(searchLower) ||
+          client?.country?.toLowerCase().includes(searchLower) ||
+          order.status.toLowerCase().includes(searchLower) ||
+          order.currency.toLowerCase().includes(searchLower)
+        );
+      });
     }
 
     // Sort orders: first by fiscal year (descending - latest year first), then by status priority, then by creation date (descending)
