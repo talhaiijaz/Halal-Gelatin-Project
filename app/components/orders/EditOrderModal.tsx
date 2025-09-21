@@ -14,6 +14,28 @@ import { formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/curre
 import toast from "react-hot-toast";
 import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
 
+// Validation function for bloom format
+const isValidBloomFormat = (bloom: string): boolean => {
+  if (!bloom || bloom.trim() === "") return true; // Empty is valid
+  
+  const trimmedBloom = bloom.trim();
+  
+  // Check for single 3-digit number
+  const singleNumberPattern = /^\d{3}$/;
+  if (singleNumberPattern.test(trimmedBloom)) {
+    return true;
+  }
+  
+  // Check for range format (3-digit-3-digit)
+  const rangePattern = /^\d{3}-\d{3}$/;
+  if (rangePattern.test(trimmedBloom)) {
+    const [start, end] = trimmedBloom.split('-').map(Number);
+    return start <= end; // Ensure start is not greater than end
+  }
+  
+  return false;
+};
+
 interface OrderItem {
   product: string;
   quantityKg: number;
@@ -658,30 +680,42 @@ export default function EditOrderModal({
                       <div className="grid grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
-                          <select
+                          <input
+                            type="text"
                             value={item.bloom ?? ""}
                             onChange={(e) => updateOrderItem(index, "bloom", e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Select Bloom Value</option>
-                            {ALL_BLOOM_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
+                            className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-primary focus:border-primary ${
+                              item.bloom && !isValidBloomFormat(item.bloom) 
+                                ? 'border-red-500 bg-red-50' 
+                                : item.bloom && isValidBloomFormat(item.bloom)
+                                ? 'border-green-500 bg-green-50'
+                                : 'border-gray-300'
+                            }`}
+                            placeholder="e.g., 180 or 180-200"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Format: 3-digit number (e.g., 180) or range (e.g., 180-200)
+                          </p>
+                          {item.bloom && !isValidBloomFormat(item.bloom) && (
+                            <p className="text-xs text-red-500 mt-1">
+                              Invalid format. Use 3-digit number (180) or range (180-200)
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Mesh</label>
-                          <input
-                            type="number"
+                          <select
                             value={item.mesh ?? ""}
                             onChange={(e) => updateOrderItem(index, "mesh", e.target.value === "" ? undefined : parseFloat(e.target.value))}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
-                            placeholder="e.g., 80"
-                            min="0"
-                            step="1"
-                          />
+                          >
+                            <option value="">Select Mesh Value</option>
+                            <option value="8">8</option>
+                            <option value="20">20</option>
+                            <option value="25">25</option>
+                            <option value="30">30</option>
+                            <option value="40">40</option>
+                          </select>
                         </div>
                       </div>
                       {/* Lot numbers */}
