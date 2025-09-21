@@ -53,7 +53,7 @@ export default function LocalClientsPage() {
   const [isCustomFiscalYear, setIsCustomFiscalYear] = useState<boolean>(false);
   
   // State for expanded metric modal
-  const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables' | 'total_orders' | 'active_orders' | 'total_quantity' | 'pending_quantity'; audience: 'local' }>(null);
+  const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables' | 'total_quantity' | 'pending_quantity' | 'processed_quantity'; audience: 'local' }>(null);
   
   // Load fiscal year setting from localStorage and listen for changes
   useEffect(() => {
@@ -141,6 +141,23 @@ export default function LocalClientsPage() {
     fiscalYear: dashboardFiscalYear,
   });
 
+  // Query for dashboard orders (uses dashboardFiscalYear)
+  const dashboardOrdersData = useQuery(api.orders.list, { 
+    clientType: "local",
+    fiscalYear: dashboardFiscalYear,
+  });
+  
+  // Extract dashboard orders array (handle both paginated and non-paginated responses)
+  const dashboardOrders = Array.isArray(dashboardOrdersData) ? dashboardOrdersData : dashboardOrdersData?.page || [];
+
+  // Query for ALL orders (no fiscal year filter) to get complete processed quantity
+  const allOrdersData = useQuery(api.orders.list, { 
+    clientType: "local",
+  });
+  
+  // Extract all orders array (handle both paginated and non-paginated responses)
+  const allOrders = Array.isArray(allOrdersData) ? allOrdersData : allOrdersData?.page || [];
+
   // Close modal on Escape and prevent body scroll
   useEffect(() => {
     if (!expandedMetric) return;
@@ -188,23 +205,13 @@ export default function LocalClientsPage() {
   // Specific order views
   const totalOrdersDetailsData = useQuery(
     api.orders.list,
-    expandedMetric && (expandedMetric.metric === 'total_orders' || expandedMetric.metric === 'total_quantity')
+    expandedMetric && expandedMetric.metric === 'total_quantity'
       ? { clientType: 'local', fiscalYear: dashboardFiscalYear }
       : 'skip'
   );
   
   // Extract orders array (handle both paginated and non-paginated responses)
   const totalOrdersDetails = Array.isArray(totalOrdersDetailsData) ? totalOrdersDetailsData : totalOrdersDetailsData?.page || [];
-  
-  const activeOrdersDetailsData = useQuery(
-    api.orders.list,
-    expandedMetric && expandedMetric.metric === 'active_orders'
-      ? { clientType: 'local', status: 'in_production', fiscalYear: dashboardFiscalYear }
-      : 'skip'
-  );
-  
-  // Extract orders array (handle both paginated and non-paginated responses)
-  const activeOrdersDetails = Array.isArray(activeOrdersDetailsData) ? activeOrdersDetailsData : activeOrdersDetailsData?.page || [];
   
   const pendingQuantityDetailsData = useQuery(
     api.orders.list,
@@ -215,6 +222,16 @@ export default function LocalClientsPage() {
   
   // Extract orders array (handle both paginated and non-paginated responses)
   const pendingQuantityDetails = Array.isArray(pendingQuantityDetailsData) ? pendingQuantityDetailsData : pendingQuantityDetailsData?.page || [];
+  
+  const processedQuantityDetailsData = useQuery(
+    api.orders.list,
+    expandedMetric && expandedMetric.metric === 'processed_quantity'
+      ? { clientType: 'local' }
+      : 'skip'
+  );
+  
+  // Extract orders array (handle both paginated and non-paginated responses)
+  const processedQuantityDetails = Array.isArray(processedQuantityDetailsData) ? processedQuantityDetailsData : processedQuantityDetailsData?.page || [];
 
   // Filter orders
   const filteredOrders = orders?.filter(order => {
@@ -339,7 +356,7 @@ export default function LocalClientsPage() {
             </div>
             
             {/* Overview Metrics Row */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
               {/* Total Quantity */}
               <div
                 className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-6 border border-indigo-200 shadow-sm cursor-pointer hover:shadow-md transition"
@@ -359,7 +376,7 @@ export default function LocalClientsPage() {
                   <p className="text-2xl font-bold text-indigo-900">
                     {orderStats ? `${(orderStats.totalQuantity || 0).toLocaleString()} kg` : <Skeleton width={100} height={32} />}
                   </p>
-                  <p className="text-xs text-indigo-600 mt-1">Local production volume</p>
+                  <p className="text-xs text-indigo-600 mt-1">Local order volume</p>
                 </div>
               </div>
 
@@ -386,49 +403,29 @@ export default function LocalClientsPage() {
                 </div>
               </div>
 
-              {/* Orders Count */}
+              {/* Processed Quantity */}
               <div
-                className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-6 border border-emerald-200 shadow-sm cursor-pointer hover:shadow-md transition"
+                className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition"
                 role="button"
-                onClick={() => setExpandedMetric({ metric: 'total_orders', audience: 'local' })}
+                onClick={() => setExpandedMetric({ metric: 'processed_quantity', audience: 'local' })}
               >
                 <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-emerald-200 rounded-lg">
-                    <Users className="h-6 w-6 text-emerald-700" />
+                  <div className="p-2 bg-green-200 rounded-lg">
+                    <CheckCircle className="h-6 w-6 text-green-700" />
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide">Orders</p>
+                    <p className="text-xs text-green-600 font-medium uppercase tracking-wide">Processed</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-emerald-700 mb-1">Total Orders</p>
-                  <p className="text-2xl font-bold text-emerald-900">
-                    {stats ? `${stats.totalOrders || 0}` : <Skeleton width={100} height={32} />}
+                  <p className="text-sm font-medium text-green-700 mb-1">Processed Quantity</p>
+                  <p className="text-2xl font-bold text-green-900">
+                    {allOrders ? `${allOrders
+                      .filter(order => order.status === 'shipped' || order.status === 'delivered')
+                      .reduce((total, order) => total + (order.items?.reduce((sum, item) => sum + (item.quantityKg || 0), 0) || 0), 0)
+                      .toLocaleString()} kg` : <Skeleton width={100} height={32} />}
                   </p>
-                  <p className="text-xs text-emerald-600 mt-1">Local orders</p>
-                </div>
-              </div>
-
-              {/* Active Orders */}
-              <div
-                className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200 shadow-sm cursor-pointer hover:shadow-md transition"
-                role="button"
-                onClick={() => setExpandedMetric({ metric: 'active_orders', audience: 'local' })}
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="p-2 bg-amber-200 rounded-lg">
-                    <CheckCircle className="h-6 w-6 text-amber-700" />
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-amber-600 font-medium uppercase tracking-wide">Active</p>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-amber-700 mb-1">Active Orders</p>
-                  <p className="text-2xl font-bold text-amber-900">
-                    {stats ? `${stats.activeOrders || 0}` : <Skeleton width={100} height={32} />}
-                  </p>
-                  <p className="text-xs text-amber-600 mt-1">Currently processing</p>
+                  <p className="text-xs text-green-600 mt-1">Shipped or delivered</p>
                 </div>
               </div>
             </div>
@@ -1086,18 +1083,19 @@ export default function LocalClientsPage() {
             <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-1">
-                    {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
-                    {expandedMetric.metric === 'advance' && 'Advance Payments'}
-                    {expandedMetric.metric === 'receivables' && 'Receivables'}
-                    {expandedMetric.metric === 'revenue' && 'Total Revenue'}
-                    {expandedMetric.metric === 'total_quantity' && 'Total Quantity Breakdown'}
-                    {expandedMetric.metric === 'pending_quantity' && 'Pending Quantity Orders'}
-                    {expandedMetric.metric === 'total_orders' && 'All Orders'}
-                    {expandedMetric.metric === 'active_orders' && 'Active Orders'}
-                  </h2>
+                      <h2 className="text-xl font-bold text-gray-900 mb-1">
+                        {expandedMetric.metric === 'pending' && 'Current Pending Orders'}
+                        {expandedMetric.metric === 'advance' && 'Advance Payments'}
+                        {expandedMetric.metric === 'receivables' && 'Receivables'}
+                        {expandedMetric.metric === 'revenue' && 'Total Revenue'}
+                        {expandedMetric.metric === 'total_quantity' && 'Total Quantity Breakdown'}
+                        {expandedMetric.metric === 'pending_quantity' && 'Pending Quantity Orders'}
+                        {expandedMetric.metric === 'processed_quantity' && 'All Processed Orders (Shipped/Delivered)'}
+                      </h2>
                   <p className="text-sm text-gray-600">
-                    Local Clients • {formatFiscalYear(dashboardFiscalYear)} Fiscal Year
+                    {expandedMetric.metric === 'processed_quantity' 
+                      ? 'Local Clients • All Time (All Fiscal Years)' 
+                      : `Local Clients • ${formatFiscalYear(dashboardFiscalYear)} Fiscal Year`}
                   </p>
                 </div>
                 <button
@@ -1402,17 +1400,17 @@ export default function LocalClientsPage() {
                 </div>
               )}
 
-              {/* Total Orders */}
-              {expandedMetric.metric === 'total_orders' && (
+              {/* Processed Quantity */}
+              {expandedMetric.metric === 'processed_quantity' && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  {!totalOrdersDetails ? (
+                  {!processedQuantityDetails ? (
                     <div className="p-8">
                       <Skeleton count={5} height={48} />
                     </div>
-                  ) : totalOrdersDetails.length === 0 ? (
+                  ) : processedQuantityDetails.length === 0 ? (
                     <div className="p-8 text-center">
-                      <Users className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p className="text-gray-600">No orders found.</p>
+                      <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-600">No processed orders found.</p>
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
@@ -1429,17 +1427,13 @@ export default function LocalClientsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {totalOrdersDetails.map((order) => (
+                          {processedQuantityDetails?.filter(order => order.status === 'shipped' || order.status === 'delivered').map((order) => (
                             <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
                               <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                  order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 
-                                  order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
-                                  order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
-                                  order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                                  'bg-red-100 text-red-800'
+                                  order.status === 'shipped' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
                                 }`}>
                                   {order.status.replace('_', ' ')}
                                 </span>
@@ -1459,56 +1453,6 @@ export default function LocalClientsPage() {
                 </div>
               )}
 
-              {/* Active Orders */}
-              {expandedMetric.metric === 'active_orders' && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  {!activeOrdersDetails ? (
-                    <div className="p-8">
-                      <Skeleton count={5} height={48} />
-                    </div>
-                  ) : activeOrdersDetails.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p className="text-gray-600">No active orders found.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
-                            <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {activeOrdersDetails.map((order) => (
-                            <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
-                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
-                              <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
-                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                                  {order.status.replace('_', ' ')}
-                                </span>
-                              </td>
-                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
-                              </td>
-                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount)}</td>
-                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
-                              <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{order.factoryDepartureDate ? formatDateForDisplay(order.factoryDepartureDate) : '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         </div>
