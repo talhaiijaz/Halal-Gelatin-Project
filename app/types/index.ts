@@ -54,19 +54,26 @@ export interface Order {
 
 export interface Invoice {
   _id: string;
-  orderId: string;
+  orderId?: string; // Optional for standalone invoices
   clientId: string;
   amount: number;
   currency: string;
   invoiceDate: number;
-  dueDate: number;
+  issueDate: number;
+  dueDate?: number;
   status: "unpaid" | "partially_paid" | "paid";
-  orderItems: OrderItem[];
+  orderItems?: OrderItem[];
   payments: Payment[];
   advancePaid?: number;
   invoicePaid?: number;
+  outstandingBalance: number;
+  totalPaid: number;
+  invoiceNumber?: string;
+  notes?: string;
+  isStandalone?: boolean;
+  source?: string;
   createdAt: number;
-  createdBy: string;
+  createdBy?: string;
 }
 
 export interface Client {

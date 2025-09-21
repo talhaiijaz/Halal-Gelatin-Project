@@ -746,7 +746,7 @@ export const getReceivablesDetails = query({
         outstandingBalance: inv.outstandingBalance,
         outstandingBalanceUSD,
         issueDate: inv.issueDate,
-        dueDate: inv.dueDate,
+        dueDate: inv.dueDate || 0,
       });
     }
     // Sort by due date descending (most overdue first)
@@ -825,7 +825,7 @@ export const getAdvancePaymentsDetails = query({
         advancePaid: inv.totalPaid,
         advancePaidUSD,
         issueDate: inv.issueDate,
-        dueDate: inv.dueDate,
+        dueDate: inv.dueDate || 0,
       });
     }
     // Sort by issue date desc (latest first)

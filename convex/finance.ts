@@ -606,7 +606,7 @@ export const getOverdueInvoicesSummary = query({
     const now = Date.now();
 
     const overdueInvoices = invoices.filter(inv => 
-      inv.outstandingBalance > 0 && inv.dueDate < now
+      inv.outstandingBalance > 0 && inv.dueDate && inv.dueDate < now
     );
 
     const overdueSummary = {
@@ -622,7 +622,7 @@ export const getOverdueInvoicesSummary = query({
 
     let totalDaysOverdue = 0;
     overdueInvoices.forEach(invoice => {
-      const daysOverdue = Math.floor((now - invoice.dueDate) / (1000 * 60 * 60 * 24));
+      const daysOverdue = invoice.dueDate ? Math.floor((now - invoice.dueDate) / (1000 * 60 * 60 * 24)) : 0;
       totalDaysOverdue += daysOverdue;
 
       if (daysOverdue <= 60) {

@@ -30,6 +30,8 @@ import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import ActivityLog from "@/app/components/ActivityLog";
 import EditCustomerModal from "@/app/components/clients/EditCustomerModal";
+import CreateStandaloneInvoiceModal from "@/app/components/finance/CreateStandaloneInvoiceModal";
+import StandaloneInvoiceDetailModal from "@/app/components/finance/StandaloneInvoiceDetailModal";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
@@ -43,6 +45,8 @@ export default function ClientDetailPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [isCreateStandaloneInvoiceOpen, setIsCreateStandaloneInvoiceOpen] = useState(false);
+  const [selectedStandaloneInvoiceId, setSelectedStandaloneInvoiceId] = useState<Id<"invoices"> | null>(null);
   
   // Pagination for orders
   const ordersPagination = usePagination({ pageSize: 10 });
@@ -59,6 +63,9 @@ export default function ClientDetailPage() {
   
   // Extract orders array (handle both paginated and non-paginated responses)
   const allOrders = Array.isArray(allOrdersData) ? allOrdersData : allOrdersData?.page || [];
+  
+  // Fetch standalone invoices for this client
+  const standaloneInvoices = useQuery(api.clients.getStandaloneInvoices, { clientId });
 
   const getClientCurrency = (clientType: string): SupportedCurrency => {
     return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');
@@ -494,6 +501,91 @@ export default function ClientDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Standalone Invoices */}
+          <div className="card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <FileText className="h-5 w-5 mr-2" />
+                Standalone Invoices
+              </h2>
+              <button
+                onClick={() => setIsCreateStandaloneInvoiceOpen(true)}
+                className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Invoice
+              </button>
+            </div>
+            
+            {standaloneInvoices && standaloneInvoices.length > 0 ? (
+              <div className="space-y-3">
+                {standaloneInvoices.map((invoice) => (
+                  <div 
+                    key={invoice._id} 
+                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                    onClick={() => setSelectedStandaloneInvoiceId(invoice._id)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <FileText className="h-5 w-5 text-gray-400" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {invoice.invoiceNumber}
+                        </p>
+                        <div className="flex items-center space-x-2">
+                          <p className="text-xs text-gray-500">
+                            {formatDate(invoice.issueDate)}
+                          </p>
+                          <span className="text-xs text-gray-400">•</span>
+                          <span className="text-xs text-gray-500 capitalize">
+                            {invoice.source?.replace("_", " ")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900">
+                        {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
+                      </p>
+                      <div className="flex items-center space-x-2">
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          invoice.status === "paid" 
+                            ? "bg-green-100 text-green-800"
+                            : invoice.status === "partially_paid"
+                            ? "bg-yellow-100 text-yellow-800"
+                            : "bg-red-100 text-red-800"
+                        }`}>
+                          {invoice.status.replace("_", " ")}
+                        </span>
+                        {invoice.outstandingBalance > 0 && (
+                          <span className="text-xs text-gray-500">
+                            Outstanding: {formatCurrency(invoice.outstandingBalance, invoice.currency as SupportedCurrency)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No standalone invoices</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  No standalone invoices have been created for this client yet.
+                </p>
+                <div className="mt-4">
+                  <button
+                    onClick={() => setIsCreateStandaloneInvoiceOpen(true)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Invoice
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -523,6 +615,34 @@ export default function ClientDetailPage() {
         onClose={() => setIsEditClientOpen(false)}
         client={client}
       />
+
+      {/* Create Standalone Invoice Modal */}
+      {client && (
+        <CreateStandaloneInvoiceModal
+          isOpen={isCreateStandaloneInvoiceOpen}
+          onClose={() => setIsCreateStandaloneInvoiceOpen(false)}
+          clientId={clientId}
+          clientName={client.name || "Unknown Client"}
+          clientType={client.type}
+          onSuccess={() => {
+            setIsCreateStandaloneInvoiceOpen(false);
+            toast.success("Standalone invoice created successfully");
+            router.refresh();
+          }}
+        />
+      )}
+
+      {/* Standalone Invoice Detail Modal */}
+      {selectedStandaloneInvoiceId && (
+        <StandaloneInvoiceDetailModal
+          invoiceId={selectedStandaloneInvoiceId}
+          isOpen={selectedStandaloneInvoiceId !== null}
+          onClose={() => setSelectedStandaloneInvoiceId(null)}
+          onUpdate={() => {
+            router.refresh();
+          }}
+        />
+      )}
 
       {/* Activity Log Modal */}
       {isActivityLogOpen && (

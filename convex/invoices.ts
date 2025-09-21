@@ -84,6 +84,120 @@ export const createForOrder = mutation({
   },
 });
 
+// Create standalone invoice (without order)
+export const createStandalone = mutation({
+  args: {
+    clientId: v.id("clients"),
+    invoiceNumber: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    issueDate: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    source: v.optional(v.string()), // e.g., "previous_platform"
+  },
+  handler: async (ctx, args) => {
+    // Verify client exists
+    const client = await ctx.db.get(args.clientId);
+    if (!client) throw new Error("Client not found");
+
+    // Check if invoice number already exists
+    const existingInvoice = await ctx.db
+      .query("invoices")
+      .withIndex("by_invoice_number", q => q.eq("invoiceNumber", args.invoiceNumber))
+      .first();
+    
+    if (existingInvoice) {
+      throw new Error("Invoice number already exists");
+    }
+
+    const issueDate = args.issueDate || Date.now();
+
+    const invoiceId = await ctx.db.insert("invoices", {
+      invoiceNumber: args.invoiceNumber,
+      clientId: args.clientId,
+      issueDate,
+      status: "unpaid",
+      amount: args.amount,
+      currency: args.currency,
+      totalPaid: 0,
+      outstandingBalance: args.amount,
+      notes: args.notes || "",
+      isStandalone: true,
+      source: args.source || "current_system",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    await logInvoiceEvent(ctx, { 
+      entityId: String(invoiceId), 
+      action: "create", 
+      message: `Standalone invoice created for client ${client.name}` 
+    });
+    
+    return invoiceId;
+  },
+});
+
+// Update standalone invoice
+export const updateStandalone = mutation({
+  args: {
+    invoiceId: v.id("invoices"),
+    invoiceNumber: v.optional(v.string()),
+    amount: v.optional(v.number()),
+    currency: v.optional(v.string()),
+    issueDate: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    source: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const invoice = await ctx.db.get(args.invoiceId);
+    if (!invoice) throw new Error("Invoice not found");
+    
+    if (!invoice.isStandalone) {
+      throw new Error("Can only update standalone invoices");
+    }
+
+    // Check if invoice number already exists (if being updated)
+    if (args.invoiceNumber && args.invoiceNumber !== invoice.invoiceNumber) {
+      const existingInvoice = await ctx.db
+        .query("invoices")
+        .withIndex("by_invoice_number", q => q.eq("invoiceNumber", args.invoiceNumber))
+        .first();
+      
+      if (existingInvoice) {
+        throw new Error("Invoice number already exists");
+      }
+    }
+
+    // Update fields
+    const updateData: any = {
+      updatedAt: Date.now(),
+    };
+
+    if (args.invoiceNumber !== undefined) updateData.invoiceNumber = args.invoiceNumber;
+    if (args.amount !== undefined) updateData.amount = args.amount;
+    if (args.currency !== undefined) updateData.currency = args.currency;
+    if (args.issueDate !== undefined) updateData.issueDate = args.issueDate;
+    if (args.notes !== undefined) updateData.notes = args.notes;
+    if (args.source !== undefined) updateData.source = args.source;
+
+    // Recalculate outstanding balance if amount changed
+    if (args.amount !== undefined) {
+      updateData.outstandingBalance = args.amount - invoice.totalPaid;
+    }
+
+    await ctx.db.patch(args.invoiceId, updateData);
+
+    await logInvoiceEvent(ctx, { 
+      entityId: String(args.invoiceId), 
+      action: "update", 
+      message: `Standalone invoice updated` 
+    });
+    
+    return args.invoiceId;
+  },
+});
+
 // List invoices with filters and pagination
 export const list = query({
   args: {
@@ -161,7 +275,7 @@ export const list = query({
     const invoicesWithDetails = await Promise.all(
       invoicesToProcess.map(async (invoice) => {
         const client = await ctx.db.get(invoice.clientId);
-        const order = await ctx.db.get(invoice.orderId);
+        const order = invoice.orderId ? await ctx.db.get(invoice.orderId) : null;
         const payments = await ctx.db
           .query("payments")
           .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
@@ -178,9 +292,11 @@ export const list = query({
           .filter((p: any) => p.type !== "advance")
           .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-        // Calculate outstanding balance based on order status
-        // Only show outstanding for shipped/delivered orders
-        const shouldShowOutstanding = order?.status === "shipped" || order?.status === "delivered";
+        // Calculate outstanding balance
+        // For standalone invoices, always show outstanding balance
+        // For order-based invoices, only show outstanding for shipped/delivered orders
+        const shouldShowOutstanding = invoice.isStandalone || 
+          (order && (order.status === "shipped" || order.status === "delivered"));
         const calculatedOutstandingBalance = shouldShowOutstanding ? invoice.outstandingBalance : 0;
 
         return {
@@ -229,11 +345,11 @@ export const get = query({
     if (!invoice) return null;
 
     const client = await ctx.db.get(invoice.clientId);
-    const order = await ctx.db.get(invoice.orderId);
-    const orderItems = await ctx.db
+    const order = invoice.orderId ? await ctx.db.get(invoice.orderId) : null;
+    const orderItems = invoice.orderId ? await ctx.db
       .query("orderItems")
-      .withIndex("by_order", q => q.eq("orderId", invoice.orderId))
-      .collect();
+      .withIndex("by_order", q => q.eq("orderId", invoice.orderId!))
+      .collect() : [];
     const payments = await ctx.db
       .query("payments")
       .withIndex("by_invoice", (q) => q.eq("invoiceId", args.id))
@@ -262,9 +378,11 @@ export const get = query({
       .filter((p: any) => p.type !== "advance")
       .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-    // Calculate outstanding balance based on order status
-    // Only show outstanding for shipped/delivered orders
-    const shouldShowOutstanding = order?.status === "shipped" || order?.status === "delivered";
+    // Calculate outstanding balance
+    // For standalone invoices, always show outstanding balance
+    // For order-based invoices, only show outstanding for shipped/delivered orders
+    const shouldShowOutstanding = invoice.isStandalone || 
+      (order && (order.status === "shipped" || order.status === "delivered"));
     const calculatedOutstandingBalance = shouldShowOutstanding ? invoice.outstandingBalance : 0;
 
     return {
@@ -390,7 +508,7 @@ export const getAgingReport = query({
 
     for (const invoice of invoices) {
       if (invoice.outstandingBalance > 0) {
-        const daysOverdue = Math.floor((now - invoice.dueDate) / (1000 * 60 * 60 * 24));
+        const daysOverdue = invoice.dueDate ? Math.floor((now - invoice.dueDate) / (1000 * 60 * 60 * 24)) : 0;
         
         if (daysOverdue <= 0) {
           aging.current += invoice.outstandingBalance;
@@ -418,7 +536,7 @@ export const updateOverdueInvoices = mutation({
     let updatedCount = 0;
     
     for (const invoice of invoices) {
-      if (invoice.status === "unpaid" && invoice.dueDate < now) {
+      if (invoice.status === "unpaid" && invoice.dueDate && invoice.dueDate < now) {
         await ctx.db.patch(invoice._id, { 
           status: "unpaid", // Keep as unpaid even if overdue
           updatedAt: Date.now(),

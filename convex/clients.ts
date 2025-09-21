@@ -85,26 +85,34 @@ export const get = query({
       .order("desc")
       .take(10);
 
-    // Get outstanding invoices for shipped/delivered orders only
+    // Get outstanding invoices (both standalone and order-based)
     const invoices = await ctx.db
       .query("invoices")
       .withIndex("by_client", (q) => q.eq("clientId", args.id))
       .filter((q) => q.neq(q.field("status"), "paid"))
       .collect();
 
-    // Filter to only include invoices for shipped/delivered orders
-    const shippedOrDeliveredInvoices = [];
+    // Filter to include:
+    // 1. Standalone invoices (always included)
+    // 2. Order-based invoices for shipped/delivered orders only
+    const relevantInvoices = [];
     for (const invoice of invoices) {
-      const order = await ctx.db.get(invoice.orderId);
-      if (order && (order.status === "shipped" || order.status === "delivered")) {
-        shippedOrDeliveredInvoices.push(invoice);
+      if (invoice.isStandalone) {
+        // Always include standalone invoices
+        relevantInvoices.push(invoice);
+      } else if (invoice.orderId) {
+        // Only include order-based invoices for shipped/delivered orders
+        const order = await ctx.db.get(invoice.orderId);
+        if (order && (order.status === "shipped" || order.status === "delivered")) {
+          relevantInvoices.push(invoice);
+        }
       }
     }
 
-    const totalOutstanding = shippedOrDeliveredInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
-    // Group outstanding by original invoice currency (only for shipped/delivered orders)
+    const totalOutstanding = relevantInvoices.reduce((sum, inv) => sum + inv.outstandingBalance, 0);
+    // Group outstanding by original invoice currency
     const outstandingByCurrency: Record<string, number> = {};
-    shippedOrDeliveredInvoices.forEach(inv => {
+    relevantInvoices.forEach(inv => {
       const currency = inv.currency;
       if (inv.outstandingBalance > 0) {
         outstandingByCurrency[currency] = (outstandingByCurrency[currency] || 0) + inv.outstandingBalance;
@@ -118,6 +126,42 @@ export const get = query({
       outstandingByCurrency,
       totalOrders: orders.length,
     };
+  },
+});
+
+// Get standalone invoices for a client
+export const getStandaloneInvoices = query({
+  args: {
+    clientId: v.id("clients"),
+  },
+  handler: async (ctx, args) => {
+    const invoices = await ctx.db
+      .query("invoices")
+      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .filter((q) => q.eq(q.field("isStandalone"), true))
+      .order("desc")
+      .collect();
+
+    // Enrich with payment data
+    const invoicesWithDetails = await Promise.all(
+      invoices.map(async (invoice) => {
+        const payments = await ctx.db
+          .query("payments")
+          .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
+          .collect();
+
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        const outstandingBalance = invoice.amount - totalPaid;
+
+        return {
+          ...invoice,
+          totalPaid,
+          outstandingBalance,
+        };
+      })
+    );
+
+    return invoicesWithDetails;
   },
 });
 

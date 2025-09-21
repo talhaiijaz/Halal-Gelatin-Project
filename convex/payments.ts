@@ -689,7 +689,7 @@ export const list = query({
         const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
         const client = await ctx.db.get(payment.clientId);
         let order = null;
-        if (invoice) order = await ctx.db.get(invoice.orderId);
+        if (invoice && invoice.orderId) order = await ctx.db.get(invoice.orderId);
 
         const recordedBy = payment.recordedBy ? await ctx.db.get(payment.recordedBy) : null;
         const bankAccount = payment.bankAccountId ? await ctx.db.get(payment.bankAccountId) : null;
@@ -870,7 +870,7 @@ export const getUnpaidInvoices = query({
     const enrichedInvoices = await Promise.all(
       invoices.map(async (invoice) => {
         const client = await ctx.db.get(invoice.clientId);
-        const order = await ctx.db.get(invoice.orderId);
+        const order = invoice.orderId ? await ctx.db.get(invoice.orderId) : null;
 
         // Get payments for this invoice to calculate advance and invoice payments
         const payments = await ctx.db
@@ -887,9 +887,11 @@ export const getUnpaidInvoices = query({
           .filter((p: any) => p.type !== "advance")
           .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-        // Calculate outstanding balance based on order status
-        // Only show outstanding for shipped/delivered orders
-        const shouldShowOutstanding = order?.status === "shipped" || order?.status === "delivered";
+        // Calculate outstanding balance
+        // For standalone invoices, always show outstanding balance
+        // For order-based invoices, only show outstanding for shipped/delivered orders
+        const shouldShowOutstanding = invoice.isStandalone || 
+          (order && (order.status === "shipped" || order.status === "delivered"));
         const calculatedOutstandingBalance = shouldShowOutstanding ? invoice.outstandingBalance : 0;
 
         return {
@@ -929,7 +931,7 @@ export const getPaymentReceipt = query({
     if (!invoice) return null;
 
     const client = await ctx.db.get(invoice.clientId);
-    const order = await ctx.db.get(invoice.orderId);
+    const order = invoice.orderId ? await ctx.db.get(invoice.orderId) : null;
     const recordedBy = payment.recordedBy ? await ctx.db.get(payment.recordedBy) : null;
 
     return {

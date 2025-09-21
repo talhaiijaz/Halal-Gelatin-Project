@@ -128,16 +128,19 @@ export default defineSchema({
   // Invoices table
   invoices: defineTable({
     invoiceNumber: v.optional(v.string()), // Unique invoice number (e.g., INV-2025-0001)
-    orderId: v.id("orders"),
+    orderId: v.optional(v.id("orders")), // Optional for standalone invoices
     clientId: v.id("clients"),
     issueDate: v.number(),
-    dueDate: v.number(),
+    dueDate: v.optional(v.number()),
     status: v.union(v.literal("unpaid"), v.literal("partially_paid"), v.literal("paid")),
     amount: v.number(), // Same as order total
     currency: v.string(),
     totalPaid: v.number(),
     outstandingBalance: v.number(), // amount - totalPaid
     notes: v.optional(v.string()),
+    // Standalone invoice fields
+    isStandalone: v.optional(v.boolean()), // True for invoices created without orders
+    source: v.optional(v.string()), // "previous_platform", "current_system", etc.
     approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -145,7 +148,8 @@ export default defineSchema({
     .index("by_order", ["orderId"])
     .index("by_client", ["clientId"])
     .index("by_status", ["status"])
-    .index("by_invoice_number", ["invoiceNumber"]),
+    .index("by_invoice_number", ["invoiceNumber"])
+    .index("by_standalone", ["isStandalone"]),
 
   // Payments table
   payments: defineTable({
