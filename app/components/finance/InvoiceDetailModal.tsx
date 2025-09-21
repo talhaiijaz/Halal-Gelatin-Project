@@ -8,6 +8,7 @@ import { X, FileText, User, Package, DollarSign, Calendar } from "lucide-react";
 import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { type Payment, type OrderItem } from "@/app/types";
 import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import PaymentDetailModal from "./PaymentDetailModal";
 
 
 interface InvoiceDetailModalProps {
@@ -19,6 +20,8 @@ interface InvoiceDetailModalProps {
 
 export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecordPayment }: InvoiceDetailModalProps) {
   const invoice = useQuery(api.invoices.get, invoiceId ? { id: invoiceId } : "skip");
+  const [showPaymentDetail, setShowPaymentDetail] = useState(false);
+  const [selectedPaymentId, setSelectedPaymentId] = useState<Id<"payments"> | null>(null);
   
   // Lock body scroll when modal is open
   useModalBodyScrollLock(isOpen);
@@ -167,7 +170,14 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                         </thead>
                         <tbody className="divide-y">
                           {payments.map((p: any) => (
-                            <tr key={p._id}>
+                            <tr 
+                              key={p._id}
+                              className="hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => {
+                                setSelectedPaymentId(p._id);
+                                setShowPaymentDetail(true);
+                              }}
+                            >
                               <td className="px-3 py-2">{formatDate(p.paymentDate)}</td>
                               <td className="px-3 py-2">
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.type === "advance" ? "bg-orange-100 text-orange-800" : "bg-green-100 text-green-800"}`}>
@@ -280,6 +290,16 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
           )}
         </div>
       </div>
+
+      {/* Payment Detail Modal */}
+      <PaymentDetailModal
+        isOpen={showPaymentDetail}
+        onClose={() => {
+          setShowPaymentDetail(false);
+          setSelectedPaymentId(null);
+        }}
+        paymentId={selectedPaymentId}
+      />
     </div>
   );
 }

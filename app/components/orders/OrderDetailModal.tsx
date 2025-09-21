@@ -24,6 +24,7 @@ import DocumentUpload from "./DocumentUpload";
 import EditOrderModal from "./EditOrderModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import RecordPaymentModal from "@/app/components/finance/RecordPaymentModal";
+import InvoiceDetailModal from "@/app/components/finance/InvoiceDetailModal";
 import ActivityLog from "../ActivityLog";
 import DatePickerModal from "../DatePickerModal";
 import { useQuery as useConvexQuery } from "convex/react";
@@ -50,6 +51,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   const [isEditingInvoiceNumber, setIsEditingInvoiceNumber] = useState(false);
   const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
+  const [showInvoiceDetail, setShowInvoiceDetail] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState<"pending" | "in_production" | "shipped" | "delivered" | "cancelled" | null>(null);
 
@@ -678,12 +680,20 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                         );
                       })()}
 
-                      <button
-                        className="w-full btn-primary text-sm"
-                        onClick={() => setIsRecordPaymentOpen(true)}
-                      >
-                        Record Payment
-                      </button>
+                      <div className="flex space-x-3">
+                        <button
+                          className="flex-1 btn-primary text-sm"
+                          onClick={() => setIsRecordPaymentOpen(true)}
+                        >
+                          Record Payment
+                        </button>
+                        <button
+                          className="flex-1 btn-secondary text-sm"
+                          onClick={() => setShowInvoiceDetail(true)}
+                        >
+                          View Invoice Details
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -810,6 +820,19 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
         onConfirm={handleDatePickerConfirm}
         title="Select Delivery Date"
       />
+
+      {/* Invoice Detail Modal */}
+      {order && order.invoice && (
+        <InvoiceDetailModal
+          isOpen={showInvoiceDetail}
+          onClose={() => setShowInvoiceDetail(false)}
+          invoiceId={order.invoice._id as unknown as Id<"invoices">}
+          onRecordPayment={(invoiceId, clientId) => {
+            setShowInvoiceDetail(false);
+            setIsRecordPaymentOpen(true);
+          }}
+        />
+      )}
 
     </div>
   );
