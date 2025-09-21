@@ -35,6 +35,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
+import { shouldHighlightOrderYellow, getOrderHighlightClasses, getOrderTextHighlightClasses } from "@/app/utils/orderHighlighting";
 
 export default function InternationalClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -161,6 +162,9 @@ export default function InternationalClientsPage() {
   
   // Extract all orders array (handle both paginated and non-paginated responses)
   const allOrders = Array.isArray(allOrdersData) ? allOrdersData : allOrdersData?.page || [];
+
+  // Fetch bank accounts for highlighting
+  const bankAccounts = useQuery(api.banks.list);
 
   // Close modal on Escape and prevent body scroll
   useEffect(() => {
@@ -1221,19 +1225,23 @@ export default function InternationalClientsPage() {
                       };
 
                       const metrics = calculateFinancialMetrics(order);
+                      // Find the associated bank account for highlighting
+                      const bankAccount = bankAccounts?.find(bank => bank._id === order.bankAccountId);
+                      const shouldHighlight = shouldHighlightOrderYellow(order, bankAccount);
+                      
                       return (
                         <tr 
                           key={order._id} 
-                          className="hover:bg-gray-50 cursor-pointer transition-colors"
+                          className={`${getOrderHighlightClasses(shouldHighlight)} hover:bg-gray-50 cursor-pointer transition-colors`}
                           onClick={() => setSelectedOrderId(order._id)}
                         >
                           <td className="px-4 py-4">
-                            <div className="text-sm font-medium text-gray-900">
+                            <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                               {order.invoiceNumber}
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <div className="text-sm text-gray-900 truncate max-w-[120px]" title={order.client?.name || "Unknown Client"}>{order.client?.name || "Unknown Client"}</div>
+                            <div className={`text-sm ${getOrderTextHighlightClasses(shouldHighlight)} truncate max-w-[120px]`} title={order.client?.name || "Unknown Client"}>{order.client?.name || "Unknown Client"}</div>
                           </td>
                           <td className="px-4 py-4">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
@@ -1244,10 +1252,10 @@ export default function InternationalClientsPage() {
                           </td>
                           <td className="px-4 py-4 text-center">
                             <div className="space-y-1">
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                                 {formatCurrency(metrics.total as number, order.currency as SupportedCurrency)}
                               </div>
-                              <div className="text-xs text-gray-600">
+                              <div className={`text-xs ${shouldHighlight ? 'text-gray-700' : 'text-gray-600'}`}>
                                 Paid: {formatCurrency(metrics.paid as number, order.currency as SupportedCurrency)}
                                 {(metrics.advancePaid as number) > 0 && (
                                   <span className="text-blue-600">
@@ -1255,25 +1263,25 @@ export default function InternationalClientsPage() {
                                   </span>
                                 )}
                               </div>
-                              <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                              <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : shouldHighlight ? 'text-gray-700' : 'text-gray-500'}`}>
                                 Receivables: {(metrics.outstanding as number) > 0 ? formatCurrency(metrics.outstanding as number, order.currency as SupportedCurrency) : 
                                              order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as SupportedCurrency) : 
                                              "Not due"}
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">
-                            <div className="text-sm font-medium text-gray-900">
+                          <td className="px-4 py-4 text-sm">
+                            <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                               {order.items?.reduce((total: number, item: any) => total + (item.quantityKg || 0), 0).toLocaleString()} kg
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">
-                            <div className="truncate" title={order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}>
+                          <td className="px-4 py-4 text-sm">
+                            <div className={`truncate ${getOrderTextHighlightClasses(shouldHighlight)}`} title={order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}>
                               {order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">
-                            <div className="truncate" title={order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}>
+                          <td className="px-4 py-4 text-sm">
+                            <div className={`truncate ${getOrderTextHighlightClasses(shouldHighlight)}`} title={order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}>
                               {order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}
                             </div>
                           </td>

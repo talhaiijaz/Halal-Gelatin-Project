@@ -17,6 +17,7 @@ import { timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrency } from "@/app/utils/currencyFormat";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
+import { shouldHighlightOrderYellow, getOrderHighlightClasses, getOrderTextHighlightClasses } from "@/app/utils/orderHighlighting";
 
 function OrdersPageContent() {
   // const searchParams = useSearchParams();
@@ -39,6 +40,8 @@ function OrdersPageContent() {
   const bankValidation = useQuery(api.banks.checkAllBanksHaveCountries);
   // Check order validation
   const orderValidation = useQuery(api.orders.checkAllOrdersHaveBanks);
+  // Fetch bank accounts for highlighting
+  const bankAccounts = useQuery(api.banks.list);
 
 
   // Helper function to calculate financial metrics for an order
@@ -365,19 +368,23 @@ function OrdersPageContent() {
               ) : (sortedOrders && sortedOrders.length > 0) ? (
                 sortedOrders.map((order) => {
                   const metrics = calculateFinancialMetrics(order);
+                  // Find the associated bank account
+                  const bankAccount = bankAccounts?.find(bank => bank._id === order.bankAccountId);
+                  const shouldHighlight = shouldHighlightOrderYellow(order, bankAccount);
+                  
                   return (
                     <tr 
                       key={order._id} 
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      className={`${getOrderHighlightClasses(shouldHighlight)} hover:bg-gray-50 cursor-pointer transition-colors`}
                       onClick={() => setSelectedOrderId(order._id)}
                     >
                       <td className="px-4 py-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                           {order.invoiceNumber}
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="text-sm text-gray-900">{order.client?.name || "Unknown Client"}</div>
+                        <div className={`text-sm ${getOrderTextHighlightClasses(shouldHighlight)}`}>{order.client?.name || "Unknown Client"}</div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center space-x-2">
@@ -396,10 +403,10 @@ function OrdersPageContent() {
                       </td>
                       <td className="px-4 py-4 text-center">
                         <div className="space-y-1">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                             {formatCurrency(metrics.total as number, order.currency as "USD" | "EUR" | "PKR" | "AED")}
                           </div>
-                          <div className="text-xs text-gray-600">
+                          <div className={`text-xs ${shouldHighlight ? 'text-gray-700' : 'text-gray-600'}`}>
                             Paid: {formatCurrency(metrics.paid as number, order.currency as "USD" | "EUR" | "PKR" | "AED")}
                             {(metrics.advancePaid as number) > 0 && (
                               <span className="text-blue-600">
@@ -407,25 +414,25 @@ function OrdersPageContent() {
                               </span>
                             )}
                           </div>
-                          <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                          <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : shouldHighlight ? 'text-gray-700' : 'text-gray-500'}`}>
                             Receivables: {(metrics.outstanding as number) > 0 ? formatCurrency(metrics.outstanding as number, order.currency as "USD" | "EUR" | "PKR" | "AED") : 
                                          order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as "USD" | "EUR" | "PKR" | "AED") : 
                                          "Not due"}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-900">
-                        <div className="text-sm font-medium text-gray-900">
+                      <td className="px-4 py-4 text-sm">
+                        <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                           {order.items?.reduce((total, item) => total + (item.quantityKg || 0), 0).toLocaleString()} kg
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-900">
-                        <div className="truncate" title={order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}>
+                      <td className="px-4 py-4 text-sm">
+                        <div className={`truncate ${getOrderTextHighlightClasses(shouldHighlight)}`} title={order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}>
                           {order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-900">
-                        <div className="truncate" title={order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}>
+                      <td className="px-4 py-4 text-sm">
+                        <div className={`truncate ${getOrderTextHighlightClasses(shouldHighlight)}`} title={order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}>
                           {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}
                         </div>
                       </td>

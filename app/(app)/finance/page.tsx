@@ -42,6 +42,7 @@ import { formatDateForDisplay } from "@/app/utils/dateUtils";
 import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
+import { shouldHighlightOrderYellow, getOrderHighlightClasses, getOrderTextHighlightClasses } from "@/app/utils/orderHighlighting";
 
 // Note: formatCurrency is now imported from utils/currencyFormat
 
@@ -111,6 +112,12 @@ export default function FinancePage() {
   // Fetch banks data
   const bankAccounts = useQuery(api.banks.listWithBalances);
   const bankValidation = useQuery(api.banks.checkAllBanksHaveCountries);
+  
+  // Fetch orders data for highlighting
+  const ordersData = useQuery(api.orders.list, {
+    fiscalYear: currentFiscalYear,
+    paginationOpts: { numItems: 1000, cursor: null }
+  });
   // const bankStats = useQuery(api.banks.getStats);
   
   // Mutations
@@ -458,10 +465,17 @@ export default function FinancePage() {
                     </tr>
                   ) : (
                     // Invoice rows
-                    sortedInvoices?.map((invoice) => (
+                    sortedInvoices?.map((invoice) => {
+                      // Find associated order and bank account for highlighting
+                      const ordersList = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
+                      const associatedOrder = ordersList.find((order: any) => order._id === invoice.orderId);
+                      const bankAccount = bankAccounts?.find(bank => bank._id === associatedOrder?.bankAccountId);
+                      const shouldHighlight = shouldHighlightOrderYellow(associatedOrder || { status: "pending" }, bankAccount);
+                      
+                      return (
                       <tr
                         key={invoice._id}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
+                        className={`${getOrderHighlightClasses(shouldHighlight)} hover:bg-gray-50 cursor-pointer transition-colors`}
                         onClick={() => {
                           setSelectedInvoiceId(invoice._id);
                           setIsInvoiceModalOpen(true);
@@ -469,29 +483,29 @@ export default function FinancePage() {
                       >
                         <td className="px-4 py-4">
                           <div>
-                            <div className="text-sm font-medium text-gray-900">{invoice.invoiceNumber || "N/A"}</div>
+                            <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>{invoice.invoiceNumber || "N/A"}</div>
                           </div>
                         </td>
                         <td className="px-4 py-4 min-w-0">
                           <div className="min-w-0">
-                            <div className="text-sm text-gray-900 truncate" title={invoice.client?.name}>
+                            <div className={`text-sm ${getOrderTextHighlightClasses(shouldHighlight)} truncate`} title={invoice.client?.name}>
                               {invoice.client?.name}
                             </div>
-                            <div className="text-xs text-gray-500 truncate" title={invoice.client?.email}>
+                            <div className={`text-xs ${shouldHighlight ? 'text-gray-600' : 'text-gray-500'} truncate`} title={invoice.client?.email}>
                               {invoice.client?.email}
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                             {formatDateForDisplay(invoice.issueDate)}
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
                             {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className={`text-xs ${shouldHighlight ? 'text-gray-600' : 'text-gray-500'}`}>
                             Paid: {formatCurrency(invoice.totalPaid, invoice.currency as SupportedCurrency)}
                             {invoice.advancePaid > 0 && (
                               <span className="text-blue-600">
@@ -537,7 +551,8 @@ export default function FinancePage() {
                           </span>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
