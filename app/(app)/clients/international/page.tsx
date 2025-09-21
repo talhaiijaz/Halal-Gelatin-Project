@@ -249,7 +249,7 @@ export default function InternationalClientsPage() {
     cancelled: 5
   };
 
-  const sortedOrders = filteredOrders?.sort((a, b) => {
+  const sortedOrders = filteredOrders?.sort((a: any, b: any) => {
     // First sort by fiscal year (descending - latest year first)
     if (a.fiscalYear !== b.fiscalYear) {
       return (b.fiscalYear || 0) - (a.fiscalYear || 0);
@@ -412,8 +412,8 @@ export default function InternationalClientsPage() {
                   <p className="text-sm font-medium text-green-700 mb-1">Dispatched Quantity</p>
                   <p className="text-2xl font-bold text-green-900">
                     {allOrders ? `${allOrders
-                      .filter(order => order.status === 'shipped' || order.status === 'delivered')
-                      .reduce((total, order) => total + (order.items?.reduce((sum, item) => sum + (item.quantityKg || 0), 0) || 0), 0)
+                      .filter((order: any) => order.status === 'shipped' || order.status === 'delivered')
+                      .reduce((total: number, order: any) => total + (order.items?.reduce((sum: number, item: any) => sum + (item.quantityKg || 0), 0) || 0), 0)
                       .toLocaleString()} kg` : <Skeleton width={100} height={32} />}
                   </p>
                   <p className="text-xs text-green-600 mt-1">Shipped or delivered</p>
@@ -640,7 +640,7 @@ export default function InternationalClientsPage() {
                     </tr>
                   ) : (
                     // Client rows
-                    clientSummary.map((client) => (
+                    clientSummary.map((client: any) => (
                       <tr key={client.clientId} className="hover:bg-gray-50">
                         <td className="px-6 py-4">
                           <div className="flex items-center">
@@ -755,7 +755,7 @@ export default function InternationalClientsPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {pendingOrdersDetails.map((row) => (
+                              {pendingOrdersDetails.map((row: any) => (
                                 <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                   <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -805,7 +805,7 @@ export default function InternationalClientsPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {advanceDetails.map((row) => (
+                              {advanceDetails.map((row: any) => (
                                 <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                   <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -849,7 +849,7 @@ export default function InternationalClientsPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {receivablesDetails.map((row) => (
+                              {receivablesDetails.map((row: any) => (
                                 <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                   <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -893,7 +893,7 @@ export default function InternationalClientsPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {revenueDetails.map((row) => (
+                              {revenueDetails.map((row: any) => (
                                 <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
                                   <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -938,7 +938,7 @@ export default function InternationalClientsPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {totalOrdersDetails.map((order) => (
+                              {totalOrdersDetails.map((order: any) => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
                                   <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
@@ -954,7 +954,7 @@ export default function InternationalClientsPage() {
                                     </span>
                                   </td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
+                                    {order.items?.reduce((sum: number, item: any) => sum + item.quantityKg, 0).toLocaleString() || '0'}
                                   </td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
@@ -995,7 +995,7 @@ export default function InternationalClientsPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {pendingQuantityDetails?.filter(order => order.status === 'pending' || order.status === 'in_production').map((order) => (
+                              {pendingQuantityDetails?.filter((order: any) => order.status === 'pending' || order.status === 'in_production').map((order: any) => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
                                   <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
@@ -1007,7 +1007,7 @@ export default function InternationalClientsPage() {
                                     </span>
                                   </td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
+                                    {order.items?.reduce((sum: number, item: any) => sum + item.quantityKg, 0).toLocaleString() || '0'}
                                   </td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
@@ -1048,7 +1048,7 @@ export default function InternationalClientsPage() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {processedQuantityDetails?.filter(order => order.status === 'shipped' || order.status === 'delivered').map((order) => (
+                              {processedQuantityDetails?.filter((order: any) => order.status === 'shipped' || order.status === 'delivered').map((order: any) => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedOrderId(order._id)}>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{order.invoiceNumber}</td>
                                   <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={order.client?.name || 'Unknown Client'}>{order.client?.name || 'Unknown Client'}</td>
@@ -1060,7 +1060,7 @@ export default function InternationalClientsPage() {
                                     </span>
                                   </td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {order.items?.reduce((sum, item) => sum + item.quantityKg, 0).toLocaleString() || '0'}
+                                    {order.items?.reduce((sum: number, item: any) => sum + item.quantityKg, 0).toLocaleString() || '0'}
                                   </td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}</td>
                                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.currency}</td>
@@ -1182,7 +1182,7 @@ export default function InternationalClientsPage() {
                       </tr>
                     ))
                   ) : (sortedOrders && sortedOrders.length > 0) ? (
-                    sortedOrders.map((order) => {
+                    sortedOrders.map((order: any) => {
                       // Calculate financial metrics for international orders
                       const calculateFinancialMetrics = (order: Record<string, unknown>) => {
                         if (!order.invoice) {
@@ -1264,7 +1264,7 @@ export default function InternationalClientsPage() {
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-900">
                             <div className="text-sm font-medium text-gray-900">
-                              {order.items?.reduce((total, item) => total + (item.quantityKg || 0), 0).toLocaleString()} kg
+                              {order.items?.reduce((total: number, item: any) => total + (item.quantityKg || 0), 0).toLocaleString()} kg
                             </div>
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-900">
@@ -1356,7 +1356,7 @@ export default function InternationalClientsPage() {
 
           {/* Customer Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(Array.isArray(clientsData) ? clientsData : clientsData?.page || []).map((client) => (
+            {(Array.isArray(clientsData) ? clientsData : clientsData?.page || []).map((client: any) => (
               <div key={client._id} className="card-hover p-6 flex flex-col h-full">
                 {/* Header with profile picture, name and status */}
                 <div className="flex items-start justify-between mb-4">

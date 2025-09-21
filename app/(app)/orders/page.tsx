@@ -35,6 +35,9 @@ function OrdersPageContent() {
     paginationOpts: ordersPagination.paginationOpts,
   });
 
+  // Check bank validation
+  const bankValidation = useQuery(api.banks.checkAllBanksHaveCountries);
+
 
   // Helper function to calculate financial metrics for an order
   const calculateFinancialMetrics = (order: Record<string, unknown>) => {
@@ -194,13 +197,44 @@ function OrdersPageContent() {
           </button>
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700"
+            disabled={bankValidation && !bankValidation.allHaveCountries}
+            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+              bankValidation && !bankValidation.allHaveCountries
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-orange-600 hover:bg-orange-700"
+            }`}
+            title={bankValidation && !bankValidation.allHaveCountries ? "Cannot create orders until all banks have countries assigned" : ""}
           >
             <Plus className="h-4 w-4 mr-2" />
             Create Order
           </button>
         </div>
       </div>
+
+      {/* Bank Validation Warning */}
+      {bankValidation && !bankValidation.allHaveCountries && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <Package className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">
+                Order Creation Blocked
+              </h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>
+                  Cannot create new orders until all bank accounts have countries assigned. 
+                  This is required for proper transaction processing and order management.
+                </p>
+                <p className="mt-2 font-medium">
+                  Please visit the Finance → Banks section to assign countries to all bank accounts.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white p-6 rounded-lg shadow">
@@ -358,7 +392,13 @@ function OrdersPageContent() {
                       <div className="mt-6">
                         <button
                           onClick={() => setIsCreateModalOpen(true)}
-                          className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark"
+                          disabled={bankValidation && !bankValidation.allHaveCountries}
+                          className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
+                            bankValidation && !bankValidation.allHaveCountries
+                              ? "bg-gray-400 cursor-not-allowed"
+                              : "bg-primary hover:bg-primary-dark"
+                          }`}
+                          title={bankValidation && !bankValidation.allHaveCountries ? "Cannot create orders until all banks have countries assigned" : ""}
                         >
                           <Plus className="h-5 w-5 mr-2" />
                           Create Order

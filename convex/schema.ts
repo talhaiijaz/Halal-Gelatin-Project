@@ -225,6 +225,7 @@ export default defineSchema({
     accountNumber: v.string(),
     accountType: v.optional(v.union(v.literal("business"), v.literal("personal"))), // Account type
     currency: v.string(),
+    country: v.optional(v.string()), // Country where the bank is located
     openingBalance: v.optional(v.number()), // Opening balance when bank account is created
     currentBalance: v.optional(v.number()), // Current balance (calculated from all transactions)
     status: v.union(v.literal("active"), v.literal("inactive")),

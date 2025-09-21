@@ -19,6 +19,7 @@ interface BankAccountModalProps {
     bankName: string;
     accountNumber: string;
     currency: string;
+    country?: string; // Optional for existing banks
     openingBalance?: number;
     status: "active" | "inactive";
   } | null;
@@ -34,6 +35,7 @@ export default function BankAccountModal({
   const [bankName, setBankName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [currency, setCurrency] = useState("PKR");
+  const [country, setCountry] = useState("Pakistan");
   const [openingBalance, setOpeningBalance] = useState("");
   const [status, setStatus] = useState<"active" | "inactive">("active");
   const [originalOpeningBalance, setOriginalOpeningBalance] = useState<number | null>(null);
@@ -52,6 +54,7 @@ export default function BankAccountModal({
         setBankName(bankAccount.bankName);
         setAccountNumber(bankAccount.accountNumber);
         setCurrency(bankAccount.currency);
+        setCountry(bankAccount.country || "Pakistan");
         setOpeningBalance(bankAccount.openingBalance?.toString() || "");
         setStatus(bankAccount.status);
         setOriginalOpeningBalance(bankAccount.openingBalance || 0);
@@ -62,6 +65,7 @@ export default function BankAccountModal({
         setBankName("");
         setAccountNumber("");
         setCurrency("PKR");
+        setCountry("Pakistan");
         setOpeningBalance("");
         setStatus("active");
         setOriginalOpeningBalance(null);
@@ -78,7 +82,7 @@ export default function BankAccountModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!accountName.trim() || !bankName.trim() || !accountNumber.trim()) {
+    if (!accountName.trim() || !bankName.trim() || !accountNumber.trim() || !country.trim()) {
       toast.error("Please fill in all required fields");
       return;
     }
@@ -93,6 +97,7 @@ export default function BankAccountModal({
           bankName: bankName.trim(),
           accountNumber: accountNumber.trim(),
           currency: currency,
+          country: country.trim(),
           openingBalance: openingBalance ? parseFloat(openingBalance) : undefined,
           status: status,
         });
@@ -107,6 +112,7 @@ export default function BankAccountModal({
           bankName: bankName.trim(),
           accountNumber: accountNumber.trim(),
           currency: currency,
+          country: country.trim(),
           openingBalance: openingBalance ? parseFloat(openingBalance) : undefined,
         });
         const message = openingBalance && parseFloat(openingBalance) !== 0
@@ -218,6 +224,79 @@ export default function BankAccountModal({
               <option value="USD">USD - US Dollar</option>
               <option value="EUR">EUR - Euro</option>
               <option value="AED">AED - UAE Dirham</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Country *
+            </label>
+            <select
+              value={country}
+              onChange={(e) => setCountry(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+              required
+            >
+              <option value="">Select a country</option>
+              <option value="Pakistan">Pakistan</option>
+              <option value="United States">United States</option>
+              <option value="United Kingdom">United Kingdom</option>
+              <option value="Canada">Canada</option>
+              <option value="Australia">Australia</option>
+              <option value="Germany">Germany</option>
+              <option value="France">France</option>
+              <option value="India">India</option>
+              <option value="China">China</option>
+              <option value="Japan">Japan</option>
+              <option value="United Arab Emirates">United Arab Emirates</option>
+              <option value="Saudi Arabia">Saudi Arabia</option>
+              <option value="Singapore">Singapore</option>
+              <option value="Malaysia">Malaysia</option>
+              <option value="Thailand">Thailand</option>
+              <option value="Turkey">Turkey</option>
+              <option value="Italy">Italy</option>
+              <option value="Spain">Spain</option>
+              <option value="Netherlands">Netherlands</option>
+              <option value="Belgium">Belgium</option>
+              <option value="Switzerland">Switzerland</option>
+              <option value="Austria">Austria</option>
+              <option value="Sweden">Sweden</option>
+              <option value="Norway">Norway</option>
+              <option value="Denmark">Denmark</option>
+              <option value="Finland">Finland</option>
+              <option value="Brazil">Brazil</option>
+              <option value="Mexico">Mexico</option>
+              <option value="Argentina">Argentina</option>
+              <option value="Chile">Chile</option>
+              <option value="South Africa">South Africa</option>
+              <option value="Egypt">Egypt</option>
+              <option value="Kenya">Kenya</option>
+              <option value="Nigeria">Nigeria</option>
+              <option value="Indonesia">Indonesia</option>
+              <option value="Philippines">Philippines</option>
+              <option value="Vietnam">Vietnam</option>
+              <option value="South Korea">South Korea</option>
+              <option value="New Zealand">New Zealand</option>
+              <option value="Poland">Poland</option>
+              <option value="Czech Republic">Czech Republic</option>
+              <option value="Hungary">Hungary</option>
+              <option value="Romania">Romania</option>
+              <option value="Russia">Russia</option>
+              <option value="Ukraine">Ukraine</option>
+              <option value="Greece">Greece</option>
+              <option value="Portugal">Portugal</option>
+              <option value="Ireland">Ireland</option>
+              <option value="Israel">Israel</option>
+              <option value="Jordan">Jordan</option>
+              <option value="Lebanon">Lebanon</option>
+              <option value="Kuwait">Kuwait</option>
+              <option value="Qatar">Qatar</option>
+              <option value="Bahrain">Bahrain</option>
+              <option value="Sri Lanka">Sri Lanka</option>
+              <option value="Bangladesh">Bangladesh</option>
+              <option value="Afghanistan">Afghanistan</option>
+              <option value="Iran">Iran</option>
+              <option value="Iraq">Iraq</option>
             </select>
           </div>
 

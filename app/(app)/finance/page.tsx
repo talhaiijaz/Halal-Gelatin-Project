@@ -110,6 +110,7 @@ export default function FinancePage() {
   
   // Fetch banks data
   const bankAccounts = useQuery(api.banks.listWithBalances);
+  const bankValidation = useQuery(api.banks.checkAllBanksHaveCountries);
   // const bankStats = useQuery(api.banks.getStats);
   
   // Mutations
@@ -782,18 +783,62 @@ export default function FinancePage() {
                 setIsBankModalOpen(true);
               }}
               className="btn-primary flex items-center space-x-2"
+              disabled={bankValidation && !bankValidation.allHaveCountries}
             >
               <Plus className="h-4 w-4" />
               <span>Add Bank Account</span>
             </button>
           </div>
 
+          {/* Bank Validation Warning */}
+          {bankValidation && !bankValidation.allHaveCountries && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <Settings className="h-5 w-5 text-red-400" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Bank Setup Required
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>
+                      {bankValidation.banksWithoutCountries.length} bank account(s) are missing country information. 
+                      This is required for proper transaction processing and order management.
+                    </p>
+                    <div className="mt-3">
+                      <p className="font-medium">Banks needing country assignment:</p>
+                      <ul className="mt-1 list-disc list-inside space-y-1">
+                        {bankValidation.banksWithoutCountries.map((bank: any) => (
+                          <li key={bank._id}>
+                            <button
+                              onClick={() => {
+                                setBankAccountToEdit(bank);
+                                setIsEditBankModalOpen(true);
+                              }}
+                              className="text-red-600 hover:text-red-800 underline"
+                            >
+                              {bank.accountName} ({bank.bankName}) - {bank.accountNumber}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="mt-3 font-medium">
+                      ⚠️ You cannot create new banks or orders until all banks have countries assigned.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Bank Account Selection */}
           {bankAccounts && bankAccounts.length > 0 && (
             <div className="card p-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Bank Account</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {bankAccounts.map((account) => (
+                {bankAccounts.map((account: any) => (
                   <div
                     key={account._id}
                     className={`p-4 border rounded-lg transition-colors ${
@@ -821,6 +866,11 @@ export default function FinancePage() {
                         >
                           <Settings className="h-4 w-4" />
                         </button>
+                        {(!account.country || account.country.trim() === '') && (
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                            No Country
+                          </span>
+                        )}
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                           account.status === "active" 
                             ? "bg-green-100 text-green-800" 
@@ -835,6 +885,9 @@ export default function FinancePage() {
                       onClick={() => setSelectedBankAccountId(account._id)}
                     >
                       <p className="text-sm text-gray-600 mb-1">{account.bankName}</p>
+                      <p className="text-xs text-gray-500 mb-1">
+                        {account.country ? `📍 ${account.country}` : '📍 No Country'}
+                      </p>
                       <p className="text-sm text-gray-500 mb-2">#{account.accountNumber}</p>
                       <p className="text-lg font-semibold text-gray-900">
                         {account.currentBalance !== undefined 
@@ -913,6 +966,9 @@ export default function FinancePage() {
                       Bank
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
+                      Country
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">
                       Currency
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">
@@ -950,7 +1006,7 @@ export default function FinancePage() {
                     ))
                   ) : bankAccounts.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center">
+                      <td colSpan={6} className="px-6 py-12 text-center">
                         <Building2 className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No bank accounts</h3>
                         <p className="mt-1 text-sm text-gray-500">
@@ -972,7 +1028,7 @@ export default function FinancePage() {
                     </tr>
                   ) : (
                     // Bank account rows
-                    bankAccounts.map((account) => (
+                    bankAccounts.map((account: any) => (
                       <tr 
                         key={account._id} 
                         className="hover:bg-gray-50 cursor-pointer"
@@ -989,6 +1045,18 @@ export default function FinancePage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{account.bankName}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {account.country ? (
+                              <span className="flex items-center">
+                                <span className="mr-1">📍</span>
+                                {account.country}
+                              </span>
+                            ) : (
+                              <span className="text-red-500 text-xs">No Country</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">{account.currency}</div>

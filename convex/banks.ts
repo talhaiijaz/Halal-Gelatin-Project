@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { api } from "./_generated/api";
 import { updateBankAccountBalance, calculateBankAccountBalance } from "./bankUtils";
 import { paginationOptsValidator } from "convex/server";
 
@@ -48,9 +49,16 @@ export const create = mutation({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
+    country: v.string(), // Required for new banks
     openingBalance: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Check if all existing banks have countries
+    const validationResult: { allHaveCountries: boolean; banksWithoutCountries: any[] } = await ctx.runQuery(api.banks.checkAllBanksHaveCountries, {});
+    if (!validationResult.allHaveCountries) {
+      throw new Error("Cannot create new banks until all existing banks have countries assigned. Please update existing banks first.");
+    }
+
     // Check if account number already exists
     const existingAccount = await ctx.db
       .query("bankAccounts")
@@ -66,6 +74,7 @@ export const create = mutation({
       bankName: args.bankName,
       accountNumber: args.accountNumber,
       currency: args.currency,
+      country: args.country,
       openingBalance: args.openingBalance,
       status: "active",
       createdAt: Date.now(),
@@ -99,7 +108,7 @@ export const create = mutation({
     await logBankEvent(ctx, { 
       entityId: String(bankAccountId), 
       action: "create", 
-      message: `Bank account created: ${args.accountName} (${args.bankName})${args.openingBalance ? ` with opening balance of ${args.openingBalance} ${args.currency}` : ''}` 
+      message: `Bank account created: ${args.accountName} (${args.bankName}) in ${args.country}${args.openingBalance ? ` with opening balance of ${args.openingBalance} ${args.currency}` : ''}` 
     });
     return bankAccountId;
   },
@@ -113,6 +122,7 @@ export const update = mutation({
     bankName: v.string(),
     accountNumber: v.string(),
     currency: v.string(),
+    country: v.string(), // Required for updates
     openingBalance: v.optional(v.number()),
     status: v.union(v.literal("active"), v.literal("inactive")),
   },
@@ -150,6 +160,7 @@ export const update = mutation({
       bankName: args.bankName,
       accountNumber: args.accountNumber,
       currency: args.currency,
+      country: args.country,
       openingBalance: args.openingBalance,
       status: args.status,
     });
@@ -180,7 +191,7 @@ export const update = mutation({
     await logBankEvent(ctx, { 
       entityId: String(args.id), 
       action: "update", 
-      message: `Bank account updated: ${args.accountName} (${args.bankName})${openingBalanceChanged ? ` - Opening balance adjusted from ${oldOpeningBalance} to ${newOpeningBalance}` : ''}` 
+      message: `Bank account updated: ${args.accountName} (${args.bankName}) in ${args.country}${openingBalanceChanged ? ` - Opening balance adjusted from ${oldOpeningBalance} to ${newOpeningBalance}` : ''}` 
     });
     
     return { success: true };
@@ -331,6 +342,59 @@ export const getStats = query({
       totalAccounts,
       activeAccounts,
       accountsByCurrency,
+    };
+  },
+});
+
+// Check if all banks have countries assigned
+export const checkAllBanksHaveCountries = query({
+  args: {},
+  returns: v.object({
+    allHaveCountries: v.boolean(),
+    banksWithoutCountries: v.array(v.object({
+      _id: v.id("bankAccounts"),
+      accountName: v.string(),
+      bankName: v.string(),
+      accountNumber: v.string(),
+    })),
+  }),
+  handler: async (ctx) => {
+    const bankAccounts = await ctx.db.query("bankAccounts").collect();
+    
+    // Filter banks without countries (this will catch existing banks that don't have the country field)
+    const banksWithoutCountries = bankAccounts.filter(account => !account.country || account.country.trim() === '');
+    
+    return {
+      allHaveCountries: banksWithoutCountries.length === 0,
+      banksWithoutCountries: banksWithoutCountries.map(account => ({
+        _id: account._id,
+        accountName: account.accountName,
+        bankName: account.bankName,
+        accountNumber: account.accountNumber,
+      })),
+    };
+  },
+});
+
+// Validate if new bank creation is allowed
+export const canCreateNewBank = query({
+  args: {},
+  returns: v.object({
+    canCreate: v.boolean(),
+    reason: v.optional(v.string()),
+  }),
+  handler: async (ctx): Promise<{ canCreate: boolean; reason?: string }> => {
+    const validationResult: { allHaveCountries: boolean; banksWithoutCountries: any[] } = await ctx.runQuery(api.banks.checkAllBanksHaveCountries, {});
+    
+    if (!validationResult.allHaveCountries) {
+      return {
+        canCreate: false,
+        reason: `Cannot create new banks until all existing banks have countries assigned. ${validationResult.banksWithoutCountries.length} bank(s) missing countries.`,
+      };
+    }
+    
+    return {
+      canCreate: true,
     };
   },
 });

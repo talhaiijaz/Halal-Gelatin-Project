@@ -380,7 +380,7 @@ export default function ClientDetailPage() {
                   (() => {
                     // Group revenue by currency
                     const revenueByCurrency: Record<string, number> = {};
-                    allOrders.forEach(order => {
+                    allOrders.forEach((order: any) => {
                       if (order.invoice && order.invoice.totalPaid) {
                         const currency = order.invoice.currency || order.currency;
                         revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + order.invoice.totalPaid;
@@ -441,7 +441,7 @@ export default function ClientDetailPage() {
             {allOrders && allOrders.length > 0 ? (
               <div>
                 <div className="space-y-3">
-                  {allOrders.map((order) => (
+                  {allOrders.map((order: any) => (
                     <div 
                       key={order._id} 
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
@@ -520,7 +520,7 @@ export default function ClientDetailPage() {
             
             {standaloneInvoices && standaloneInvoices.length > 0 ? (
               <div className="space-y-3">
-                {standaloneInvoices.map((invoice) => (
+                {standaloneInvoices.map((invoice: any) => (
                   <div 
                     key={invoice._id} 
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
