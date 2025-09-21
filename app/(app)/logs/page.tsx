@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+// Removed usePagination and Pagination imports since we'll use a simpler approach
 import { 
   Search, 
   Download,
@@ -23,9 +24,51 @@ export default function LogsPage() {
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [allLogs, setAllLogs] = useState<any[]>([]);
 
   // Fetch logs with pagination
-  const logs = useQuery(api.dashboard.listLogs, { limit: 100 });
+  const logsResult = useQuery(api.dashboard.listLogs, { 
+    paginationOpts: {
+      numItems: 50,
+      cursor: cursor
+    }
+  });
+  
+  // Get total count for pagination
+  const totalCount = useQuery(api.dashboard.getLogsCount);
+
+  // Extract logs from paginated result
+  const currentPageLogs = logsResult?.page || [];
+  const isDone = logsResult?.isDone || false;
+  const continueCursor = logsResult?.continueCursor || null;
+
+  // Update allLogs when new logs are fetched
+  React.useEffect(() => {
+    if (currentPageLogs.length > 0) {
+      if (cursor === null) {
+        // First page - replace all logs
+        setAllLogs(currentPageLogs);
+      } else {
+        // Subsequent pages - append to existing logs
+        setAllLogs(prev => [...prev, ...currentPageLogs]);
+      }
+    }
+  }, [currentPageLogs, cursor]);
+
+  const loadMore = () => {
+    if (!isDone && continueCursor) {
+      setCursor(continueCursor);
+    }
+  };
+
+  const resetPagination = () => {
+    setCursor(null);
+    setAllLogs([]);
+  };
+
+  // Use allLogs for filtering and display
+  const logs = allLogs;
 
   // Compute date threshold based on filter
   const dateThreshold = (() => {
@@ -109,7 +152,7 @@ export default function LogsPage() {
   };
 
   const exportToCSV = () => {
-    if (!filteredLogs) return;
+    if (!filteredLogs || filteredLogs.length === 0) return;
 
     const csvContent = [
       ["Action", "Entity", "Message", "Timestamp"],
@@ -193,7 +236,7 @@ export default function LogsPage() {
           <option value="month">This Month</option>
         </select>
         <div className="flex items-center text-sm text-gray-600">
-          {logs ? `${filteredLogs?.length || 0} logs found` : <Skeleton width={100} />}
+          {totalCount ? `Showing ${allLogs.length} of ${totalCount} total logs` : <Skeleton width={150} />}
         </div>
       </div>
 
@@ -278,6 +321,19 @@ export default function LogsPage() {
             </tbody>
           </table>
         </div>
+        {!isDone && totalCount && allLogs.length < totalCount && (
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="flex justify-center">
+              <button
+                onClick={loadMore}
+                disabled={!logsResult}
+                className="px-6 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {!logsResult ? "Loading..." : `Load More Logs (${allLogs.length} of ${totalCount})`}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -20,7 +20,6 @@ import {
   CreditCard,
   Plus,
   FileText,
-  Search,
   Clock,
   CheckCircle,
   Building2,
@@ -37,7 +36,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel } from "@/app/utils/fiscalYear";
+import { getCurrentFiscalYear, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
 // import { useMutation } from "convex/react";
 import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
@@ -54,10 +53,6 @@ export default function FinancePage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
   const [preselectedInvoiceId, setPreselectedInvoiceId] = useState<string | null>(null);
   const [preselectedClientId, setPreselectedClientId] = useState<string | null>(null);
-  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
-  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState("all");
-  const [invoiceFiscalYearFilter, setInvoiceFiscalYearFilter] = useState<number | "all">("all");
-  const [invoiceOrderStatusFilter, setInvoiceOrderStatusFilter] = useState("all");
   const [isBankModalOpen, setIsBankModalOpen] = useState(false);
   const [isDeleteBankModalOpen, setIsDeleteBankModalOpen] = useState(false);
   const [selectedBankAccount, setSelectedBankAccount] = useState<Record<string, unknown> | null>(null);
@@ -69,7 +64,6 @@ export default function FinancePage() {
   // const [selectedPayment, setSelectedPayment] = useState<EditablePayment | null>(null);
   const [isPaymentDetailOpen, setIsPaymentDetailOpen] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<string | null>(null);
-  const [paymentFiscalYearFilter, setPaymentFiscalYearFilter] = useState<number | "all">("all");
   
   // Pagination hooks
   const paymentsPagination = usePagination({ pageSize: 10 });
@@ -90,7 +84,6 @@ export default function FinancePage() {
   
   // Fetch invoices data with pagination
   const invoicesData = useQuery(api.invoices.list, { 
-    fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter,
     paginationOpts: invoicesPagination.paginationOpts
   });
   // const invoiceStats = useQuery(api.finance.getInvoiceStats, { 
@@ -99,7 +92,6 @@ export default function FinancePage() {
   
   // Fetch payments data with pagination
   const paymentsData = useQuery(api.payments.list, { 
-    fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter,
     paginationOpts: paymentsPagination.paginationOpts
   });
   // const paymentStats = useQuery(api.payments.getStats, { 
@@ -164,30 +156,8 @@ export default function FinancePage() {
     }
   };
 
-  // Filter invoices (now working with paginated data)
-  const filteredInvoices = (Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || []).filter(invoice => {
-    if (invoiceSearchQuery) {
-      const searchLower = invoiceSearchQuery.toLowerCase();
-      const matchesSearch = 
-        invoice.invoiceNumber?.toLowerCase().includes(searchLower) ||
-        invoice.client?.name?.toLowerCase().includes(searchLower) ||
-        invoice.invoiceNumber?.toLowerCase().includes(searchLower);
-      if (!matchesSearch) return false;
-    }
-
-    if (invoiceStatusFilter !== "all" && invoice.status !== invoiceStatusFilter) {
-      return false;
-    }
-
-    if (invoiceOrderStatusFilter !== "all" && invoice.order?.status !== invoiceOrderStatusFilter) {
-      return false;
-    }
-
-    return true;
-  });
-
-  // Sort filtered invoices by issue date (latest first)
-  const sortedInvoices = filteredInvoices?.sort((a, b) => {
+  // Get invoices from paginated data and sort by issue date (latest first)
+  const sortedInvoices = (Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [])?.sort((a, b) => {
     // Sort by issue date (descending - latest first)
     return b.issueDate - a.issueDate;
   });
@@ -389,76 +359,6 @@ export default function FinancePage() {
 
           
 
-          {/* Search and Filters */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
-              {/* Universal Search */}
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    value={invoiceSearchQuery}
-                    onChange={(e) => setInvoiceSearchQuery(e.target.value)}
-                    placeholder="Search invoices, clients..."
-                    className="pl-10 pr-3 py-2 w-full h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                </div>
-              </div>
-
-              {/* Invoice Status Filter */}
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Status</label>
-                <select
-                  value={invoiceStatusFilter}
-                  onChange={(e) => setInvoiceStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">All Status</option>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="partially_paid">Partially Paid</option>
-                  <option value="paid">Paid</option>
-                </select>
-              </div>
-
-              {/* Order Status Filter */}
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Order Status</label>
-                <select
-                  value={invoiceOrderStatusFilter}
-                  onChange={(e) => setInvoiceOrderStatusFilter(e.target.value)}
-                  className="w-full px-3 py-2 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">All Order Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_production">In Production</option>
-                  <option value="shipped">Shipped</option>
-                  <option value="delivered">Delivered</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
-              </div>
-
-              {/* Fiscal Year Filter */}
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fiscal Year</label>
-                <select
-                  value={invoiceFiscalYearFilter}
-                  onChange={(e) => setInvoiceFiscalYearFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
-                  className="w-full px-3 py-2 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">All Years</option>
-                  {getFiscalYearOptions().map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="mt-4 flex items-center text-sm text-gray-600">
-              {invoicesData ? `${sortedInvoices?.length || 0} invoices found` : <div className="w-20 h-4 bg-gray-200 rounded animate-pulse" />}
-            </div>
-          </div>
 
           {/* Invoices Table */}
           <div className="card overflow-hidden">
@@ -665,27 +565,6 @@ export default function FinancePage() {
 
           
 
-          {/* Payments Filter */}
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex items-end space-x-4">
-              <div className="flex flex-col">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Fiscal Year</label>
-                <select
-                  value={paymentFiscalYearFilter}
-                  onChange={(e) => setPaymentFiscalYearFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="all">All Years</option>
-                  {getFiscalYearOptions().map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex items-center text-sm text-gray-600 mb-1">
-                {paymentsData ? `${(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length} payments found` : <div className="w-20 h-4 bg-gray-200 rounded animate-pulse" />}
-              </div>
-            </div>
-          </div>
 
           {/* Payments History */}
           <div className="card overflow-hidden">

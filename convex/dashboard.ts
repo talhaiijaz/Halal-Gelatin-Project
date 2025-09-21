@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { paginationOptsValidator } from "convex/server";
 
 // Exchange rate type
 export type UsdRates = {
@@ -52,16 +53,19 @@ function toUSD(amount: number, currency: keyof UsdRates, rates: UsdRates): numbe
 // Universal logs queries
 export const listLogs = query({
   args: {
-    limit: v.optional(v.number()),
-    after: v.optional(v.number()), // createdAt cursor
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const limit = Math.min(args.limit || 50, 200);
-    let logs = await ctx.db.query("logs").order("desc").collect();
-    if (args.after) {
-      logs = logs.filter(l => l.createdAt < args.after!);
-    }
-    return logs.slice(0, limit);
+    return await ctx.db.query("logs").order("desc").paginate(args.paginationOpts);
+  }
+});
+
+// Get total count of logs for pagination
+export const getLogsCount = query({
+  args: {},
+  handler: async (ctx) => {
+    const logs = await ctx.db.query("logs").collect();
+    return logs.length;
   }
 });
 

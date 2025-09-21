@@ -31,6 +31,8 @@ import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import ActivityLog from "@/app/components/ActivityLog";
 import EditCustomerModal from "@/app/components/clients/EditCustomerModal";
 import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { usePagination } from "@/app/hooks/usePagination";
+import Pagination from "@/app/components/ui/Pagination";
 
 export default function ClientDetailPage() {
   const params = useParams();
@@ -41,14 +43,19 @@ export default function ClientDetailPage() {
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
-  const [ordersLimit, setOrdersLimit] = useState(10);
+  
+  // Pagination for orders
+  const ordersPagination = usePagination({ pageSize: 10 });
 
   // Fetch client data
   const client = useQuery(api.clients.get, { id: clientId });
   const updateClient = useMutation(api.clients.update);
   
-  // Fetch all orders for this client
-  const allOrdersData = useQuery(api.orders.list, { clientId });
+  // Fetch orders for this client with pagination
+  const allOrdersData = useQuery(api.orders.list, { 
+    clientId,
+    paginationOpts: ordersPagination.paginationOpts
+  });
   
   // Extract orders array (handle both paginated and non-paginated responses)
   const allOrders = Array.isArray(allOrdersData) ? allOrdersData : allOrdersData?.page || [];
@@ -427,7 +434,7 @@ export default function ClientDetailPage() {
             {allOrders && allOrders.length > 0 ? (
               <div>
                 <div className="space-y-3">
-                  {allOrders.slice(0, ordersLimit).map((order) => (
+                  {allOrders.map((order) => (
                     <div 
                       key={order._id} 
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
@@ -456,14 +463,15 @@ export default function ClientDetailPage() {
                   ))}
                 </div>
                 
-                {allOrders.length > ordersLimit && (
-                  <div className="mt-4 text-center">
-                    <button
-                      onClick={() => setOrdersLimit(ordersLimit + 10)}
-                      className="px-4 py-2 text-sm text-primary hover:text-primary-dark border border-primary rounded-lg hover:bg-primary/5 transition-colors"
-                    >
-                      Load More Orders ({allOrders.length - ordersLimit} remaining)
-                    </button>
+                {/* Pagination for orders */}
+                {allOrdersData && !Array.isArray(allOrdersData) && allOrdersData.page && allOrdersData.page.length > 0 && (
+                  <div className="mt-6">
+                    <Pagination
+                      currentPage={ordersPagination.currentPage}
+                      totalPages={Math.ceil((!Array.isArray(allOrdersData) ? allOrdersData.totalCount || 0 : 0) / ordersPagination.pageSize)}
+                      onPageChange={ordersPagination.goToPage}
+                      isLoading={!allOrdersData}
+                    />
                   </div>
                 )}
               </div>

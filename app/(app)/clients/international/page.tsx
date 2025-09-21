@@ -118,9 +118,13 @@ export default function InternationalClientsPage() {
     paginationOpts: clientsPagination.paginationOpts,
   });
 
+  // Pagination for orders
+  const ordersPagination = usePagination({ pageSize: 10 });
+
   const ordersData = useQuery(api.orders.list, {
     clientType: "international",
     fiscalYear: selectedFiscalYear,
+    paginationOpts: ordersPagination.paginationOpts,
   });
   
   // Extract orders array (handle both paginated and non-paginated responses)
@@ -1375,6 +1379,18 @@ export default function InternationalClientsPage() {
                 </tbody>
               </table>
             </div>
+            
+            {/* Pagination for orders */}
+            {ordersData && !Array.isArray(ordersData) && ordersData.page && ordersData.page.length > 0 && (
+              <div className="mt-6">
+                <Pagination
+                  currentPage={ordersPagination.currentPage}
+                  totalPages={Math.ceil((!Array.isArray(ordersData) ? ordersData.totalCount || 0 : 0) / ordersPagination.pageSize)}
+                  onPageChange={ordersPagination.goToPage}
+                  isLoading={!ordersData}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
