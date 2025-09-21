@@ -582,8 +582,8 @@ export default function ShipmentsPage() {
                     isBloomDelivered(bloom, next3Months[0].fiscalYear, next3Months[0].fiscalMonth);
                   
                   return (
-                    <tr key={bloom} className={`border-b hover:bg-gray-50 ${isCurrentMonthDelivered ? 'bg-green-50' : ''}`}>
-                      <td className={`py-3 px-4 font-medium sticky left-0 z-10 ${isCurrentMonthDelivered ? 'bg-green-50 text-green-800' : 'bg-white text-gray-900'}`}>
+                    <tr key={bloom} className="border-b hover:bg-gray-50">
+                      <td className="py-3 px-4 font-medium sticky left-0 z-10 bg-white text-gray-900">
                         {bloom}
                       </td>
                       {next3Months.map((monthData) => {
@@ -611,7 +611,7 @@ export default function ShipmentsPage() {
                           </td>
                         );
                       })}
-                      <td className={`text-center py-3 px-4 font-bold ${isCurrentMonthDelivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-900'}`}>
+                      <td className="text-center py-3 px-4 font-bold bg-gray-100 text-gray-900">
                         {(() => {
                           const threeMonthTotal = next3Months.reduce((sum, monthData) => 
                             sum + getBloomTotal(bloom, monthData.fiscalYear, monthData.fiscalMonth), 0);
