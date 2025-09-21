@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, FileText, User, Package, DollarSign, Calendar } from "lucide-react";
+import { X, FileText, User, Package, DollarSign, Calendar, ArrowUpDown } from "lucide-react";
 import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { type Payment, type OrderItem } from "@/app/types";
 import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
@@ -20,6 +20,8 @@ interface InvoiceDetailModalProps {
 
 export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecordPayment }: InvoiceDetailModalProps) {
   const invoice = useQuery(api.invoices.get, invoiceId ? { id: invoiceId } : "skip");
+  const transfers = useQuery(api.interBankTransfers.getByInvoice, invoiceId ? { invoiceId } : "skip");
+  const transferStatus = useQuery(api.interBankTransfers.checkInvoicePakistanTransferStatus, invoiceId ? { invoiceId } : "skip");
   const [showPaymentDetail, setShowPaymentDetail] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<Id<"payments"> | null>(null);
   
@@ -262,6 +264,102 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                   );
                 })()}
 
+                {/* Transfer History - Simple List Below Payments */}
+                {transfers && transfers.length > 0 && (
+                  <>
+                    {/* Transfer Status Summary */}
+                    {transferStatus && (
+                      <div className={`mt-4 p-3 rounded-md border ${
+                        transferStatus.hasMetThreshold 
+                          ? 'bg-green-50 border-green-200' 
+                          : 'bg-yellow-50 border-yellow-200'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className={`text-sm font-medium ${
+                              transferStatus.hasMetThreshold ? 'text-green-800' : 'text-yellow-800'
+                            }`}>
+                              Pakistan Transfer Status
+                            </p>
+                            <p className={`text-xs ${
+                              transferStatus.hasMetThreshold ? 'text-green-600' : 'text-yellow-600'
+                            }`}>
+                              {transferStatus.totalTransferredToPakistan.toLocaleString()} / {transferStatus.invoiceAmount.toLocaleString()} 
+                              ({transferStatus.percentageTransferred.toFixed(1)}% transferred to Pakistan)
+                            </p>
+                          </div>
+                          <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            transferStatus.hasMetThreshold 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {transferStatus.hasMetThreshold ? '✓ Compliant' : '⚠ Pending'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Transfer List */}
+                    <div className="mt-4 space-y-2">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Inter-Bank Transfers</h4>
+                      {transfers.map((transfer: any) => (
+                        <div key={transfer._id} className="bg-gray-50 rounded-md p-3">
+                          <div className="grid grid-cols-1 gap-2 text-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">Transfer Amount:</span>
+                              <span className="font-medium">
+                                {transfer.originalAmount && transfer.originalCurrency && transfer.originalCurrency !== transfer.currency ? (
+                                  <>
+                                    {formatCurrency(transfer.originalAmount, transfer.originalCurrency as SupportedCurrency)} → {formatCurrency(transfer.amount, transfer.currency as SupportedCurrency)}
+                                    {transfer.exchangeRate && (
+                                      <span className="text-xs text-gray-500 ml-1">(Rate: {transfer.exchangeRate})</span>
+                                    )}
+                                  </>
+                                ) : (
+                                  formatCurrency(transfer.amount, transfer.currency as SupportedCurrency)
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">From:</span>
+                              <span className="font-medium">{transfer.fromBank?.bankName} ({transfer.fromBank?.country || 'Unknown'})</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">To:</span>
+                              <span className="font-medium">{transfer.toBank?.bankName} ({transfer.toBank?.country || 'Unknown'})</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">Status:</span>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                transfer.status === 'completed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : transfer.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : transfer.status === 'failed'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {transfer.status.charAt(0).toUpperCase() + transfer.status.slice(1)}
+                              </span>
+                            </div>
+                            {transfer.reference && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Reference:</span>
+                                <span className="font-medium">{transfer.reference}</span>
+                              </div>
+                            )}
+                            {transfer.transferDate && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-gray-600">Transfer Date:</span>
+                                <span className="font-medium">{formatDate(transfer.transferDate)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
 
               </>
             )}

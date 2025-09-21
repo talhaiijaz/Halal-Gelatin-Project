@@ -899,6 +899,7 @@ export const getUnpaidInvoices = query({
       invoices.map(async (invoice) => {
         const client = await ctx.db.get(invoice.clientId);
         const order = invoice.orderId ? await ctx.db.get(invoice.orderId) : null;
+        const bankAccount = order?.bankAccountId ? await ctx.db.get(order.bankAccountId) : null;
 
         // Get payments for this invoice to calculate advance and invoice payments
         const payments = await ctx.db
@@ -934,6 +935,14 @@ export const getUnpaidInvoices = query({
             _id: order._id,
             orderNumber: order.orderNumber,
             status: order.status,
+            bankAccountId: order.bankAccountId,
+          } : null,
+          bankAccount: bankAccount ? {
+            _id: bankAccount._id,
+            accountName: bankAccount.accountName,
+            bankName: bankAccount.bankName,
+            currency: bankAccount.currency,
+            country: bankAccount.country,
           } : null,
           advancePaid,
           invoicePaid,

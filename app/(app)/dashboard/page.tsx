@@ -24,12 +24,16 @@ import { getCurrentFiscalYear, getFiscalYearForDate, formatFiscalYear } from "@/
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
 import { getUsdRates, toUSD, type UsdRates } from "@/app/utils/fx";
 import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyFormat";
+import { shouldHighlightOrderRed, shouldHighlightOrderYellowWithTransfers } from "@/app/utils/orderHighlighting";
+import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
+import { Id } from "@/convex/_generated/dataModel";
 
 export default function DashboardPage() {
   console.log("DashboardPage rendering...");
   const router = useRouter();
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [clientType] = useState<"local" | "international">("local");
   const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
   const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables'; audience: 'local' | 'international' }>(null);
@@ -48,6 +52,14 @@ export default function DashboardPage() {
   const orders = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
   const orderItems = useQuery(api.orders.listItems, {});
   const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
+  
+  // Fetch bank accounts and transfer status for red order highlighting
+  const bankAccounts = useQuery(api.banks.list, {});
+  const invoiceIds = orders
+    .filter((order: any) => order.invoice?._id)
+    .map((order: any) => order.invoice!._id);
+  const batchTransferStatus = useQuery(api.interBankTransfers.getBatchTransferStatus, 
+    invoiceIds.length > 0 ? { invoiceIds } : "skip");
   
   // Fetch client-specific stats for accurate local/international breakdown
   const localStats = useQuery(api.clients.getStats, { type: "local", fiscalYear: currentFiscalYear });
@@ -229,6 +241,13 @@ export default function DashboardPage() {
 
   const monthsData = getNext3MonthsShipmentData();
   const hasLimitExceeded = monthsData.some(month => month.exceedsLimit);
+  
+  // Identify red orders (20+ days past factory departure, no 70% transfer)
+  const redOrders = orders.filter((order: any) => {
+    const bankAccount = bankAccounts?.find(bank => bank._id === order.bankAccountId);
+    const transferStatus = order.invoice?._id ? batchTransferStatus?.[order.invoice._id] : undefined;
+    return shouldHighlightOrderRed(order, bankAccount, transferStatus);
+  });
 
   // Helper function to get client currency
   // const getClientCurrency = (clientType: string): SupportedCurrency => {
@@ -301,6 +320,75 @@ export default function DashboardPage() {
                   View Shipment Schedule
                   <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Red Orders Alert - Payment Compliance Notice */}
+      {redOrders.length > 0 && (
+        <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-red-800">
+                Urgent: Payment Orders Requiring Pakistan Transfer Compliance
+              </h3>
+              <p className="mt-1 text-sm text-red-700">
+                {redOrders.length} order{redOrders.length > 1 ? 's' : ''} have exceeded the 20-day limit and still need 70% transfer to Pakistani banks for government compliance.
+              </p>
+              
+              {/* Red Orders List */}
+              <div className="mt-3">
+                <div className="text-sm font-medium text-red-800 mb-2">Orders requiring immediate attention:</div>
+                <div className="space-y-1">
+                  {redOrders.slice(0, 5).map((order: any) => {
+                    const daysSinceDeparture = order.factoryDepartureDate ? 
+                      Math.floor((new Date().getTime() - new Date(order.factoryDepartureDate).getTime()) / (1000 * 60 * 60 * 24)) : 0;
+                    
+                    return (
+                      <div 
+                        key={order._id}
+                        className="flex items-center justify-between p-2 bg-red-100 rounded-md cursor-pointer hover:bg-red-200 transition-colors"
+                        onClick={() => setSelectedOrderId(order._id)}
+                      >
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-red-900">
+                            {order.invoiceNumber} - {order.client?.name || "Unknown Client"}
+                          </div>
+                          <div className="text-xs text-red-700">
+                            {daysSinceDeparture} days since factory departure • {formatCurrency(order.items?.reduce((total: number, item: any) => total + ((item.quantityKg || 0) * (item.pricePerKg || 0)), 0) || 0, order.currency as SupportedCurrency)}
+                          </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-red-600 ml-2" />
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {redOrders.length > 5 && (
+                  <div className="mt-2 text-xs text-red-600">
+                    +{redOrders.length - 5} more orders requiring attention
+                  </div>
+                )}
+                
+                <div className="mt-3 flex space-x-3">
+                  <button
+                    onClick={() => router.push('/orders')}
+                    className="inline-flex items-center text-sm text-red-600 hover:text-red-500 font-medium"
+                  >
+                    View All Orders
+                    <ArrowRight className="h-4 w-4 ml-1" />
+                  </button>
+                  <button
+                    onClick={() => router.push('/finance')}
+                    className="inline-flex items-center text-sm text-red-600 hover:text-red-500 font-medium"
+                  >
+                    Manage Transfers
+                    <ArrowRight className="h-4 w-4 ml-1" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1086,6 +1174,13 @@ export default function DashboardPage() {
           toast.success("Order created successfully");
           router.push("/orders");
         }}
+      />
+
+      {/* Order Detail Modal */}
+      <OrderDetailModal
+        orderId={selectedOrderId}
+        isOpen={!!selectedOrderId}
+        onClose={() => setSelectedOrderId(null)}
       />
     </div>
   );

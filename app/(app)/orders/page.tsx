@@ -17,7 +17,7 @@ import { timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrency } from "@/app/utils/currencyFormat";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
-import { shouldHighlightOrderYellow, getOrderHighlightClasses, getOrderTextHighlightClasses } from "@/app/utils/orderHighlighting";
+import { shouldHighlightOrderYellowWithTransfers, shouldHighlightOrderRed, getOrderHighlightClassesWithRed, getOrderTextHighlightClassesWithRed } from "@/app/utils/orderHighlighting";
 
 function OrdersPageContent() {
   // const searchParams = useSearchParams();
@@ -42,6 +42,15 @@ function OrdersPageContent() {
   const orderValidation = useQuery(api.orders.checkAllOrdersHaveBanks);
   // Fetch bank accounts for highlighting
   const bankAccounts = useQuery(api.banks.list);
+  
+  // Get invoice IDs for batch transfer status check (from orders that have invoices)
+  const ordersList = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
+  const invoiceIds = ordersList
+    ?.filter(order => order.invoice?._id)
+    ?.map(order => order.invoice!._id) || [];
+  const batchTransferStatus = useQuery(api.interBankTransfers.getBatchTransferStatus, 
+    invoiceIds.length > 0 ? { invoiceIds } : "skip"
+  );
 
 
   // Helper function to calculate financial metrics for an order
@@ -370,21 +379,23 @@ function OrdersPageContent() {
                   const metrics = calculateFinancialMetrics(order);
                   // Find the associated bank account
                   const bankAccount = bankAccounts?.find(bank => bank._id === order.bankAccountId);
-                  const shouldHighlight = shouldHighlightOrderYellow(order, bankAccount);
+                  const transferStatus = order.invoice?._id ? batchTransferStatus?.[order.invoice._id] : undefined;
+                  const shouldHighlightYellow = shouldHighlightOrderYellowWithTransfers(order, bankAccount, transferStatus);
+                  const shouldHighlightRed = shouldHighlightOrderRed(order, bankAccount, transferStatus);
                   
                   return (
                     <tr 
                       key={order._id} 
-                      className={`${getOrderHighlightClasses(shouldHighlight)} hover:bg-gray-50 cursor-pointer transition-colors`}
+                      className={`${getOrderHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)} hover:bg-gray-50 cursor-pointer transition-colors`}
                       onClick={() => setSelectedOrderId(order._id)}
                     >
                       <td className="px-4 py-4">
-                        <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
+                        <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
                           {order.invoiceNumber}
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className={`text-sm ${getOrderTextHighlightClasses(shouldHighlight)}`}>{order.client?.name || "Unknown Client"}</div>
+                        <div className={`text-sm ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{order.client?.name || "Unknown Client"}</div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center space-x-2">
@@ -403,10 +414,10 @@ function OrdersPageContent() {
                       </td>
                       <td className="px-4 py-4 text-center">
                         <div className="space-y-1">
-                          <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
+                          <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
                             {formatCurrency(metrics.total as number, order.currency as "USD" | "EUR" | "PKR" | "AED")}
                           </div>
-                          <div className={`text-xs ${shouldHighlight ? 'text-gray-700' : 'text-gray-600'}`}>
+                          <div className={`text-xs ${shouldHighlightYellow || shouldHighlightRed ? 'text-gray-700' : 'text-gray-600'}`}>
                             Paid: {formatCurrency(metrics.paid as number, order.currency as "USD" | "EUR" | "PKR" | "AED")}
                             {(metrics.advancePaid as number) > 0 && (
                               <span className="text-blue-600">
@@ -414,7 +425,7 @@ function OrdersPageContent() {
                               </span>
                             )}
                           </div>
-                          <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : shouldHighlight ? 'text-gray-700' : 'text-gray-500'}`}>
+                          <div className={`text-xs font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : shouldHighlightYellow || shouldHighlightRed ? 'text-gray-700' : 'text-gray-500'}`}>
                             Receivables: {(metrics.outstanding as number) > 0 ? formatCurrency(metrics.outstanding as number, order.currency as "USD" | "EUR" | "PKR" | "AED") : 
                                          order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as "USD" | "EUR" | "PKR" | "AED") : 
                                          "Not due"}
@@ -422,17 +433,17 @@ function OrdersPageContent() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm">
-                        <div className={`text-sm font-medium ${getOrderTextHighlightClasses(shouldHighlight)}`}>
+                        <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
                           {order.items?.reduce((total, item) => total + (item.quantityKg || 0), 0).toLocaleString()} kg
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm">
-                        <div className={`truncate ${getOrderTextHighlightClasses(shouldHighlight)}`} title={order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}>
+                        <div className={`truncate ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`} title={order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}>
                           {order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}
                         </div>
                       </td>
                       <td className="px-4 py-4 text-sm">
-                        <div className={`truncate ${getOrderTextHighlightClasses(shouldHighlight)}`} title={order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}>
+                        <div className={`truncate ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`} title={order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}>
                           {order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString() : 'Not set'}
                         </div>
                       </td>

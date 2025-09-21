@@ -41,12 +41,18 @@ export default function BankTransactionModal({
     // Currency conversion fields
     exchangeRate: "",
     originalAmount: "",
+    // Invoice selection for transfers
+    invoiceId: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const bankAccounts = useQuery(api.banks.list);
+  const invoices = useQuery(api.invoices.list, { paginationOpts: { numItems: 1000, cursor: null } });
+  const invoicesList = Array.isArray(invoices) ? invoices : invoices?.page || [];
   const recordTransaction = useMutation(api.bankTransactions.recordTransaction);
   const transferBetweenAccounts = useMutation(api.bankTransactions.transferBetweenAccounts);
+  const createInterBankTransfer = useMutation(api.interBankTransfers.create);
+  const updateTransferStatus = useMutation(api.interBankTransfers.updateStatus);
   
   // Get source bank account details
   const sourceAccount = bankAccounts?.find(acc => acc._id === bankAccountId);
@@ -63,6 +69,7 @@ export default function BankTransactionModal({
         transactionDate: timestampToDateString(Date.now()),
         exchangeRate: "",
         originalAmount: "",
+        invoiceId: "",
       });
     }
   }, [isOpen]);
@@ -135,18 +142,46 @@ export default function BankTransactionModal({
           // Use converted amount for the transfer
           const convertedAmount = originalAmount * exchangeRate;
           
+          // Create inter-bank transfer record
+          const transferId = await createInterBankTransfer({
+            fromBankAccountId: bankAccountId,
+            toBankAccountId: formData.toBankAccountId as Id<"bankAccounts">,
+            amount: convertedAmount,
+            currency: destinationAccount.currency,
+            originalAmount: originalAmount,
+            originalCurrency: sourceAccount.currency,
+            exchangeRate: exchangeRate,
+            invoiceId: formData.invoiceId ? formData.invoiceId as Id<"invoices"> : undefined,
+            reference: formData.reference || undefined,
+            notes: formData.notes || undefined,
+          });
+          
+          // Also create the bank transaction records for balance updates
+          const selectedInvoice = invoicesList.find(inv => inv._id === formData.invoiceId);
+          const invoiceDescription = formData.invoiceId ? 
+            `Inter-bank transfer (Invoice: ${selectedInvoice?.invoiceNumber || formData.invoiceId})` : 
+            formData.description;
+          
           await transferBetweenAccounts({
             fromBankAccountId: bankAccountId,
             toBankAccountId: formData.toBankAccountId as Id<"bankAccounts">,
             amount: convertedAmount,
             currency: destinationAccount.currency,
-            description: formData.description,
+            description: invoiceDescription,
             reference: formData.reference || undefined,
             notes: formData.notes || undefined,
             transactionDate: dateStringToTimestamp(formData.transactionDate),
             exchangeRate: exchangeRate,
             originalAmount: originalAmount,
             originalCurrency: sourceAccount.currency,
+            interBankTransferId: transferId,
+          });
+          
+          // Mark transfer as completed
+          await updateTransferStatus({
+            transferId,
+            status: "completed",
+            transferDate: dateStringToTimestamp(formData.transactionDate),
           });
           
           toast.success(`Transfer completed: ${formatCurrencyAmount(originalAmount, sourceAccount.currency)} → ${formatCurrencyAmount(convertedAmount, destinationAccount.currency)}`);
@@ -165,15 +200,43 @@ export default function BankTransactionModal({
             return;
           }
 
+          // Create inter-bank transfer record
+          const transferId = await createInterBankTransfer({
+            fromBankAccountId: bankAccountId,
+            toBankAccountId: formData.toBankAccountId as Id<"bankAccounts">,
+            amount: amount,
+            currency: sourceAccount.currency,
+            originalAmount: amount,
+            originalCurrency: sourceAccount.currency,
+            exchangeRate: 1, // No conversion for same currency
+            invoiceId: formData.invoiceId ? formData.invoiceId as Id<"invoices"> : undefined,
+            reference: formData.reference || undefined,
+            notes: formData.notes || undefined,
+          });
+          
+          // Also create the bank transaction records for balance updates
+          const selectedInvoice = invoicesList.find(inv => inv._id === formData.invoiceId);
+          const invoiceDescription = formData.invoiceId ? 
+            `Inter-bank transfer (Invoice: ${selectedInvoice?.invoiceNumber || formData.invoiceId})` : 
+            formData.description;
+          
           await transferBetweenAccounts({
             fromBankAccountId: bankAccountId,
             toBankAccountId: formData.toBankAccountId as Id<"bankAccounts">,
             amount: amount,
             currency: sourceAccount.currency,
-            description: formData.description,
+            description: invoiceDescription,
             reference: formData.reference || undefined,
             notes: formData.notes || undefined,
             transactionDate: dateStringToTimestamp(formData.transactionDate),
+            interBankTransferId: transferId,
+          });
+          
+          // Mark transfer as completed
+          await updateTransferStatus({
+            transferId,
+            status: "completed",
+            transferDate: dateStringToTimestamp(formData.transactionDate),
           });
           
           toast.success(`Transfer completed: ${formatCurrencyAmount(amount, sourceAccount.currency)}`);
@@ -293,6 +356,30 @@ export default function BankTransactionModal({
                   </option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Invoice Selection for Transfers */}
+          {transactionType === "transfer" && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Invoice (Optional)
+              </label>
+              <select
+                value={formData.invoiceId}
+                onChange={(e) => setFormData({ ...formData, invoiceId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
+              >
+                <option value="">Select an invoice (optional)</option>
+                {invoicesList.map((invoice) => (
+                  <option key={invoice._id} value={invoice._id}>
+                    {invoice.invoiceNumber || `Invoice ${invoice._id}`} - {invoice.client?.name} - {formatCurrencyAmount(invoice.amount, invoice.currency)}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select an invoice to track this transfer for compliance reporting
+              </p>
             </div>
           )}
 

@@ -30,6 +30,8 @@ export default function RecordPaymentModal({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>(preselectedInvoiceId || "");
   const [isAdvancePayment, setIsAdvancePayment] = useState<boolean>(false);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>("");
+  const [originalBankAccountId, setOriginalBankAccountId] = useState<string>("");
+  const [showBankWarning, setShowBankWarning] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get unpaid invoices for selected client
@@ -58,7 +60,7 @@ export default function RecordPaymentModal({
     }
   }, [preselectedClientId, preselectedInvoiceId]);
 
-  // Auto-fill amount when invoice is selected
+  // Auto-fill amount and bank account when invoice is selected
   useEffect(() => {
     if (selectedInvoiceId && unpaidInvoices) {
       const invoice = unpaidInvoices.find(inv => inv._id === selectedInvoiceId);
@@ -70,6 +72,17 @@ export default function RecordPaymentModal({
           amount: remainingAmount.toString(),
           conversionRateToUSD: "",
         }));
+
+        // Auto-select bank account from order if available
+        if (invoice.bankAccount?._id) {
+          setOriginalBankAccountId(invoice.bankAccount._id);
+          setSelectedBankAccountId(invoice.bankAccount._id);
+          setShowBankWarning(false);
+        } else {
+          setOriginalBankAccountId("");
+          setSelectedBankAccountId("");
+          setShowBankWarning(false);
+        }
       }
     }
   }, [selectedInvoiceId, unpaidInvoices]);
@@ -171,6 +184,18 @@ export default function RecordPaymentModal({
       ...prev,
       [e.target.name]: e.target.value,
     }));
+  };
+
+  const handleBankAccountChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newBankAccountId = e.target.value;
+    setSelectedBankAccountId(newBankAccountId);
+    
+    // Show warning if user changes from original bank account
+    if (originalBankAccountId && newBankAccountId !== originalBankAccountId) {
+      setShowBankWarning(true);
+    } else {
+      setShowBankWarning(false);
+    }
   };
 
   const getCurrencyForDisplay = (currency?: string): SupportedCurrency => {
@@ -567,7 +592,7 @@ export default function RecordPaymentModal({
                 </label>
                 <select
                   value={selectedBankAccountId}
-                  onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                  onChange={handleBankAccountChange}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
                 >
@@ -586,6 +611,38 @@ export default function RecordPaymentModal({
                     </option>
                   ))}
                 </select>
+                
+                {/* Warning message when bank account is changed from original */}
+                {showBankWarning && originalBankAccountId && unpaidInvoices && bankAccounts && (() => {
+                  const invoice = unpaidInvoices.find(inv => inv._id === selectedInvoiceId);
+                  const originalBank = bankAccounts.find(bank => bank._id === originalBankAccountId);
+                  return (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-yellow-800">
+                            Bank Account Changed
+                          </h3>
+                          <div className="mt-1 text-sm text-yellow-700">
+                            <p>
+                              You're recording this payment in a different bank account than specified in the original order.
+                            </p>
+                            {originalBank && (
+                              <p className="mt-1 font-medium">
+                                Original order was set for: <span className="font-semibold">{originalBank.accountName} - {originalBank.bankName} ({originalBank.currency})</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Advance toggle placed after bank account */}

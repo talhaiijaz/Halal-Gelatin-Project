@@ -402,7 +402,11 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                           </div>
                           <div className="mt-1 text-blue-600">
                             {formatCurrency(transaction.originalAmount, transaction.originalCurrency as any)} 
-                            → {formatCurrency(Math.abs(transaction.amount), transaction.currency as any)}
+                            → {
+                              transaction.originalCurrency !== transaction.currency ? 
+                                formatCurrency(Math.abs(transaction.amount), transaction.currency as any) :
+                                formatCurrency(transaction.originalAmount * transaction.exchangeRate, 'PKR' as any)
+                            }
                             <span className="ml-2 text-blue-500">
                               (Rate: {transaction.exchangeRate.toFixed(4)})
                             </span>

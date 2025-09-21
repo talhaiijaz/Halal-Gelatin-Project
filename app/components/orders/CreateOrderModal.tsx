@@ -800,14 +800,14 @@ export default function CreateOrderModal({
                       required
                     >
                       <option value="">Select a bank account</option>
-                      {bankAccounts?.filter(bank => bank.currency === currentCurrency).map((bank) => (
+                      {bankAccounts?.map((bank) => (
                         <option key={bank._id} value={bank._id}>
                           {bank.currency} - {bank.bankName} - {bank.accountName}
                         </option>
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1">
-                      Select the bank account where payments for this order will be received. Only banks with matching currency are shown.
+                      Select the bank account where payments for this order will be received. Currency conversion may be required if the bank currency differs from the order currency.
                     </p>
                   </div>
 

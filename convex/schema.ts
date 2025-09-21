@@ -257,6 +257,7 @@ export default defineSchema({
     // Link to related entities
     paymentId: v.optional(v.id("payments")), // If this is from a customer payment
     relatedBankAccountId: v.optional(v.id("bankAccounts")), // For transfers
+    interBankTransferId: v.optional(v.id("interBankTransfers")), // Link to inter-bank transfer record
     // Currency conversion support for transfers between different currencies
     originalAmount: v.optional(v.number()), // Original amount before conversion
     originalCurrency: v.optional(v.string()), // Original currency before conversion
@@ -340,4 +341,32 @@ export default defineSchema({
   })
     .index("by_key", ["key"])
     .index("by_category", ["category"]),
+
+  // Inter-bank Transfers table
+  interBankTransfers: defineTable({
+    fromBankAccountId: v.id("bankAccounts"), // Source bank account
+    toBankAccountId: v.id("bankAccounts"),   // Destination bank account
+    amount: v.number(),                      // Transfer amount (converted amount)
+    currency: v.string(),                    // Currency of transfer (destination currency)
+    originalAmount: v.optional(v.number()),  // Original amount before conversion
+    originalCurrency: v.optional(v.string()), // Original currency before conversion
+    exchangeRate: v.optional(v.number()),    // Exchange rate used for conversion
+    invoiceId: v.optional(v.id("invoices")), // Optional invoice this transfer is for
+    reference: v.optional(v.string()),       // Transfer reference number
+    notes: v.optional(v.string()),           // Additional notes
+    status: v.union(
+      v.literal("pending"),    // Transfer initiated but not completed
+      v.literal("completed"),  // Transfer completed successfully
+      v.literal("failed"),     // Transfer failed
+      v.literal("cancelled")   // Transfer cancelled
+    ),
+    transferDate: v.optional(v.number()),    // When the transfer actually happened
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_from_bank", ["fromBankAccountId"])
+    .index("by_to_bank", ["toBankAccountId"])
+    .index("by_invoice", ["invoiceId"])
+    .index("by_status", ["status"])
+    .index("by_date", ["transferDate"]),
 });

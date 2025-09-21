@@ -22,6 +22,14 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
   
   // Get the linked payment details if this is a payment-linked transaction
   const payment = useQuery(api.payments.get, transaction?.paymentId ? { id: transaction.paymentId } : "skip");
+  
+  // Get the related bank account for transfers
+  const relatedBankAccount = useQuery(api.banks.get, transaction?.relatedBankAccountId ? { id: transaction.relatedBankAccountId } : "skip");
+  
+  // Check if this is an inter-bank transfer transaction
+  const isInterBankTransfer = transaction?.description?.includes("Inter-bank transfer");
+  const invoiceNumber = isInterBankTransfer && transaction ? 
+    transaction.description?.match(/Invoice: ([^)]+)/)?.[1] : null;
 
   const [reversalReason, setReversalReason] = useState("");
   const [showReversalInput, setShowReversalInput] = useState(false);
@@ -258,6 +266,24 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
             </div>
           )}
 
+          {/* Inter-Bank Transfer Info */}
+          {isInterBankTransfer && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <ArrowUpDown className="h-4 w-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-800">Inter-Bank Transfer</span>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="text-purple-800">
+                  <span className="font-medium">Linked Invoice:</span> {invoiceNumber || 'Not specified'}
+                </div>
+                <div className="text-purple-600">
+                  This transaction is part of an inter-bank transfer for compliance tracking.
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Currency Conversion Info */}
           {transaction.originalAmount && transaction.originalCurrency && transaction.exchangeRate && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -269,7 +295,14 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                 <div className="text-blue-800">
                   <span className="font-medium">{formatCurrency(transaction.originalAmount, transaction.originalCurrency as any)}</span>
                   <span className="mx-2">→</span>
-                  <span className="font-medium">{formatCurrency(Math.abs(transaction.amount), transaction.currency as any)}</span>
+                  <span className="font-medium">
+                    {transaction.originalCurrency !== transaction.currency ? 
+                      formatCurrency(Math.abs(transaction.amount), transaction.currency as any) :
+                      relatedBankAccount?.currency ? 
+                        formatCurrency(transaction.originalAmount * transaction.exchangeRate, relatedBankAccount.currency as any) :
+                        formatCurrency(transaction.originalAmount * transaction.exchangeRate, 'PKR' as any)
+                    }
+                  </span>
                 </div>
                 <div className="text-blue-600">Exchange Rate: {transaction.exchangeRate.toFixed(4)}</div>
               </div>

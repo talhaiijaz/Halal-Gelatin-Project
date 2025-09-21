@@ -233,6 +233,12 @@ export const deleteTransaction = mutation({
       linkedTransaction = await ctx.db.get(transaction.linkedTransactionId);
     }
 
+    // Check if this transaction is linked to an inter-bank transfer
+    let interBankTransfer = null;
+    if ((transaction as any).interBankTransferId) {
+      interBankTransfer = await ctx.db.get((transaction as any).interBankTransferId);
+    }
+
     // Hard delete: completely remove the transaction from the database
     await ctx.db.delete(args.id);
 
@@ -253,6 +259,24 @@ export const deleteTransaction = mutation({
           linkedId: transaction.linkedTransactionId,
           originalTransaction: transaction,
           linkedTransaction: linkedTransaction
+        },
+      });
+    }
+
+    // If there's an inter-bank transfer linked, delete it as well
+    if (interBankTransfer && (transaction as any).interBankTransferId) {
+      await ctx.db.delete((transaction as any).interBankTransferId);
+      
+      // Log the inter-bank transfer deletion
+      await logBankTransactionEvent(ctx, {
+        entityId: String((transaction as any).interBankTransferId),
+        action: "delete",
+        message: `Inter-bank transfer deleted: ${(interBankTransfer as any).reference || 'No reference'} - Deleted along with bank transaction`,
+        metadata: { 
+          originalTransactionId: args.id, 
+          interBankTransferId: (transaction as any).interBankTransferId,
+          originalTransaction: transaction,
+          interBankTransfer: interBankTransfer
         },
       });
     }
@@ -366,6 +390,8 @@ export const transferBetweenAccounts = mutation({
     exchangeRate: v.optional(v.number()), // Required when currencies differ
     originalAmount: v.optional(v.number()), // Original amount in source currency
     originalCurrency: v.optional(v.string()), // Source currency
+    // Link to inter-bank transfer
+    interBankTransferId: v.optional(v.id("interBankTransfers")),
   },
   handler: async (ctx, args) => {
     try {
@@ -467,6 +493,11 @@ export const transferBetweenAccounts = mutation({
       transferOutData.convertedAmountUSD = convertedAmountUSD;
     }
 
+    // Add inter-bank transfer link if provided
+    if (args.interBankTransferId) {
+      transferOutData.interBankTransferId = args.interBankTransferId;
+    }
+
     const transferOutId = await ctx.db.insert("bankTransactions", transferOutData);
 
     // Create transfer in transaction
@@ -491,6 +522,11 @@ export const transferBetweenAccounts = mutation({
       transferInData.originalCurrency = args.originalCurrency;
       transferInData.exchangeRate = args.exchangeRate;
       transferInData.convertedAmountUSD = convertedAmountUSD;
+    }
+
+    // Add inter-bank transfer link if provided
+    if (args.interBankTransferId) {
+      transferInData.interBankTransferId = args.interBankTransferId;
     }
 
     const transferInId = await ctx.db.insert("bankTransactions", transferInData);
