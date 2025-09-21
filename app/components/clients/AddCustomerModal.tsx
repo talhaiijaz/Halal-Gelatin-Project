@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Search, Loader2, User, Camera, X } from "lucide-react";
@@ -20,6 +20,7 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
   const [isLoadingCities, setIsLoadingCities] = useState(false);
   const [cities, setCities] = useState<string[]>([]);
   const [citySearchTerm, setCitySearchTerm] = useState("");
+  const [debouncedCitySearchTerm, setDebouncedCitySearchTerm] = useState("");
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState<string | null>(null);
@@ -134,6 +135,7 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
         taxId: "",
       });
       setCitySearchTerm("");
+      setDebouncedCitySearchTerm("");
       setShowCityDropdown(false);
       setProfilePicture(null);
       setProfilePicturePreview(null);
@@ -189,7 +191,7 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
     }
   };
 
-  const loadCitiesForCountry = async (country: string) => {
+  const loadCitiesForCountry = useCallback(async (country: string) => {
     setIsLoadingCities(true);
     try {
       const cityList = await getCitiesByCountry({ country });
@@ -200,7 +202,7 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
     } finally {
       setIsLoadingCities(false);
     }
-  };
+  }, [getCitiesByCountry]);
 
   // Load cities when component mounts for local clients
   useEffect(() => {
@@ -208,6 +210,15 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
       loadCitiesForCountry("Pakistan");
     }
   }, [type]);
+
+  // Debounce city search term to improve performance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCitySearchTerm(citySearchTerm);
+    }, 300); // 300ms debounce delay
+
+    return () => clearTimeout(timer);
+  }, [citySearchTerm]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -224,10 +235,17 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
     };
   }, []);
 
-  // Filter cities based on search term
-  const filteredCities = cities.filter(city =>
-    city.toLowerCase().includes(citySearchTerm.toLowerCase())
-  );
+  // Optimized city filtering with memoization and debouncing
+  const filteredCities = useMemo(() => {
+    if (!debouncedCitySearchTerm.trim()) {
+      return cities.slice(0, 20); // Show first 20 cities when no search term
+    }
+    
+    const searchLower = debouncedCitySearchTerm.toLowerCase();
+    return cities
+      .filter(city => city.toLowerCase().includes(searchLower))
+      .slice(0, 50); // Limit results to 50 for better performance
+  }, [cities, debouncedCitySearchTerm]);
 
   const handleCitySelect = (city: string) => {
     setFormData(prev => ({ ...prev, city }));
@@ -381,9 +399,10 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
                         type="text"
                         value={citySearchTerm}
                         onChange={(e) => {
-                          setCitySearchTerm(e.target.value);
+                          const value = e.target.value;
+                          setCitySearchTerm(value);
                           setShowCityDropdown(true);
-                          setFormData(prev => ({ ...prev, city: e.target.value }));
+                          setFormData(prev => ({ ...prev, city: value }));
                         }}
                         onFocus={() => setShowCityDropdown(true)}
                         placeholder={isLoadingCities ? "Loading cities..." : "Type to search cities"}
@@ -401,19 +420,32 @@ export default function AddCustomerModal({ isOpen, onClose, type }: AddCustomerM
                     {showCityDropdown && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
                         {filteredCities.length > 0 ? (
-                          filteredCities.map((city) => (
-                            <button
-                              key={city}
-                              type="button"
-                              onClick={() => handleCitySelect(city)}
-                              className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
-                            >
-                              {city}
-                            </button>
-                          ))
+                          <>
+                            {filteredCities.map((city) => (
+                              <button
+                                key={city}
+                                type="button"
+                                onClick={() => handleCitySelect(city)}
+                                className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                              >
+                                {city}
+                              </button>
+                            ))}
+                            {debouncedCitySearchTerm && filteredCities.length === 50 && (
+                              <div className="px-3 py-2 text-xs text-gray-400 border-t">
+                                Showing first 50 results. Refine your search for more specific results.
+                              </div>
+                            )}
+                          </>
                         ) : (
                           <div className="px-3 py-2 text-gray-500">
-                            {citySearchTerm ? "No cities found" : "Select a country first"}
+                            {citySearchTerm && debouncedCitySearchTerm !== citySearchTerm ? (
+                              "Searching..."
+                            ) : citySearchTerm ? (
+                              "No cities found"
+                            ) : (
+                              "Select a country first"
+                            )}
                           </div>
                         )}
                       </div>

@@ -418,7 +418,7 @@ export default function LocalClientsPage() {
                   </div>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-green-700 mb-1">Processed Quantity</p>
+                  <p className="text-sm font-medium text-green-700 mb-1">Dispatched Quantity</p>
                   <p className="text-2xl font-bold text-green-900">
                     {allOrders ? `${allOrders
                       .filter(order => order.status === 'shipped' || order.status === 'delivered')
