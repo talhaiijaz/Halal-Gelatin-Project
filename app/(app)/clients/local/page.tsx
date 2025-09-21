@@ -707,7 +707,7 @@ export default function LocalClientsPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Invoice Number
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                       Client
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -716,14 +716,11 @@ export default function LocalClientsPage() {
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                       AMOUNT
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Quantity
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                      Bloom & Quantity
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Fac. Dep. Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Delivery Date
                     </th>
                   </tr>
                 </thead>
@@ -792,8 +789,8 @@ export default function LocalClientsPage() {
                               {order.invoiceNumber}
                             </div>
                           </td>
-                          <td className="px-4 py-4">
-                            <div className="text-sm text-gray-900 truncate max-w-[120px]" title={order.client?.name || "Unknown Client"}>{order.client?.name || "Unknown Client"}</div>
+                          <td className="px-4 py-4 w-32">
+                            <div className="text-sm text-gray-900 break-words">{order.client?.name || "Unknown Client"}</div>
                           </td>
                           <td className="px-4 py-4">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
@@ -822,19 +819,22 @@ export default function LocalClientsPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">
-                            <div className="text-sm font-medium text-gray-900">
-                              {order.items?.reduce((total, item) => total + (item.quantityKg || 0), 0).toLocaleString()} kg
+                          <td className="px-4 py-4 text-sm text-gray-900 w-48">
+                            <div className="space-y-1">
+                              {order.items && order.items.length > 0 ? (
+                                order.items.map((item, index) => (
+                                  <div key={index} className="text-sm">
+                                    {item.bloom ? `${item.bloom}: ${(item.quantityKg || 0).toLocaleString()} kg` : `No Bloom: ${(item.quantityKg || 0).toLocaleString()} kg`}
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="text-sm">No Items</div>
+                              )}
                             </div>
                           </td>
                           <td className="px-4 py-4 text-sm text-gray-900">
                             <div className="truncate" title={order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}>
                               {order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">
-                            <div className="truncate" title={order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}>
-                              {order.deliveryDate ? formatDate(order.deliveryDate) : 'Not set'}
                             </div>
                           </td>
                         </tr>
@@ -843,7 +843,7 @@ export default function LocalClientsPage() {
                   ) : (
                     // Empty state when no orders match filters
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center">
+                      <td colSpan={6} className="px-6 py-12 text-center">
                         <Package className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No local orders found</h3>
                         <p className="mt-1 text-sm text-gray-500">
