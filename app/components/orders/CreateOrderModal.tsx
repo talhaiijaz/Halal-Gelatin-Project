@@ -112,6 +112,7 @@ export default function CreateOrderModal({
   const [orderCreationAttempted, setOrderCreationAttempted] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [selectedCurrency, setSelectedCurrency] = useState("USD");
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<Id<"bankAccounts"> | null>(null);
   const [dateValidationError, setDateValidationError] = useState("");
 
   const clients = useQuery(api.clients.list, {});
@@ -189,6 +190,11 @@ export default function CreateOrderModal({
       setCurrentStep(2); // Skip client selection step
     }
   }, [preselectedClientId]);
+
+  // Reset bank selection when currency changes
+  useEffect(() => {
+    setSelectedBankAccountId(null);
+  }, [currentCurrency]);
 
   // Calculate order total from all items
   const orderTotal = orderItems.reduce((sum, item) => sum + (item.inclusiveTotal || 0), 0) + freightCost;
@@ -429,6 +435,7 @@ export default function CreateOrderModal({
     setOrderCreationAttempted(false);
     setClientSearchQuery("");
     setInvoiceNumber("");
+    setSelectedBankAccountId(null);
     setLotNumbersInputs([]);
   };
 
@@ -458,6 +465,12 @@ export default function CreateOrderModal({
       setFactoryDepartureDateError(""); // Clear error if date is provided
     }
 
+    // Validate that bank account is selected
+    if (!selectedBankAccountId) {
+      toast.error("Please select a bank account for payment processing.");
+      return;
+    }
+
     console.log('Creating order...', { shouldClose, currentStep, createdOrderId });
     console.log('Order data being sent:', {
       clientId: selectedClientId,
@@ -470,6 +483,7 @@ export default function CreateOrderModal({
       const result = await createOrder({
         clientId: selectedClientId,
         invoiceNumber: invoiceNumber.trim(),
+        bankAccountId: selectedBankAccountId!,
         fiscalYear: selectedFiscalYear,
         currency: selectedClient?.type === 'international' ? selectedCurrency : undefined,
         notes,
@@ -773,6 +787,29 @@ export default function CreateOrderModal({
                       </p>
                     </div>
                   )}
+
+                  {/* Bank Account Selection */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Bank Account <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={selectedBankAccountId || ""}
+                      onChange={(e) => setSelectedBankAccountId(e.target.value as Id<"bankAccounts">)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary"
+                      required
+                    >
+                      <option value="">Select a bank account</option>
+                      {bankAccounts?.filter(bank => bank.currency === currentCurrency).map((bank) => (
+                        <option key={bank._id} value={bank._id}>
+                          {bank.currency} - {bank.bankName} - {bank.accountName}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Select the bank account where payments for this order will be received. Only banks with matching currency are shown.
+                    </p>
+                  </div>
 
                   {/* Products Section */}
                   <div className="mb-6">

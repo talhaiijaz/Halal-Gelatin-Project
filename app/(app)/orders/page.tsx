@@ -37,6 +37,8 @@ function OrdersPageContent() {
 
   // Check bank validation
   const bankValidation = useQuery(api.banks.checkAllBanksHaveCountries);
+  // Check order validation
+  const orderValidation = useQuery(api.orders.checkAllOrdersHaveBanks);
 
 
   // Helper function to calculate financial metrics for an order
@@ -197,13 +199,19 @@ function OrdersPageContent() {
           </button>
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            disabled={bankValidation && !bankValidation.allHaveCountries}
+            disabled={(bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)}
             className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
-              bankValidation && !bankValidation.allHaveCountries
+              (bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-orange-600 hover:bg-orange-700"
             }`}
-            title={bankValidation && !bankValidation.allHaveCountries ? "Cannot create orders until all banks have countries assigned" : ""}
+            title={
+              bankValidation && !bankValidation.allHaveCountries 
+                ? "Cannot create orders until all banks have countries assigned" 
+                : orderValidation && !orderValidation.allHaveBanks
+                ? "Cannot create orders until all existing orders have banks assigned"
+                : ""
+            }
           >
             <Plus className="h-4 w-4 mr-2" />
             Create Order
@@ -271,6 +279,46 @@ function OrdersPageContent() {
         </div>
       </div>
 
+      {/* Order Validation Warning */}
+      {orderValidation && !orderValidation.allHaveBanks && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <Package className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">
+                Order Creation Blocked
+              </h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>
+                  Cannot create new orders until all existing orders have banks assigned. 
+                  This is required for proper payment processing and order management.
+                </p>
+                <p className="mt-2 font-medium">
+                  Orders missing banks ({orderValidation.ordersWithoutBanks.length}):
+                </p>
+                <ul className="mt-1 list-disc list-inside space-y-1">
+                  {orderValidation.ordersWithoutBanks.map((order: any) => (
+                    <li key={order._id}>
+                      <button
+                        onClick={() => setSelectedOrderId(order._id)}
+                        className="text-red-600 hover:text-red-800 underline"
+                      >
+                        {order.orderNumber} ({order.invoiceNumber})
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 font-medium">
+                  ⚠️ You cannot create new orders until all existing orders have banks assigned.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Orders Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
@@ -332,12 +380,19 @@ function OrdersPageContent() {
                         <div className="text-sm text-gray-900">{order.client?.name || "Unknown Client"}</div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                          {getStatusIcon(order.status)}
-                          <span className="ml-1 capitalize">
-                            {order.status.replace("_", " ")}
+                        <div className="flex items-center space-x-2">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                            {getStatusIcon(order.status)}
+                            <span className="ml-1 capitalize">
+                              {order.status.replace("_", " ")}
+                            </span>
                           </span>
-                        </span>
+                          {(!order.bankAccountId || order.bankAccountId === null) && (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                              No Bank
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-4 text-center">
                         <div className="space-y-1">
@@ -392,13 +447,19 @@ function OrdersPageContent() {
                       <div className="mt-6">
                         <button
                           onClick={() => setIsCreateModalOpen(true)}
-                          disabled={bankValidation && !bankValidation.allHaveCountries}
+                          disabled={(bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)}
                           className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
-                            bankValidation && !bankValidation.allHaveCountries
+                            (bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)
                               ? "bg-gray-400 cursor-not-allowed"
                               : "bg-primary hover:bg-primary-dark"
                           }`}
-                          title={bankValidation && !bankValidation.allHaveCountries ? "Cannot create orders until all banks have countries assigned" : ""}
+                          title={
+                            bankValidation && !bankValidation.allHaveCountries 
+                              ? "Cannot create orders until all banks have countries assigned" 
+                              : orderValidation && !orderValidation.allHaveBanks
+                              ? "Cannot create orders until all existing orders have banks assigned"
+                              : ""
+                          }
                         >
                           <Plus className="h-5 w-5 mr-2" />
                           Create Order

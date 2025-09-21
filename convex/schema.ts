@@ -76,6 +76,8 @@ export default defineSchema({
     packingListId: v.optional(v.id("_storage")),
     proformaInvoiceId: v.optional(v.id("_storage")),
     commercialInvoiceId: v.optional(v.id("_storage")),
+    // Bank account for payment processing
+    bankAccountId: v.optional(v.id("bankAccounts")),
     approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
     updatedAt: v.number(),

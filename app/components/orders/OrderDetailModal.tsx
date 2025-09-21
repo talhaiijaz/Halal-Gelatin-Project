@@ -43,6 +43,7 @@ interface OrderDetailModalProps {
 
 export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDetailModalProps) {
   const order = useQuery(api.orders.get, orderId ? { id: orderId } : "skip");
+  const bankAccount = useQuery(api.banks.get, order?.bankAccountId ? { id: order.bankAccountId } : "skip");
   const logs = useConvexQuery(convexApi.dashboard.listEntityLogs, orderId ? { entityTable: "orders", entityId: String(orderId) } : "skip");
   const updateStatus = useMutation(api.orders.updateStatus);
   const updateInvoiceNumber = useMutation(api.orders.updateInvoiceNumber);
@@ -272,6 +273,53 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                     </div>
                   </div>
                 )}
+
+                {/* Bank Account Information */}
+                <div className="card p-4">
+                  <h3 className="font-medium text-gray-900 mb-3 flex items-center">
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Bank Account Information
+                  </h3>
+                  {order.bankAccountId && bankAccount ? (
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm text-gray-500">Bank Name</p>
+                        <p className="font-medium text-gray-900">{bankAccount.bankName}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Account Name</p>
+                        <p className="font-medium text-gray-900">{bankAccount.accountName}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Account Number</p>
+                        <p className="font-medium text-gray-900">#{bankAccount.accountNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Currency</p>
+                        <p className="font-medium text-gray-900">{bankAccount.currency}</p>
+                      </div>
+                      {bankAccount.country && (
+                        <div>
+                          <p className="text-sm text-gray-500">Country</p>
+                          <p className="font-medium text-gray-900">{bankAccount.country}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : order.bankAccountId ? (
+                    <div className="text-center py-4">
+                      <Clock className="h-8 w-8 text-yellow-400 mx-auto mb-2" />
+                      <p className="text-sm text-yellow-600 font-medium">Loading Bank Details...</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <AlertCircle className="h-8 w-8 text-red-400 mx-auto mb-2" />
+                      <p className="text-sm text-red-600 font-medium">No Bank Account Assigned</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        This order needs a bank account for payment processing
+                      </p>
+                    </div>
+                  )}
+                </div>
 
                 {/* Product Details */}
                 <div className="card p-4">

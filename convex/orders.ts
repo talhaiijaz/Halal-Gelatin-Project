@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
+import { api } from "./_generated/api";
 
 async function logOrderEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
@@ -300,6 +301,7 @@ export const create = mutation({
   args: {
     clientId: v.id("clients"),
     invoiceNumber: v.string(), // Required invoice number for tracking
+    bankAccountId: v.id("bankAccounts"), // Required bank account for payment processing
     fiscalYear: v.optional(v.number()), // Optional fiscal year for order number
     currency: v.optional(v.string()), // Currency for international clients (defaults to USD)
     notes: v.optional(v.string()),
@@ -335,6 +337,12 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     
+    // Check if all existing orders have banks
+    const validationResult: { allHaveBanks: boolean; ordersWithoutBanks: any[] } = await ctx.runQuery(api.orders.checkAllOrdersHaveBanks, {});
+    if (!validationResult.allHaveBanks) {
+      throw new Error("Cannot create new orders until all existing orders have banks assigned. Please update existing orders first.");
+    }
+
     // Check if invoice number already exists in orders table
     const existingOrder = await ctx.db
       .query("orders")
@@ -398,6 +406,7 @@ export const create = mutation({
       orderNumber,
       invoiceNumber: args.invoiceNumber,
       clientId: args.clientId,
+      bankAccountId: args.bankAccountId, // Bank account for payment processing
       status: "pending",
       // Timeline fields
       orderCreationDate: args.orderCreationDate || Date.now(), // Default to current timestamp if not provided
@@ -1168,6 +1177,7 @@ export const update = mutation({
   args: {
     orderId: v.id("orders"),
     clientId: v.optional(v.id("clients")),
+    bankAccountId: v.optional(v.id("bankAccounts")), // Bank account for payment processing
     // currency cannot be changed; derived from client type
     notes: v.optional(v.string()),
     freightCost: v.optional(v.number()),
@@ -1518,5 +1528,55 @@ export const listItems = query({
   handler: async (ctx, args) => {
     const orderItems = await ctx.db.query("orderItems").collect();
     return orderItems;
+  },
+});
+
+// Check if all orders have banks assigned
+export const checkAllOrdersHaveBanks = query({
+  args: {},
+  returns: v.object({
+    allHaveBanks: v.boolean(),
+    ordersWithoutBanks: v.array(v.object({
+      _id: v.id("orders"),
+      orderNumber: v.string(),
+      invoiceNumber: v.string(),
+      clientId: v.id("clients"),
+    })),
+  }),
+  handler: async (ctx) => {
+    const orders = await ctx.db.query("orders").collect();
+    const ordersWithoutBanks = orders.filter(order => !order.bankAccountId);
+    return {
+      allHaveBanks: ordersWithoutBanks.length === 0,
+      ordersWithoutBanks: ordersWithoutBanks.map(order => ({
+        _id: order._id,
+        orderNumber: order.orderNumber,
+        invoiceNumber: order.invoiceNumber,
+        clientId: order.clientId,
+      })),
+    };
+  },
+});
+
+// Check if new orders can be created
+export const canCreateNewOrder = query({
+  args: {},
+  returns: v.object({
+    canCreate: v.boolean(),
+    reason: v.optional(v.string()),
+  }),
+  handler: async (ctx): Promise<{ canCreate: boolean; reason?: string }> => {
+    const validationResult: { allHaveBanks: boolean; ordersWithoutBanks: any[] } = await ctx.runQuery(api.orders.checkAllOrdersHaveBanks, {});
+    
+    if (!validationResult.allHaveBanks) {
+      return {
+        canCreate: false,
+        reason: `Cannot create new orders until all existing orders have banks assigned. ${validationResult.ordersWithoutBanks.length} order(s) missing banks.`,
+      };
+    }
+    
+    return {
+      canCreate: true,
+    };
   },
 });
