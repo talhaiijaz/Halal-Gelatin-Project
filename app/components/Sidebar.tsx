@@ -223,7 +223,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Mobile menu button */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="flex items-center justify-between h-16 px-4">
           <div className="flex items-center">
             <img
@@ -235,7 +235,9 @@ export default function Sidebar() {
           </div>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
+            className="p-3 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 active:bg-gray-200"
+            aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -248,13 +250,21 @@ export default function Sidebar() {
 
       {/* Mobile sidebar */}
       {mobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 flex">
+        <div className="lg:hidden fixed inset-0 z-40 flex" role="dialog" aria-modal="true">
           <div
             className="fixed inset-0 bg-gray-600 bg-opacity-75"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white">
+          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <NavContent />
+            <div className="mt-auto p-3 border-t border-gray-200">
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full py-3 text-sm font-medium rounded-lg bg-gray-100 text-gray-800 hover:bg-gray-200 active:bg-gray-300"
+              >
+                Close Menu
+              </button>
+            </div>
           </div>
         </div>
       )}

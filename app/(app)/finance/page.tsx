@@ -198,13 +198,15 @@ export default function FinancePage() {
             Monitor financial performance and manage payments
           </p>
         </div>
-        <button
-          onClick={() => setIsRecordPaymentOpen(true)}
-          className="btn-primary flex items-center"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Record Payment
-        </button>
+        <div className="hidden lg:block">
+          <button
+            onClick={() => setIsRecordPaymentOpen(true)}
+            className="btn-primary flex items-center"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Record Payment
+          </button>
+        </div>
       </div>
 
 
@@ -422,10 +424,87 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Invoices Table */}
-          <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full table-fixed divide-y divide-gray-200">
+      {/* Invoices - Mobile Cards */}
+      <div className="lg:hidden space-y-3">
+        {!invoicesData ? (
+          [...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow p-4">
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-28 bg-gray-200 rounded animate-pulse" />
+                <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse" />
+              </div>
+              <div className="mt-3 space-y-2">
+                <div className="h-3 w-40 bg-gray-200 rounded animate-pulse" />
+                <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
+              </div>
+            </div>
+          ))
+        ) : sortedInvoices?.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <FileText className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
+            <p className="mt-1 text-sm text-gray-500">Invoices will appear here once orders move to production.</p>
+          </div>
+        ) : (
+          sortedInvoices?.map((invoice) => {
+            const ordersList = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
+            const associatedOrder = ordersList.find((order: any) => order._id === invoice.orderId);
+            const bankAccount = bankAccounts?.find(bank => bank._id === associatedOrder?.bankAccountId);
+            const transferStatus = batchTransferStatus?.[invoice._id];
+            const shouldHighlightYellow = shouldHighlightOrderYellowWithTransfers(
+              associatedOrder || { status: "pending" },
+              bankAccount,
+              transferStatus
+            );
+            const shouldHighlightRed = shouldHighlightOrderRed(
+              associatedOrder || { status: "pending" },
+              bankAccount,
+              transferStatus
+            );
+            return (
+              <button
+                key={invoice._id}
+                className={`w-full text-left bg-white rounded-lg shadow p-4 active:bg-gray-50 ${getOrderHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}
+                onClick={() => {
+                  setSelectedInvoiceId(invoice._id);
+                  setIsInvoiceModalOpen(true);
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className={`text-base font-semibold ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{invoice.invoiceNumber || "N/A"}</div>
+                    <div className={`mt-1 text-sm ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{invoice.client?.name}</div>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(invoice.status)}`}>
+                    {getStatusIcon(invoice.status)}
+                    <span className="ml-1 capitalize">{invoice.status.replace("_", " ")}</span>
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-gray-500">Amount</div>
+                    <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}</div>
+                    <div className="text-xs text-gray-500">Paid</div>
+                    <div className={`text-xs ${shouldHighlightYellow || shouldHighlightRed ? 'text-gray-700' : 'text-gray-600'}`}>{formatCurrency(invoice.totalPaid, invoice.currency as SupportedCurrency)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Issue Date</div>
+                    <div className={`text-sm ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{formatDateForDisplay(invoice.issueDate)}</div>
+                    {(invoice.order?.status === "shipped" || invoice.order?.status === "delivered") && invoice.outstandingBalance > 0 && (
+                      <div className="text-xs text-red-600 font-medium">Receivables: {formatCurrency(invoice.outstandingBalance, invoice.currency as SupportedCurrency)}</div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      {/* Invoices Table - Desktop */}
+      <div className="hidden lg:block card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">
@@ -665,8 +744,50 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Payments History */}
-          <div className="card overflow-hidden">
+          {/* Payments - Mobile Cards */}
+          <div className="lg:hidden space-y-3">
+            {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).map((payment) => (
+              <button
+                key={payment._id}
+                className="w-full text-left bg-white rounded-lg shadow p-4 active:bg-gray-50"
+                onClick={() => {
+                  setSelectedPaymentId(payment._id as string);
+                  setIsPaymentDetailOpen(true);
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-sm text-gray-500">{formatDate(payment.paymentDate)}</div>
+                    <div className="text-base font-semibold text-gray-900 mt-0.5">{payment.client?.name || '-'}</div>
+                    <div className="text-xs text-gray-500">{payment.invoice?.invoiceNumber || '-'}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-green-600">{formatCurrency(payment.amount, payment.currency as SupportedCurrency)}</div>
+                    <span className={`inline-flex mt-1 px-2.5 py-1 rounded-full text-xs font-medium ${payment.type === 'advance' ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'}`}>{payment.type === 'advance' ? 'Advance' : 'Invoice'}</span>
+                  </div>
+                </div>
+                {payment.bankAccount && (
+                  <div className="mt-2 text-xs text-gray-500">{payment.bankAccount.accountName} • {payment.bankAccount.bankName}</div>
+                )}
+              </button>
+            ))}
+            {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length === 0 && (
+              <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">No payments recorded yet</div>
+            )}
+            {/* Mobile FAB to record payment */}
+            <div className="fixed bottom-20 right-5 z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+              <button
+                onClick={() => setIsRecordPaymentOpen(true)}
+                className="h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white bg-orange-600 hover:bg-orange-700 active:bg-orange-800"
+                aria-label="Record Payment"
+              >
+                <Plus className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Payments History - Desktop */}
+          <div className="hidden lg:block card overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">
                 Payment History

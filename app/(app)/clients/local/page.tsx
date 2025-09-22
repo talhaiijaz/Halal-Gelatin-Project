@@ -1061,11 +1061,11 @@ export default function LocalClientsPage() {
 
       {/* Modal for Details */}
       {expandedMetric && (
-        <div className="fixed inset-0 z-[9999] flex items-start justify-center pt-4" style={{ width: '100vw', height: '100vh' }}>
+        <div className="fixed inset-0 z-[9999] flex items-stretch sm:items-start justify-center pt-0 sm:pt-4" style={{ width: '100vw', height: '100vh' }}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[calc(100vh-2rem)] mx-2 sm:mx-4 overflow-hidden border border-gray-200">
+          <div className="relative bg-white sm:rounded-2xl rounded-none shadow-2xl w-full max-w-6xl h-[100vh] sm:h-[calc(100vh-2rem)] mx-0 sm:mx-4 overflow-hidden border border-gray-200">
             {/* Header */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-6 py-4">
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 sticky top-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
               <div className="flex items-center justify-between">
                 <div>
                       <h2 className="text-xl font-bold text-gray-900 mb-1">
@@ -1085,7 +1085,7 @@ export default function LocalClientsPage() {
                 </div>
                 <button
                   onClick={() => setExpandedMetric(null)}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full p-2 transition-colors"
+                  className="text-gray-600 hover:text-gray-900 hover:bg-gray-200 rounded-full p-2 transition-colors"
                   aria-label="Close"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1096,7 +1096,7 @@ export default function LocalClientsPage() {
             </div>
 
             {/* Content */}
-            <div className="p-6 overflow-auto h-[calc(100vh-2rem-80px)] bg-gray-50">
+            <div className="p-4 sm:p-6 overflow-auto h-[calc(100vh-64px)] sm:h-[calc(100vh-2rem-80px)] bg-gray-50" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
               {expandedMetric.metric === 'pending' && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                   {!pendingOrdersDetails ? (

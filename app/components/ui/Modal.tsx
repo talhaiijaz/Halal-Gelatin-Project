@@ -77,7 +77,7 @@ export default function Modal({
       onClick={handleBackdropClick}
     >
       <div 
-        className={`relative bg-white rounded-lg shadow-xl w-full ${maxWidthClasses[maxWidth]} mx-4 max-h-[90vh] overflow-hidden ${className}`}
+        className={`relative bg-white rounded-lg shadow-xl w-full ${maxWidthClasses[maxWidth]} mx-4 max-h-[90vh] overflow-hidden ${className} sm:mx-4 mx-0 sm:rounded-lg rounded-none sm:h-auto h-full`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -101,7 +101,7 @@ export default function Modal({
         )}
 
         {/* Content */}
-        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6">
+        <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6 sm:p-6 p-4">
           {children}
         </div>
       </div>

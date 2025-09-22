@@ -244,6 +244,22 @@ function OrdersPageContent() {
         </div>
       </div>
 
+      {/* FAB for creating order on mobile */}
+      <div className="lg:hidden fixed bottom-20 right-5 z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          disabled={(bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)}
+          className={`h-14 w-14 rounded-full shadow-lg flex items-center justify-center text-white ${
+            (bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)
+              ? "bg-gray-400"
+              : "bg-orange-600 hover:bg-orange-700 active:bg-orange-800"
+          }`}
+          aria-label="Create Order"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      </div>
+
       {/* Bank Validation Warning */}
       {bankValidation && !bankValidation.allHaveCountries && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -270,8 +286,8 @@ function OrdersPageContent() {
       )}
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 items-end">
           {/* Universal Search */}
           <div className="flex flex-col">
             <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
@@ -289,7 +305,7 @@ function OrdersPageContent() {
                   router.replace(url.pathname + (url.search ? url.search : ""));
                 }}
                 placeholder="Search orders, invoices, clients..."
-                className="pl-10 pr-3 py-2 w-full h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="pl-10 pr-3 py-2 w-full h-11 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
             </div>
           </div>
@@ -300,7 +316,7 @@ function OrdersPageContent() {
             <select
               value={selectedFiscalYear || ""}
               onChange={(e) => setSelectedFiscalYear(e.target.value ? parseInt(e.target.value) : undefined)}
-              className="w-full px-3 py-2 h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full px-3 py-2 h-11 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
             >
               <option value="">All Years</option>
               {getFiscalYearOptions().map(option => (
@@ -351,8 +367,75 @@ function OrdersPageContent() {
         </div>
       )}
 
-      {/* Orders Table */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
+      {/* Orders List - Mobile Cards */}
+      <div className="lg:hidden space-y-3">
+        {!ordersData ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow p-4">
+              <Skeleton height={18} width={160} />
+              <div className="mt-3">
+                <Skeleton height={14} />
+                <Skeleton height={14} width={120} />
+              </div>
+            </div>
+          ))
+        ) : (sortedOrders && sortedOrders.length > 0) ? (
+          sortedOrders.map((order) => {
+            const metrics = calculateFinancialMetrics(order);
+            const bankAccount = bankAccounts?.find(bank => bank._id === order.bankAccountId);
+            const transferStatus = order.invoice?._id ? batchTransferStatus?.[order.invoice._id] : undefined;
+            const shouldHighlightYellow = shouldHighlightOrderYellowWithTransfers(order, bankAccount, transferStatus);
+            const shouldHighlightRed = shouldHighlightOrderRed(order, bankAccount, transferStatus);
+            return (
+              <button
+                key={order._id}
+                className={`w-full text-left bg-white rounded-lg shadow p-4 active:bg-gray-50 ${getOrderHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}
+                onClick={() => setSelectedOrderId(order._id)}
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className={`text-base font-semibold ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
+                      {order.invoiceNumber}
+                    </div>
+                    <div className={`mt-1 text-sm ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{order.client?.name || "Unknown Client"}</div>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
+                    {getStatusIcon(order.status)}
+                    <span className="ml-1 capitalize">{order.status.replace("_", " ")}</span>
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-gray-500">Amount</div>
+                    <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
+                      {formatCurrency(metrics.total as number, order.currency as any)}
+                    </div>
+                    <div className="text-xs text-gray-500">Paid</div>
+                    <div className={`text-xs ${shouldHighlightYellow || shouldHighlightRed ? 'text-gray-700' : 'text-gray-600'}`}>{formatCurrency(metrics.paid as number, order.currency as any)}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-500">Receivables</div>
+                    <div className={`text-sm font-medium ${(metrics.outstanding as number) > 0 ? 'text-red-600' : shouldHighlightYellow || shouldHighlightRed ? 'text-gray-700' : 'text-gray-500'}`}>
+                      {(metrics.outstanding as number) > 0 ? formatCurrency(metrics.outstanding as number, order.currency as any) : order.status === "shipped" || order.status === "delivered" ? formatCurrency(0, order.currency as any) : "Not due"}
+                    </div>
+                    <div className="text-xs text-gray-500">Departure</div>
+                    <div className={`text-xs ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}</div>
+                  </div>
+                </div>
+              </button>
+            );
+          })
+        ) : (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <Package className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No orders found</h3>
+            <p className="mt-1 text-sm text-gray-500">{searchTerm || selectedFiscalYear ? "Try adjusting your filters" : "Get started by creating a new order."}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Orders Table - Desktop */}
+      <div className="hidden lg:block bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 table-fixed">
             <thead className="bg-gray-50">

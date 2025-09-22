@@ -103,23 +103,23 @@ export default function DatePickerModal({
         height: '100vh'
       }}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div className="bg-white rounded-lg sm:rounded-lg rounded-none shadow-xl max-w-md w-full mx-0 sm:mx-4 h-full sm:h-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-blue-600" />
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-600 hover:text-gray-900 p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6 overflow-y-auto" style={{ maxHeight: 'calc(90vh - 120px)' }}>
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -146,7 +146,7 @@ export default function DatePickerModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-lg">
+        <div className="flex items-center justify-end space-x-3 p-4 sm:p-6 border-t border-gray-200 bg-gray-50 rounded-b-lg sticky bottom-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <button
             onClick={handleClose}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"

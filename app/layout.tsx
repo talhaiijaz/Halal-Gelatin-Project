@@ -5,19 +5,25 @@ import ConvexClientProvider from "./providers/ConvexClientProvider";
 import { AuthProvider } from "./components/AuthProvider";
 import { Toaster } from "react-hot-toast";
 import ErrorBoundary from "./components/ErrorBoundary";
+import InstallPrompt from "./components/InstallPrompt";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Halal Gelatin CRM",
   description: "Gelatin Manufacturing CRM System",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#ea580c',
 };
 
 export default function RootLayout({
@@ -26,12 +32,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} h-full bg-white`}>
         <ErrorBoundary>
           <AuthProvider>
             <ConvexClientProvider>
               {children}
+              <InstallPrompt />
               <Toaster
                 position="top-right"
                 toastOptions={{

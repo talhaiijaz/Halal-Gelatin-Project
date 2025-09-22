@@ -42,10 +42,10 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl">
+      <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl sm:rounded-l-xl">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b px-6 py-4 flex items-center justify-between">
+          <div className="border-b px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between sticky top-0 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <FileText className="h-5 w-5 mr-2" /> Invoice Details
@@ -54,13 +54,13 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                 <p className="text-sm text-gray-600 mt-1">Invoice #{invoice.invoiceNumber || invoice._id}</p>
               )}
             </div>
-            <button onClick={onClose} className="rounded-lg p-1 hover:bg-gray-100">
+            <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 active:bg-gray-200">
               <X className="h-5 w-5 text-gray-500" />
             </button>
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 overscroll-contain" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}>
             {!invoice ? (
               <div className="h-full flex items-center justify-center text-gray-500">Loading…</div>
             ) : (
@@ -367,7 +367,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
 
           {/* Footer */}
           {invoice && (
-            <div className="border-t px-6 py-4 flex items-center justify-between">
+            <div className="border-t px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between sticky bottom-0 bg-white" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
               <div className="text-sm text-gray-600">
                 Receivables: <span className="font-semibold text-orange-600">
                   {(() => {
@@ -379,7 +379,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                 </span>
               </div>
               <button
-                className="btn-primary"
+                className="btn-primary px-4 py-2"
                 onClick={() => onRecordPayment?.(invoice._id as Id<"invoices">, invoice.clientId as Id<"clients">)}
               >
                 Record Payment
