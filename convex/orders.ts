@@ -1580,3 +1580,138 @@ export const canCreateNewOrder = query({
     };
   },
 });
+
+// Get top 5 recent orders for a client sorted by factoryDepartureDate
+export const getRecentOrdersForClient = query({
+  args: {
+    clientId: v.id("clients"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(v.object({
+    _id: v.id("orders"),
+    _creationTime: v.number(),
+    orderNumber: v.string(),
+    invoiceNumber: v.string(),
+    clientId: v.id("clients"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("in_production"),
+      v.literal("shipped"),
+      v.literal("delivered"),
+      v.literal("cancelled")
+    ),
+    factoryDepartureDate: v.optional(v.number()),
+    orderCreationDate: v.optional(v.number()),
+    createdAt: v.number(),
+    totalAmount: v.number(),
+    currency: v.string(),
+    fiscalYear: v.optional(v.number()),
+    bankAccountId: v.optional(v.id("bankAccounts")),
+    deliveryDate: v.optional(v.number()),
+    freightCost: v.optional(v.number()),
+    notes: v.optional(v.string()),
+    timelineNotes: v.optional(v.string()),
+    updatedAt: v.number(),
+    client: v.optional(v.object({
+      _id: v.id("clients"),
+      name: v.optional(v.string()),
+      type: v.string(),
+    })),
+    items: v.array(v.object({
+      _id: v.id("orderItems"),
+      product: v.string(),
+      quantityKg: v.number(),
+      unitPrice: v.number(),
+    })),
+    invoice: v.optional(v.object({
+      _id: v.id("invoices"),
+      invoiceNumber: v.string(),
+      status: v.union(v.literal("unpaid"), v.literal("partially_paid"), v.literal("paid")),
+      amount: v.number(),
+      totalPaid: v.number(),
+      outstandingBalance: v.number(),
+      currency: v.string(),
+    })),
+  })),
+  handler: async (ctx, args) => {
+    const limit = args.limit || 5;
+
+    // Get all orders for the client
+    const allClientOrders = await ctx.db
+      .query("orders")
+      .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
+      .collect();
+
+    // Filter to only upcoming-relevant statuses
+    const candidateOrders = allClientOrders.filter(
+      (o) => o.status === "pending" || o.status === "in_production"
+    );
+
+    // Partition by date relative to today
+    const now = Date.now();
+    const futureOrToday: typeof candidateOrders = [];
+    const past: typeof candidateOrders = [];
+    for (const o of candidateOrders) {
+      const d = o.factoryDepartureDate || o.orderCreationDate || o.createdAt;
+      if (d >= now) futureOrToday.push(o);
+      else past.push(o);
+    }
+
+    // Sort: future ascending (nearest first), past descending (least overdue first)
+    futureOrToday.sort((a, b) => (
+      (a.factoryDepartureDate || a.orderCreationDate || a.createdAt) -
+      (b.factoryDepartureDate || b.orderCreationDate || b.createdAt)
+    ));
+    past.sort((a, b) => (
+      (b.factoryDepartureDate || b.orderCreationDate || b.createdAt) -
+      (a.factoryDepartureDate || a.orderCreationDate || a.createdAt)
+    ));
+
+    const ordered = futureOrToday.concat(past);
+    const limitedOrders = ordered.slice(0, limit);
+
+    // Get client details and enrich orders
+    const client = await ctx.db.get(args.clientId);
+    const ordersWithDetails = await Promise.all(
+      limitedOrders.map(async (order) => {
+        // Get order items
+        const items = await ctx.db
+          .query("orderItems")
+          .withIndex("by_order", (q) => q.eq("orderId", order._id))
+          .collect();
+
+        // Get invoice if exists
+        const invoice = await ctx.db
+          .query("invoices")
+          .withIndex("by_order", (q) => q.eq("orderId", order._id))
+          .first();
+
+        return {
+          ...order,
+          client: client ? {
+            _id: client._id,
+            name: client.name,
+            type: client.type,
+          } : undefined,
+          items: items.map(item => ({
+            _id: item._id,
+            product: item.product,
+            quantityKg: item.quantityKg,
+            unitPrice: item.unitPrice,
+          })),
+          invoice: invoice ? {
+            _id: invoice._id,
+            invoiceNumber: order.invoiceNumber, // Use the invoice number from the order
+            status: invoice.status,
+            amount: invoice.amount,
+            totalPaid: invoice.totalPaid,
+            outstandingBalance: invoice.outstandingBalance,
+            currency: invoice.currency,
+          } : undefined,
+        };
+      })
+    );
+
+    return ordersWithDetails;
+  },
+});

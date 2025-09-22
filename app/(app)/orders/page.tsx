@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Plus, Package, Clock, CheckCircle2, XCircle, Truck, Download, Search } from "lucide-react";
@@ -11,7 +11,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import toast from "react-hot-toast";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-// import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { getFiscalYearOptions } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrency } from "@/app/utils/currencyFormat";
@@ -20,10 +20,20 @@ import Pagination from "@/app/components/ui/Pagination";
 import { shouldHighlightOrderYellowWithTransfers, shouldHighlightOrderRed, getOrderHighlightClassesWithRed, getOrderTextHighlightClassesWithRed } from "@/app/utils/orderHighlighting";
 
 function OrdersPageContent() {
-  // const searchParams = useSearchParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  // Initialize search from URL (?search=...)
+  useEffect(() => {
+    const initial = searchParams?.get("search") || "";
+    if (initial && initial !== searchTerm) {
+      setSearchTerm(initial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   const [selectedFiscalYear, setSelectedFiscalYear] = useState<number | undefined>(undefined);
 
   // Pagination hook
@@ -270,7 +280,14 @@ function OrdersPageContent() {
               <input
                 type="text"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSearchTerm(val);
+                  const url = new URL(window.location.href);
+                  if (val) url.searchParams.set("search", val);
+                  else url.searchParams.delete("search");
+                  router.replace(url.pathname + (url.search ? url.search : ""));
+                }}
                 placeholder="Search orders, invoices, clients..."
                 className="pl-10 pr-3 py-2 w-full h-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
               />
@@ -337,25 +354,25 @@ function OrdersPageContent() {
       {/* Orders Table */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
+          <table className="min-w-full divide-y divide-gray-200 table-fixed">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '15%'}}>
                   Invoice Number
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '20%'}}>
                   Client
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '12%'}}>
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '18%'}}>
                   AMOUNT
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '20%'}}>
                   Bloom & Quantity
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '15%'}}>
                   Fac. Dep. Date
                 </th>
               </tr>
@@ -389,15 +406,15 @@ function OrdersPageContent() {
                       className={`${getOrderHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)} hover:bg-gray-50 cursor-pointer transition-colors`}
                       onClick={() => setSelectedOrderId(order._id)}
                     >
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4" style={{width: '15%'}}>
                         <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
                           {order.invoiceNumber}
                         </div>
                       </td>
-                      <td className="px-4 py-4 w-32">
+                      <td className="px-4 py-4" style={{width: '20%'}}>
                         <div className={`text-sm ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)} break-words`}>{order.client?.name || "Unknown Client"}</div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4" style={{width: '12%'}}>
                         <div className="flex items-center space-x-2">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                             {getStatusIcon(order.status)}
@@ -412,7 +429,7 @@ function OrdersPageContent() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-center">
+                      <td className="px-4 py-4 text-center" style={{width: '18%'}}>
                         <div className="space-y-1">
                           <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
                             {formatCurrency(metrics.total as number, order.currency as "USD" | "EUR" | "PKR" | "AED")}
@@ -432,7 +449,7 @@ function OrdersPageContent() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm w-48">
+                      <td className="px-4 py-4 text-sm" style={{width: '20%'}}>
                         <div className={`space-y-1 ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
                           {order.items && order.items.length > 0 ? (
                             order.items.map((item, index) => (
@@ -445,7 +462,7 @@ function OrdersPageContent() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm">
+                      <td className="px-4 py-4 text-sm" style={{width: '15%'}}>
                         <div className={`truncate ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`} title={order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}>
                           {order.factoryDepartureDate ? new Date(order.factoryDepartureDate).toLocaleDateString() : 'Not set'}
                         </div>

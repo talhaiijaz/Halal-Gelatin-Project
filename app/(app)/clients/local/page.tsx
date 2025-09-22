@@ -701,25 +701,25 @@ export default function LocalClientsPage() {
           {/* Orders Table */}
           <div className="card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200 table-fixed">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '15%'}}>
                       Invoice Number
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '20%'}}>
                       Client
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '12%'}}>
                       Status
                     </th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '18%'}}>
                       AMOUNT
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '20%'}}>
                       Bloom & Quantity
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '15%'}}>
                       Fac. Dep. Date
                     </th>
                   </tr>
@@ -784,22 +784,22 @@ export default function LocalClientsPage() {
                           className="hover:bg-gray-50 cursor-pointer transition-colors"
                           onClick={() => setSelectedOrderId(order._id)}
                         >
-                          <td className="px-4 py-4">
+                          <td className="px-4 py-4" style={{width: '15%'}}>
                             <div className="text-sm font-medium text-gray-900">
                               {order.invoiceNumber}
                             </div>
                           </td>
-                          <td className="px-4 py-4 w-32">
+                          <td className="px-4 py-4" style={{width: '20%'}}>
                             <div className="text-sm text-gray-900 break-words">{order.client?.name || "Unknown Client"}</div>
                           </td>
-                          <td className="px-4 py-4">
+                          <td className="px-4 py-4" style={{width: '12%'}}>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                               <span className="ml-1 capitalize">
                                 {order.status.replace("_", " ")}
                               </span>
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-center">
+                          <td className="px-4 py-4 text-center" style={{width: '18%'}}>
                             <div className="space-y-1">
                               <div className="text-sm font-medium text-gray-900">
                                 {formatCurrency(metrics.total as number)}
@@ -819,7 +819,7 @@ export default function LocalClientsPage() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900 w-48">
+                          <td className="px-4 py-4 text-sm text-gray-900" style={{width: '20%'}}>
                             <div className="space-y-1">
                               {order.items && order.items.length > 0 ? (
                                 order.items.map((item, index) => (
@@ -832,7 +832,7 @@ export default function LocalClientsPage() {
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-900">
+                          <td className="px-4 py-4 text-sm text-gray-900" style={{width: '15%'}}>
                             <div className="truncate" title={order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}>
                               {order.factoryDepartureDate ? formatDate(order.factoryDepartureDate) : 'Not set'}
                             </div>

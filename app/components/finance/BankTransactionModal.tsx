@@ -47,7 +47,13 @@ export default function BankTransactionModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const bankAccounts = useQuery(api.banks.list);
-  const invoices = useQuery(api.invoices.list, { paginationOpts: { numItems: 1000, cursor: null } });
+  // Use filtered invoices for interbank transfers, regular invoices for other transaction types
+  const invoices = useQuery(
+    transactionType === "transfer" 
+      ? api.invoices.listForInterbankTransfers 
+      : api.invoices.list, 
+    { paginationOpts: { numItems: 1000, cursor: null } }
+  );
   const invoicesList = Array.isArray(invoices) ? invoices : invoices?.page || [];
   const recordTransaction = useMutation(api.bankTransactions.recordTransaction);
   const transferBetweenAccounts = useMutation(api.bankTransactions.transferBetweenAccounts);
@@ -378,7 +384,7 @@ export default function BankTransactionModal({
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Select an invoice to track this transfer for compliance reporting
+                Only international invoices that haven't been fully transferred to Pakistan are shown
               </p>
             </div>
           )}

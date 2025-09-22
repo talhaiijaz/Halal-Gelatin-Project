@@ -55,7 +55,13 @@ export default function ClientDetailPage() {
   const client = useQuery(api.clients.get, { id: clientId });
   const updateClient = useMutation(api.clients.update);
   
-  // Fetch orders for this client with pagination
+  // Fetch recent orders for this client (top 5)
+  const recentOrders = useQuery(api.orders.getRecentOrdersForClient, { 
+    clientId,
+    limit: 5
+  });
+  
+  // Fetch all orders for this client (for the "View All Orders" functionality)
   const allOrdersData = useQuery(api.orders.list, { 
     clientId,
     paginationOpts: ordersPagination.paginationOpts
@@ -422,26 +428,35 @@ export default function ClientDetailPage() {
             </div>
           </div>
 
-          {/* All Orders */}
+          {/* Upcoming Orders */}
           <div className="card p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <Package className="h-5 w-5 mr-2" />
-                All Orders
+                Upcoming Orders
               </h2>
-              <button
-                onClick={() => setIsCreateOrderOpen(true)}
-                className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Order
-              </button>
+              <div className="flex space-x-2">
+                <Link
+                  href={`/orders?search=${encodeURIComponent(client?.name || "")}`}
+                  className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  View All Orders
+                </Link>
+                <button
+                  onClick={() => setIsCreateOrderOpen(true)}
+                  className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Order
+                </button>
+              </div>
             </div>
             
-            {allOrders && allOrders.length > 0 ? (
+            {recentOrders && recentOrders.length > 0 ? (
               <div>
                 <div className="space-y-3">
-                  {allOrders.map((order: any) => (
+                  {recentOrders.map((order: any) => (
                     <div 
                       key={order._id} 
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
@@ -454,31 +469,39 @@ export default function ClientDetailPage() {
                             {order.invoiceNumber}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {formatDate(order.factoryDepartureDate || order.orderCreationDate || order.createdAt)}
+                            Factory Departure: {formatDate(order.factoryDepartureDate || order.orderCreationDate || order.createdAt)}
                           </p>
+                          {order.items && order.items.length > 0 && (
+                            <p className="text-xs text-gray-400">
+                              {order.items.reduce((sum: number, item: any) => sum + item.quantityKg, 0).toLocaleString()} kg
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-medium text-gray-900">
                           {formatCurrency(order.totalAmount, order.currency as SupportedCurrency)}
                         </p>
-                        <p className="text-xs text-gray-500 capitalize">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          order.status === 'pending' ? 'bg-orange-100 text-orange-800' : 
+                          order.status === 'in_production' ? 'bg-blue-100 text-blue-800' :
+                          order.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                          order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
                           {order.status.replace("_", " ")}
-                        </p>
+                        </span>
                       </div>
                     </div>
                   ))}
                 </div>
                 
-                {/* Pagination for orders */}
-                {allOrdersData && !Array.isArray(allOrdersData) && allOrdersData.page && allOrdersData.page.length > 0 && (
-                  <div className="mt-6">
-                    <Pagination
-                      currentPage={ordersPagination.currentPage}
-                      totalPages={Math.ceil((!Array.isArray(allOrdersData) ? allOrdersData.totalCount || 0 : 0) / ordersPagination.pageSize)}
-                      onPageChange={ordersPagination.goToPage}
-                      isLoading={!allOrdersData}
-                    />
+                {/* Show total count if there are more orders */}
+                {allOrders && allOrders.length > 5 && (
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-gray-500">
+                      Showing {recentOrders?.length || 0} of {allOrders.length} orders
+                    </p>
                   </div>
                 )}
               </div>

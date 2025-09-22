@@ -638,3 +638,126 @@ export const deleteInvoice = mutation({
     return { success: true };
   },
 });
+
+// Get invoices suitable for interbank transfers
+// Only shows invoices with international clients that haven't been completed (70%+ transferred to Pakistan)
+export const listForInterbankTransfers = query({
+  args: {
+    paginationOpts: v.optional(v.object({
+      numItems: v.number(),
+      cursor: v.union(v.string(), v.null()),
+    })),
+  },
+  // Keep the return validator permissive to avoid TS mismatch with enriched objects
+  returns: v.any(),
+  handler: async (ctx, args) => {
+    // Get all invoices
+    let invoices = await ctx.db.query("invoices").collect();
+    
+    // Filter for international clients only
+    const internationalInvoices = [];
+    for (const invoice of invoices) {
+      const client = await ctx.db.get(invoice.clientId);
+      if (client && client.type === "international") {
+        internationalInvoices.push(invoice);
+      }
+    }
+    
+    // Check which invoices have been completed (70%+ transferred to Pakistan)
+    const incompleteInvoices = [];
+    for (const invoice of internationalInvoices) {
+      // Get all completed transfers for this invoice
+      const transfers = await ctx.db
+        .query("interBankTransfers")
+        .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
+        .filter((q) => q.eq(q.field("status"), "completed"))
+        .collect();
+      
+      // Calculate total transferred to Pakistani banks
+      let totalTransferredToPakistan = 0;
+      for (const transfer of transfers) {
+        const toBank = await ctx.db.get(transfer.toBankAccountId);
+        if (toBank && toBank.country === "Pakistan") {
+          // Use original amount if available (before conversion), otherwise use transfer amount
+          const amountForCalculation = transfer.originalAmount || transfer.amount;
+          totalTransferredToPakistan += amountForCalculation;
+        }
+      }
+      
+      const percentageTransferred = (totalTransferredToPakistan / invoice.amount) * 100;
+      
+      // Only include invoices that haven't reached 70% transfer threshold
+      if (percentageTransferred < 70) {
+        incompleteInvoices.push(invoice);
+      }
+    }
+    
+    // Fetch related data for each invoice
+    const invoicesWithDetails = await Promise.all(
+      incompleteInvoices.map(async (invoice) => {
+        const client = await ctx.db.get(invoice.clientId);
+        const order = invoice.orderId ? await ctx.db.get(invoice.orderId) : null;
+        const payments = await ctx.db
+          .query("payments")
+          .withIndex("by_invoice", (q) => q.eq("invoiceId", invoice._id))
+          .collect();
+
+        const totalPayments = payments.reduce((sum, p) => sum + p.amount, 0);
+        
+        // Calculate advance and invoice payments separately
+        const advancePaid = payments
+          .filter((p: any) => p.type === "advance")
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+        
+        const invoicePaid = payments
+          .filter((p: any) => p.type !== "advance")
+          .reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+        // Calculate outstanding balance
+        // For standalone invoices, always show outstanding balance
+        // For order-based invoices, only show outstanding for shipped/delivered orders
+        const shouldShowOutstanding = invoice.isStandalone || 
+          (order && (order.status === "shipped" || order.status === "delivered"));
+        const calculatedOutstandingBalance = shouldShowOutstanding ? invoice.outstandingBalance : 0;
+
+        return {
+          ...invoice,
+          outstandingBalance: calculatedOutstandingBalance, // Override with calculated value
+          client: client ? {
+            _id: client._id,
+            name: client.name,
+            email: client.email,
+            type: client.type,
+          } : null,
+          order: order ? {
+            _id: order._id,
+            orderNumber: order.orderNumber,
+            status: order.status,
+          } : null,
+          payments,
+          totalPayments,
+          advancePaid,
+          invoicePaid,
+        };
+      })
+    );
+
+    // Return paginated result if paginationOpts was provided, otherwise return all invoices
+    if (args.paginationOpts) {
+      const { numItems, cursor } = args.paginationOpts;
+      const startIndex = cursor ? parseInt(cursor) : 0;
+      const endIndex = startIndex + numItems;
+      const page = invoicesWithDetails.slice(startIndex, endIndex);
+      const isDone = endIndex >= invoicesWithDetails.length;
+      const continueCursor = isDone ? null : endIndex.toString();
+      
+      return {
+        page,
+        isDone,
+        continueCursor,
+      };
+    } else {
+      return invoicesWithDetails;
+    }
+  },
+});
