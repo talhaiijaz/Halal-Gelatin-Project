@@ -1587,52 +1587,6 @@ export const getRecentOrdersForClient = query({
     clientId: v.id("clients"),
     limit: v.optional(v.number()),
   },
-  returns: v.array(v.object({
-    _id: v.id("orders"),
-    _creationTime: v.number(),
-    orderNumber: v.string(),
-    invoiceNumber: v.string(),
-    clientId: v.id("clients"),
-    status: v.union(
-      v.literal("pending"),
-      v.literal("in_production"),
-      v.literal("shipped"),
-      v.literal("delivered"),
-      v.literal("cancelled")
-    ),
-    factoryDepartureDate: v.optional(v.number()),
-    orderCreationDate: v.optional(v.number()),
-    createdAt: v.number(),
-    totalAmount: v.number(),
-    currency: v.string(),
-    fiscalYear: v.optional(v.number()),
-    bankAccountId: v.optional(v.id("bankAccounts")),
-    deliveryDate: v.optional(v.number()),
-    freightCost: v.optional(v.number()),
-    notes: v.optional(v.string()),
-    timelineNotes: v.optional(v.string()),
-    updatedAt: v.number(),
-    client: v.optional(v.object({
-      _id: v.id("clients"),
-      name: v.optional(v.string()),
-      type: v.string(),
-    })),
-    items: v.array(v.object({
-      _id: v.id("orderItems"),
-      product: v.string(),
-      quantityKg: v.number(),
-      unitPrice: v.number(),
-    })),
-    invoice: v.optional(v.object({
-      _id: v.id("invoices"),
-      invoiceNumber: v.optional(v.string()),
-      status: v.union(v.literal("unpaid"), v.literal("partially_paid"), v.literal("paid")),
-      amount: v.number(),
-      totalPaid: v.number(),
-      outstandingBalance: v.number(),
-      currency: v.string(),
-    })),
-  })),
   handler: async (ctx, args) => {
     try {
       const limit = args.limit || 5;
@@ -1685,63 +1639,68 @@ export const getRecentOrdersForClient = query({
     // Enrich orders with details
     const ordersWithDetails = await Promise.all(
       limitedOrders.map(async (order) => {
-        try {
-          // Get order items
-          const items = await ctx.db
-            .query("orderItems")
-            .withIndex("by_order", (q) => q.eq("orderId", order._id))
-            .collect();
+        // Get client details
+        const client = await ctx.db.get(order.clientId);
+        
+        // Get order items
+        const items = await ctx.db
+          .query("orderItems")
+          .withIndex("by_order", (q) => q.eq("orderId", order._id))
+          .collect();
 
-          // Get invoice if exists
-          const invoice = await ctx.db
-            .query("invoices")
-            .withIndex("by_order", (q) => q.eq("orderId", order._id))
-            .first();
+        // Get invoice for this order
+        const invoice = await ctx.db
+          .query("invoices")
+          .withIndex("by_order", (q) => q.eq("orderId", order._id))
+          .first();
 
-          return {
-            ...order,
-            client: client ? {
-              _id: client._id,
-              name: client.name,
-              type: client.type,
-            } : undefined,
-            items: items.map(item => ({
-              _id: item._id,
-              product: item.product,
-              quantityKg: item.quantityKg,
-              unitPrice: item.unitPrice,
-            })),
-            invoice: invoice ? {
-              _id: invoice._id,
-              invoiceNumber: invoice.invoiceNumber || order.invoiceNumber || undefined, // Use invoice number from invoice or fallback to order
-              status: invoice.status,
-              amount: invoice.amount,
-              totalPaid: invoice.totalPaid,
-              outstandingBalance: invoice.outstandingBalance,
-              currency: invoice.currency,
-            } : undefined,
-          };
-        } catch (error) {
-          console.error(`Error processing order ${order._id}:`, error);
-          // Return a minimal order object if there's an error
-          return {
-            ...order,
-            client: client ? {
-              _id: client._id,
-              name: client.name,
-              type: client.type,
-            } : undefined,
-            items: [],
-            invoice: undefined,
-          };
-        }
+        return {
+          _id: order._id,
+          _creationTime: order._creationTime,
+          orderNumber: order.orderNumber,
+          invoiceNumber: order.invoiceNumber,
+          clientId: order.clientId,
+          status: order.status,
+          factoryDepartureDate: order.factoryDepartureDate,
+          orderCreationDate: order.orderCreationDate,
+          createdAt: order.createdAt,
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          fiscalYear: order.fiscalYear,
+          bankAccountId: order.bankAccountId,
+          deliveryDate: order.deliveryDate,
+          freightCost: order.freightCost,
+          notes: order.notes,
+          timelineNotes: order.timelineNotes,
+          updatedAt: order.updatedAt,
+          client: client ? {
+            _id: client._id,
+            name: client.name,
+            type: client.type,
+          } : undefined,
+          items: items.map(item => ({
+            _id: item._id,
+            product: item.product,
+            quantityKg: item.quantityKg,
+            unitPrice: item.unitPrice,
+          })),
+          invoice: invoice ? {
+            _id: invoice._id,
+            invoiceNumber: invoice.invoiceNumber,
+            status: invoice.status,
+            amount: invoice.amount,
+            totalPaid: invoice.totalPaid,
+            outstandingBalance: invoice.outstandingBalance,
+            currency: invoice.currency,
+          } : undefined,
+        };
       })
     );
 
-      return ordersWithDetails;
-    } catch (error) {
-      console.error(`Error in getRecentOrdersForClient for client ${args.clientId}:`, error);
-      throw error;
-    }
-  },
+    return ordersWithDetails;
+  } catch (error) {
+    console.error("Error in getRecentOrdersForClient:", error);
+    throw error;
+  }
+},
 });
