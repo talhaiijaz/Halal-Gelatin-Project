@@ -26,14 +26,6 @@ import {
   Settings
 } from "lucide-react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
 
 import { getCurrentFiscalYear, getFiscalYearLabel } from "@/app/utils/fiscalYear";
@@ -88,7 +80,6 @@ export default function FinancePage() {
 
   // Fetch dashboard data
   const dashboardStats = useQuery(api.finance.getDashboardStats, { year: currentFiscalYear });
-  const monthlyStats = useQuery(api.finance.getMonthlyOrderStats, { year: currentFiscalYear });
   
   // Fetch invoices data with pagination
   const invoicesData = useQuery(api.invoices.list, { 
@@ -306,27 +297,7 @@ export default function FinancePage() {
             </div>
           </div>
 
-          {/* Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Monthly Orders Chart */}
-            <div className="lg:col-span-2 card p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                Number of Orders per Month
-              </h2>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={monthlyStats || []}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => formatNumber(Number(value))} />
-                  <Legend />
-                  <Bar dataKey="orders" fill="#B8621B" name="Total Orders" />
-                  <Bar dataKey="activeOrders" fill="#4ADE80" name="Active Orders" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-          </div>
+          
 
         </div>
       )}
