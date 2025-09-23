@@ -56,22 +56,28 @@ export default function ClientDetailPage() {
   const updateClient = useMutation(api.clients.update);
   
   // Fetch recent orders for this client (top 5)
-  const recentOrders = useQuery(api.orders.getRecentOrdersForClient, { 
-    clientId,
-    limit: 5
-  });
+  const recentOrders = useQuery(api.orders.getRecentOrdersForClient, 
+    clientId ? { 
+      clientId,
+      limit: 5
+    } : "skip"
+  );
   
   // Fetch all orders for this client (for the "View All Orders" functionality)
-  const allOrdersData = useQuery(api.orders.list, { 
-    clientId,
-    paginationOpts: ordersPagination.paginationOpts
-  });
+  const allOrdersData = useQuery(api.orders.list, 
+    clientId ? { 
+      clientId,
+      paginationOpts: ordersPagination.paginationOpts
+    } : "skip"
+  );
   
   // Extract orders array (handle both paginated and non-paginated responses)
   const allOrders = Array.isArray(allOrdersData) ? allOrdersData : allOrdersData?.page || [];
   
   // Fetch standalone invoices for this client
-  const standaloneInvoices = useQuery(api.clients.getStandaloneInvoices, { clientId });
+  const standaloneInvoices = useQuery(api.clients.getStandaloneInvoices, 
+    clientId ? { clientId } : "skip"
+  );
 
   const getClientCurrency = (clientType: string): SupportedCurrency => {
     return getCurrencyForClientType(clientType as 'local' | 'international', 'USD');

@@ -1634,7 +1634,15 @@ export const getRecentOrdersForClient = query({
     })),
   })),
   handler: async (ctx, args) => {
-    const limit = args.limit || 5;
+    try {
+      const limit = args.limit || 5;
+
+      // Validate client exists
+      const client = await ctx.db.get(args.clientId);
+      if (!client) {
+        console.error(`Client with ID ${args.clientId} not found`);
+        throw new Error(`Client with ID ${args.clientId} not found`);
+      }
 
     // Get all orders for the client
     const allClientOrders = await ctx.db
@@ -1642,10 +1650,14 @@ export const getRecentOrdersForClient = query({
       .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
       .collect();
 
+    console.log(`Found ${allClientOrders.length} orders for client ${args.clientId}`);
+
     // Filter to only upcoming-relevant statuses
     const candidateOrders = allClientOrders.filter(
       (o) => o.status === "pending" || o.status === "in_production"
     );
+
+    console.log(`Found ${candidateOrders.length} candidate orders (pending/in_production)`);
 
     // Partition by date relative to today
     const now = Date.now();
@@ -1670,48 +1682,66 @@ export const getRecentOrdersForClient = query({
     const ordered = futureOrToday.concat(past);
     const limitedOrders = ordered.slice(0, limit);
 
-    // Get client details and enrich orders
-    const client = await ctx.db.get(args.clientId);
+    // Enrich orders with details
     const ordersWithDetails = await Promise.all(
       limitedOrders.map(async (order) => {
-        // Get order items
-        const items = await ctx.db
-          .query("orderItems")
-          .withIndex("by_order", (q) => q.eq("orderId", order._id))
-          .collect();
+        try {
+          // Get order items
+          const items = await ctx.db
+            .query("orderItems")
+            .withIndex("by_order", (q) => q.eq("orderId", order._id))
+            .collect();
 
-        // Get invoice if exists
-        const invoice = await ctx.db
-          .query("invoices")
-          .withIndex("by_order", (q) => q.eq("orderId", order._id))
-          .first();
+          // Get invoice if exists
+          const invoice = await ctx.db
+            .query("invoices")
+            .withIndex("by_order", (q) => q.eq("orderId", order._id))
+            .first();
 
-        return {
-          ...order,
-          client: client ? {
-            _id: client._id,
-            name: client.name,
-            type: client.type,
-          } : undefined,
-          items: items.map(item => ({
-            _id: item._id,
-            product: item.product,
-            quantityKg: item.quantityKg,
-            unitPrice: item.unitPrice,
-          })),
-          invoice: invoice ? {
-            _id: invoice._id,
-            invoiceNumber: invoice.invoiceNumber || order.invoiceNumber, // Use invoice number from invoice or fallback to order
-            status: invoice.status,
-            amount: invoice.amount,
-            totalPaid: invoice.totalPaid,
-            outstandingBalance: invoice.outstandingBalance,
-            currency: invoice.currency,
-          } : undefined,
-        };
+          return {
+            ...order,
+            client: client ? {
+              _id: client._id,
+              name: client.name,
+              type: client.type,
+            } : undefined,
+            items: items.map(item => ({
+              _id: item._id,
+              product: item.product,
+              quantityKg: item.quantityKg,
+              unitPrice: item.unitPrice,
+            })),
+            invoice: invoice ? {
+              _id: invoice._id,
+              invoiceNumber: invoice.invoiceNumber || order.invoiceNumber || undefined, // Use invoice number from invoice or fallback to order
+              status: invoice.status,
+              amount: invoice.amount,
+              totalPaid: invoice.totalPaid,
+              outstandingBalance: invoice.outstandingBalance,
+              currency: invoice.currency,
+            } : undefined,
+          };
+        } catch (error) {
+          console.error(`Error processing order ${order._id}:`, error);
+          // Return a minimal order object if there's an error
+          return {
+            ...order,
+            client: client ? {
+              _id: client._id,
+              name: client.name,
+              type: client.type,
+            } : undefined,
+            items: [],
+            invoice: undefined,
+          };
+        }
       })
     );
 
-    return ordersWithDetails;
+      return ordersWithDetails;
+    } catch (error) {
+      console.error(`Error in getRecentOrdersForClient for client ${args.clientId}:`, error);
+      throw error;
+    }
   },
 });
