@@ -30,7 +30,7 @@ export const debugFiscalYears = query({
   args: {},
   returns: v.array(v.object({
     _id: v.id("orders"),
-    invoiceNumber: v.string(),
+    invoiceNumber: v.optional(v.string()),
     fiscalYear: v.optional(v.number()),
     createdAt: v.number(),
     orderCreationDate: v.optional(v.number()),

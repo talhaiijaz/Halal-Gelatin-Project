@@ -550,7 +550,7 @@ export const getOrdersByStatus = query({
   returns: v.object({
     pendingOrders: v.array(v.object({
       _id: v.id("orders"),
-      invoiceNumber: v.string(),
+      invoiceNumber: v.optional(v.string()),
       clientName: v.union(v.string(), v.null()),
       totalQuantity: v.number(),
       currency: v.string(),
@@ -561,7 +561,7 @@ export const getOrdersByStatus = query({
     })),
     inProductionOrders: v.array(v.object({
       _id: v.id("orders"),
-      invoiceNumber: v.string(),
+      invoiceNumber: v.optional(v.string()),
       clientName: v.union(v.string(), v.null()),
       totalQuantity: v.number(),
       currency: v.string(),
@@ -572,7 +572,7 @@ export const getOrdersByStatus = query({
     })),
     shippedOrders: v.array(v.object({
       _id: v.id("orders"),
-      invoiceNumber: v.string(),
+      invoiceNumber: v.optional(v.string()),
       clientName: v.union(v.string(), v.null()),
       totalQuantity: v.number(),
       currency: v.string(),
@@ -583,7 +583,7 @@ export const getOrdersByStatus = query({
     })),
     deliveredOrders: v.array(v.object({
       _id: v.id("orders"),
-      invoiceNumber: v.string(),
+      invoiceNumber: v.optional(v.string()),
       clientName: v.union(v.string(), v.null()),
       totalQuantity: v.number(),
       currency: v.string(),
@@ -683,7 +683,7 @@ export const getReceivablesDetails = query({
   returns: v.array(
     v.object({
       invoiceId: v.id("invoices"),
-      invoiceNumber: v.union(v.string(), v.null()),
+      invoiceNumber: v.optional(v.string()),
       clientId: v.id("clients"),
       clientName: v.union(v.string(), v.null()),
       orderId: v.id("orders"),
@@ -723,7 +723,7 @@ export const getReceivablesDetails = query({
     // Receivables are rolling - no fiscal year filtering
     // Only shipped/delivered orders and positive outstanding
     const result = [] as Array<{
-      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; outstandingBalance: number; outstandingBalanceUSD: number; issueDate: number; dueDate: number;
+      invoiceId: any; invoiceNumber: string | undefined; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; outstandingBalance: number; outstandingBalanceUSD: number; issueDate: number; dueDate: number;
     }>;
 
     for (const inv of invoices) {
@@ -737,7 +737,7 @@ export const getReceivablesDetails = query({
       
       result.push({
         invoiceId: inv._id,
-        invoiceNumber: inv.invoiceNumber || null,
+        invoiceNumber: inv.invoiceNumber || undefined,
         clientId: inv.clientId,
         clientName: (client as any)?.name || null,
         orderId: inv.orderId,
@@ -763,7 +763,7 @@ export const getAdvancePaymentsDetails = query({
   returns: v.array(
     v.object({
       invoiceId: v.id("invoices"),
-      invoiceNumber: v.union(v.string(), v.null()),
+      invoiceNumber: v.optional(v.string()),
       clientId: v.id("clients"),
       clientName: v.union(v.string(), v.null()),
       orderId: v.id("orders"),
@@ -803,7 +803,7 @@ export const getAdvancePaymentsDetails = query({
     // Advance payments are rolling - no fiscal year filtering
 
     const result = [] as Array<{
-      invoiceId: any; invoiceNumber: string | null; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; advancePaid: number; advancePaidUSD: number; issueDate: number; dueDate: number;
+      invoiceId: any; invoiceNumber: string | undefined; clientId: any; clientName: string | null; orderId: any; orderNumber: string; currency: string; advancePaid: number; advancePaidUSD: number; issueDate: number; dueDate: number;
     }>;
     for (const inv of invoices) {
       const order = orders.find((o) => o._id === inv.orderId);
@@ -816,7 +816,7 @@ export const getAdvancePaymentsDetails = query({
       
       result.push({
         invoiceId: inv._id,
-        invoiceNumber: inv.invoiceNumber || null,
+        invoiceNumber: inv.invoiceNumber || undefined,
         clientId: inv.clientId,
         clientName: (client as any)?.name || null,
         orderId: inv.orderId,
@@ -851,7 +851,7 @@ export const getRevenueDetails = query({
       method: v.string(),
       reference: v.string(),
       invoiceId: v.union(v.id("invoices"), v.null()),
-      invoiceNumber: v.union(v.string(), v.null()),
+      invoiceNumber: v.optional(v.string()),
     })
   ),
   handler: async (ctx, args) => {
@@ -913,7 +913,7 @@ export const getRevenueDetails = query({
         method: p.method,
         reference: p.reference,
         invoiceId: (invoice && invoice._id) || null,
-        invoiceNumber: (invoice && invoice.invoiceNumber) || null,
+        invoiceNumber: (invoice && invoice.invoiceNumber) || undefined,
       };
     });
     return result;
@@ -930,7 +930,7 @@ export const getPendingOrdersDetails = query({
     v.object({
       orderId: v.id("orders"),
       orderNumber: v.string(),
-      invoiceNumber: v.union(v.string(), v.null()),
+      invoiceNumber: v.optional(v.string()),
       clientId: v.id("clients"),
       clientName: v.union(v.string(), v.null()),
       status: v.string(),
@@ -981,7 +981,7 @@ export const getPendingOrdersDetails = query({
     }
     // Pending orders are rolling - no fiscal year filtering
 
-    const result = [] as Array<{ orderId: any; orderNumber: string; invoiceNumber: string | null; clientId: any; clientName: string | null; status: string; totalAmount: number; totalAmountUSD: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
+    const result = [] as Array<{ orderId: any; orderNumber: string; invoiceNumber: string | undefined; clientId: any; clientName: string | null; status: string; totalAmount: number; totalAmountUSD: number; currency: string; totalQuantity: number; factoryDepartureDate: number | null }>;
 
     for (const order of orders) {
       const client = clients.find((c) => c._id === order.clientId);
@@ -995,7 +995,7 @@ export const getPendingOrdersDetails = query({
       result.push({
         orderId: order._id,
         orderNumber: order.orderNumber,
-        invoiceNumber: order.invoiceNumber || null,
+        invoiceNumber: order.invoiceNumber || undefined,
         clientId: order.clientId,
         clientName: (client as any)?.name || null,
         status: order.status,

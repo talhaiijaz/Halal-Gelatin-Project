@@ -1123,7 +1123,7 @@ export default function LocalClientsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {pendingOrdersDetails.map((row) => (
+                          {pendingOrdersDetails.map((row: any) => (
                             <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                               <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -1172,7 +1172,7 @@ export default function LocalClientsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {advanceDetails.map((row) => (
+                          {advanceDetails.map((row: any) => (
                             <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                               <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -1214,7 +1214,7 @@ export default function LocalClientsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {receivablesDetails.map((row) => (
+                          {receivablesDetails.map((row: any) => (
                             <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                               <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -1257,7 +1257,7 @@ export default function LocalClientsPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {revenueDetails.map((row) => (
+                          {revenueDetails.map((row: any) => (
                             <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
                               <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
                               <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>

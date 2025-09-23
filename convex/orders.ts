@@ -1539,7 +1539,7 @@ export const checkAllOrdersHaveBanks = query({
     ordersWithoutBanks: v.array(v.object({
       _id: v.id("orders"),
       orderNumber: v.string(),
-      invoiceNumber: v.string(),
+      invoiceNumber: v.optional(v.string()),
       clientId: v.id("clients"),
     })),
   }),
@@ -1591,7 +1591,7 @@ export const getRecentOrdersForClient = query({
     _id: v.id("orders"),
     _creationTime: v.number(),
     orderNumber: v.string(),
-    invoiceNumber: v.string(),
+    invoiceNumber: v.optional(v.string()),
     clientId: v.id("clients"),
     status: v.union(
       v.literal("pending"),
@@ -1625,7 +1625,7 @@ export const getRecentOrdersForClient = query({
     })),
     invoice: v.optional(v.object({
       _id: v.id("invoices"),
-      invoiceNumber: v.string(),
+      invoiceNumber: v.optional(v.string()),
       status: v.union(v.literal("unpaid"), v.literal("partially_paid"), v.literal("paid")),
       amount: v.number(),
       totalPaid: v.number(),
@@ -1701,7 +1701,7 @@ export const getRecentOrdersForClient = query({
           })),
           invoice: invoice ? {
             _id: invoice._id,
-            invoiceNumber: order.invoiceNumber, // Use the invoice number from the order
+            invoiceNumber: invoice.invoiceNumber || order.invoiceNumber, // Use invoice number from invoice or fallback to order
             status: invoice.status,
             amount: invoice.amount,
             totalPaid: invoice.totalPaid,

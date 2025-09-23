@@ -730,7 +730,7 @@ export default function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {pendingOrdersDetails.map((row) => (
+                             {pendingOrdersDetails.map((row: any) => (
                               <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -757,7 +757,7 @@ export default function DashboardPage() {
                               <span className="text-sm font-medium text-gray-700">Total USD:</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
-                                  pendingOrdersDetails.reduce((sum, row) => sum + (row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency)), 0),
+                                  pendingOrdersDetails.reduce((sum: number, row: any) => sum + (row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency)), 0),
                                   'USD'
                                 )}
                               </span>
@@ -797,7 +797,7 @@ export default function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {advanceDetails.map((row) => (
+                            {advanceDetails.map((row: any) => (
                               <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -818,7 +818,7 @@ export default function DashboardPage() {
                               <span className="text-sm font-medium text-gray-700">Total USD:</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
-                                  advanceDetails.reduce((sum, row) => sum + (row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency)), 0),
+                                  advanceDetails.reduce((sum: number, row: any) => sum + (row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency)), 0),
                                   'USD'
                                 )}
                               </span>
@@ -858,7 +858,7 @@ export default function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {receivablesDetails.map((row) => (
+                            {receivablesDetails.map((row: any) => (
                               <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -879,7 +879,7 @@ export default function DashboardPage() {
                               <span className="text-sm font-medium text-gray-700">Total USD:</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
-                                  receivablesDetails.reduce((sum, row) => sum + (row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency)), 0),
+                                  receivablesDetails.reduce((sum: number, row: any) => sum + (row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency)), 0),
                                   'USD'
                                 )}
                               </span>
@@ -919,7 +919,7 @@ export default function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {revenueDetails.map((row) => (
+                            {revenueDetails.map((row: any) => (
                               <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
@@ -940,7 +940,7 @@ export default function DashboardPage() {
                               <span className="text-sm font-medium text-gray-700">Total USD:</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
-                                  revenueDetails.reduce((sum, row) => sum + (row.amountUSD || convertToUsd(row.amount, row.currency)), 0),
+                                  revenueDetails.reduce((sum: number, row: any) => sum + (row.amountUSD || convertToUsd(row.amount, row.currency)), 0),
                                   'USD'
                                 )}
                               </span>
