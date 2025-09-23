@@ -25,8 +25,7 @@ import {
   Building2,
   Settings
 } from "lucide-react";
-import {
-} from "recharts";
+ 
 
 import { getCurrentFiscalYear, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 import { formatDateForDisplay } from "@/app/utils/dateUtils";
