@@ -1591,7 +1591,7 @@ export const getRecentOrdersForClient = query({
     _id: v.id("orders"),
     _creationTime: v.number(),
     orderNumber: v.string(),
-    invoiceNumber: v.optional(v.string()),
+    invoiceNumber: v.string(),
     clientId: v.id("clients"),
     status: v.union(
       v.literal("pending"),
