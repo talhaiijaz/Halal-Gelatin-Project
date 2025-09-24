@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@auth/core": "^0.37.0",
+    "@clerk/nextjs": "^6.32.2",
     "convex": "^1.17.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",

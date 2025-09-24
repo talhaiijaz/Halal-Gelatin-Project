@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { useAuth } from "./AuthProvider";
+import { UserButton } from "@clerk/nextjs";
 import {
   Home,
   Users,
@@ -13,7 +13,6 @@ import {
   ChevronDown,
   Package,
   Settings,
-  LogOut,
   Activity,
   Truck,
   HelpCircle,
@@ -58,7 +57,6 @@ export default function Sidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const pathname = usePathname();
-  const { logout } = useAuth();
 
   const toggleExpanded = (itemName: string) => {
     setExpandedItems((prev) =>
@@ -204,16 +202,18 @@ export default function Sidebar() {
               <HelpCircle className="mr-3 h-4 w-4 text-gray-400" />
               Help Center
             </Link>
-            <button
-              onClick={() => {
-                logout();
-                setMobileMenuOpen(false);
-              }}
-              className="flex items-center w-full px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
-            >
-              <LogOut className="mr-3 h-4 w-4 text-gray-400" />
-              Logout
-            </button>
+            <div className="flex items-center w-full px-3 py-2">
+              <UserButton 
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8",
+                    userButtonPopoverCard: "shadow-lg",
+                    userButtonPopoverActionButton: "text-gray-700 hover:bg-gray-50"
+                  }
+                }}
+                afterSignOutUrl="/login"
+              />
+            </div>
           </div>
         </div>
       </div>
