@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { formatCurrency, SupportedCurrency } from "@/app/utils/currencyFormat";
-import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 interface StandaloneInvoiceDetailModalProps {
   invoiceId: Id<"invoices">;
@@ -47,8 +47,9 @@ export default function StandaloneInvoiceDetailModal({
   const invoice = useQuery(api.invoices.get, invoiceId ? { id: invoiceId } : "skip");
   const updateStandaloneInvoice = useMutation(api.invoices.updateStandalone);
 
-  // Lock body scroll when modal is open
-  useModalBodyScrollLock(isOpen);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   // Update form data when invoice loads
   useEffect(() => {
@@ -142,7 +143,7 @@ export default function StandaloneInvoiceDetailModal({
 
   if (!invoice) {
     return (
-      <div className={`fixed inset-0 z-50 overflow-hidden ${isOpen ? 'block' : 'hidden'}`}>
+      <div className={`fixed inset-0 z-[9999] overflow-hidden ${isOpen ? 'block' : 'hidden'}`}>
         <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
         <div className={`absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
@@ -162,7 +163,7 @@ export default function StandaloneInvoiceDetailModal({
   // Check if this is actually a standalone invoice
   if (!invoice.isStandalone) {
     return (
-      <div className={`fixed inset-0 z-50 overflow-hidden ${isOpen ? 'block' : 'hidden'}`}>
+      <div className={`fixed inset-0 z-[9999] overflow-hidden ${isOpen ? 'block' : 'hidden'}`}>
         <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
         <div className={`absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl transform transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
@@ -192,7 +193,7 @@ export default function StandaloneInvoiceDetailModal({
   }
 
   return (
-    <div className={`fixed inset-0 z-50 overflow-hidden ${isOpen ? 'block' : 'hidden'}`}>
+    <div className={`fixed inset-0 z-[9999] overflow-hidden ${isOpen ? 'block' : 'hidden'}`}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
       

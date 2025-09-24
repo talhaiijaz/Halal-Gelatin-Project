@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { X, Calendar } from "lucide-react";
 import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 interface DatePickerModalProps {
   isOpen: boolean;
@@ -25,26 +26,9 @@ export default function DatePickerModal({
   const [selectedDate, setSelectedDate] = useState("");
   const [error, setError] = useState("");
 
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const originalStyle = document.body.style.overflow;
-      const scrollY = window.scrollY;
-      
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      
-      return () => {
-        document.body.style.overflow = originalStyle;
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        window.scrollTo(0, scrollY);
-      };
-    }
-  }, [isOpen]);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   if (!isOpen) return null;
 

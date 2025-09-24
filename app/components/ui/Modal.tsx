@@ -1,8 +1,9 @@
 "use client";
 
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useModalManager } from '@/app/hooks/useModalManager';
 
 interface ModalProps {
   isOpen: boolean;
@@ -34,26 +35,11 @@ export default function Modal({
   closeOnBackdropClick = true,
   className = '',
 }: ModalProps) {
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const originalStyle = document.body.style.overflow;
-      const scrollY = window.scrollY;
-      
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      
-      return () => {
-        document.body.style.overflow = originalStyle;
-        document.body.style.position = '';
-        document.body.style.top = '';
-        document.body.style.width = '';
-        window.scrollTo(0, scrollY);
-      };
-    }
-  }, [isOpen]);
+  // Generate unique modal ID
+  const modalId = useId();
+  
+  // Manage modal state and scroll locking
+  useModalManager(modalId, isOpen);
 
   if (!isOpen) return null;
 
@@ -65,7 +51,7 @@ export default function Modal({
 
   const modalContent = (
     <div 
-      className="fixed z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50"
+      className="fixed z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50"
       style={{ 
         top: 0, 
         left: 0, 

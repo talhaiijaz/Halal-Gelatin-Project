@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useId } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -8,7 +8,7 @@ import Modal from "@/app/components/ui/Modal";
 import { Calendar, DollarSign, FileText, User, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getCurrencyForClientType, SupportedCurrency } from "@/app/utils/currencyFormat";
-import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 interface CreateStandaloneInvoiceModalProps {
   isOpen: boolean;
@@ -39,8 +39,9 @@ export default function CreateStandaloneInvoiceModal({
 
   const createStandaloneInvoice = useMutation(api.invoices.createStandalone);
 
-  // Lock body scroll when modal is open
-  useModalBodyScrollLock(isOpen);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({

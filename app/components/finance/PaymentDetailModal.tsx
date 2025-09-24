@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -8,7 +8,7 @@ import { X, DollarSign, Calendar, User, Building, FileText, Edit, Trash2, Eye } 
 import ActivityLog from "../ActivityLog";
 import EditPaymentModal from "./EditPaymentModal";
 import DeleteConfirmModal from "./DeleteConfirmModal";
-import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { useModalManager } from "@/app/hooks/useModalManager";
 import { formatCurrency, SupportedCurrency } from "@/app/utils/currencyFormat";
 
 interface PaymentDetailModalProps {
@@ -23,8 +23,9 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
-  // Lock body scroll when modal is open
-  useModalBodyScrollLock(isOpen);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   if (!isOpen || !paymentId) return null;
 
@@ -65,7 +66,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-[9999] overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl">
         <div className="flex h-full flex-col">

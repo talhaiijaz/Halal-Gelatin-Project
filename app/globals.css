@@ -15,6 +15,15 @@
 
   body {
     @apply bg-gray-50 text-gray-900;
+    /* Prevent scroll issues */
+    overflow-x: hidden;
+    /* Smooth scrolling */
+    scroll-behavior: smooth;
+  }
+
+  /* Ensure proper scroll restoration */
+  html {
+    scroll-behavior: smooth;
   }
 }
 

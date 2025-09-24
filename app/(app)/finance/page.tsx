@@ -609,20 +609,6 @@ export default function FinancePage() {
                 )}
               </div>
               
-              {/* View All Button */}
-              {filteredNeedToComeList.length > 5 && (
-                <div className="mt-4 text-center">
-                  <button
-                    onClick={() => {
-                      setActiveTab("invoices");
-                      setPakistanTransferFilter("need_to_come");
-                    }}
-                    className="text-sm text-orange-600 hover:text-orange-800 font-medium"
-                  >
-                    View All {filteredNeedToComeList.length} Invoices →
-                  </button>
-                </div>
-              )}
             </div>
 
             {/* Came to Pakistan */}
@@ -693,20 +679,6 @@ export default function FinancePage() {
                 )}
               </div>
               
-              {/* View All Button */}
-              {filteredCameToPakistanList.length > 5 && (
-                <div className="mt-4 text-center">
-                  <button
-                    onClick={() => {
-                      setActiveTab("invoices");
-                      setPakistanTransferFilter("came_to_pakistan");
-                    }}
-                    className="text-sm text-green-600 hover:text-green-800 font-medium"
-                  >
-                    View All {filteredCameToPakistanList.length} Invoices →
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 

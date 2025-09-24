@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, Search, Plus } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
@@ -12,7 +12,7 @@ import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUt
 import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 import { formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import toast from "react-hot-toast";
-import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 // Validation function for bloom format
 const isValidBloomFormat = (bloom: string): boolean => {
@@ -119,8 +119,9 @@ export default function CreateOrderModal({
   const bankAccounts = useQuery(api.banks.list);
   const createOrder = useMutation(api.orders.create);
 
-  // Lock body scroll when modal is open
-  useModalBodyScrollLock(isOpen);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   // Currency helpers
   const selectedClient = (Array.isArray(clients) ? clients : clients?.page || []).find(c => c._id === selectedClientId);

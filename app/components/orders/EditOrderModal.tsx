@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight, Search, Plus } from "lucide-react";
 import { useQuery, useMutation } from "convex/react";
@@ -12,7 +12,7 @@ import { ALL_BLOOM_OPTIONS } from "@/app/utils/bloomRanges";
 import { dateStringToTimestamp, timestampToDateString } from "@/app/utils/dateUtils";
 import { formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import toast from "react-hot-toast";
-import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 // Validation function for bloom format
 const isValidBloomFormat = (bloom: string): boolean => {
@@ -114,8 +114,9 @@ export default function EditOrderModal({
   const bankAccounts = useQuery(api.banks.list);
   const updateOrder = useMutation(api.orders.update);
 
-  // Lock body scroll when modal is open
-  useModalBodyScrollLock(isOpen);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   // Date validation helper
   const validateOrderCreationDate = (date: string, fiscalYear: number): boolean => {

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { X, FileText, User, Package, DollarSign, Calendar, ArrowUpDown } from "lucide-react";
 import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { type Payment, type OrderItem } from "@/app/types";
-import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { useModalManager } from "@/app/hooks/useModalManager";
 import PaymentDetailModal from "./PaymentDetailModal";
 
 
@@ -25,8 +25,9 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
   const [showPaymentDetail, setShowPaymentDetail] = useState(false);
   const [selectedPaymentId, setSelectedPaymentId] = useState<Id<"payments"> | null>(null);
   
-  // Lock body scroll when modal is open
-  useModalBodyScrollLock(isOpen);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   if (!isOpen || !invoiceId) return null;
 
@@ -40,7 +41,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
   const invoicePaymentTotal = invoice?.invoicePaid ?? payments.filter((p: any) => p.type !== "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-[9999] overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl sm:rounded-l-xl">
         <div className="flex h-full flex-col">

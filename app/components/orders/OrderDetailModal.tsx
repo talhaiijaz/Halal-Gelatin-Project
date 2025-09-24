@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -32,7 +32,7 @@ import { api as convexApi } from "@/convex/_generated/api";
 import { formatCurrency, formatCurrencyPrecise, type SupportedCurrency } from "@/app/utils/currencyFormat";
 import { displayError } from "@/app/utils/errorHandling";
 import { type OrderStatus, type Payment } from "@/app/types";
-import { useModalBodyScrollLock } from "@/app/hooks/useBodyScrollLock";
+import { useModalManager } from "@/app/hooks/useModalManager";
 import { getFiscalYearForDate, getFiscalYearLabel } from "@/app/utils/fiscalYear";
 
 interface OrderDetailModalProps {
@@ -57,8 +57,9 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState<"pending" | "in_production" | "shipped" | "delivered" | "cancelled" | null>(null);
 
-  // Lock body scroll when modal is open
-  useModalBodyScrollLock(isOpen);
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   if (!isOpen || !orderId) return null;
 
@@ -143,7 +144,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   // Note: formatCurrency is now imported from utils/currencyFormat
 
   const modalContent = (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-[9999] overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl sm:rounded-l-xl">
         <div className="flex h-full flex-col">
