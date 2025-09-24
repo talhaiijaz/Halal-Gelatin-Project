@@ -1,18 +1,8 @@
 "use client";
 
-import { SignIn } from '@clerk/nextjs';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { SignUp } from '@clerk/nextjs';
 
-export default function LoginPage() {
-  const router = useRouter();
-
-  const handleSignInSuccess = () => {
-    // After successful sign-in, check if MFA is required
-    // The middleware will handle redirecting to /verify-mfa if needed
-    router.push('/dashboard');
-  };
-
+export default function SignUpPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
@@ -25,14 +15,14 @@ export default function LoginPage() {
             />
           </div>
           <h2 className="mt-4 sm:mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
-            Sign in to your account
+            Create your account
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Halal Gelatin CRM System
           </p>
         </div>
         <div className="flex justify-center">
-          <SignIn 
+          <SignUp 
             appearance={{
               elements: {
                 formButtonPrimary: 'bg-orange-600 hover:bg-orange-700 text-sm normal-case',
@@ -45,7 +35,6 @@ export default function LoginPage() {
               }
             }}
             redirectUrl="/sso-callback"
-            afterSignInUrl="/sso-callback"
             afterSignUpUrl="/sso-callback"
           />
         </div>

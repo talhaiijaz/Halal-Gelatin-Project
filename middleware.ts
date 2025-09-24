@@ -17,7 +17,9 @@ const isProtectedRoute = createRouteMatcher([
 
 const isPublicRoute = createRouteMatcher([
   '/login(.*)',
+  '/sign-up(.*)',
   '/verify-mfa(.*)',
+  '/sso-callback(.*)',
   '/',
 ])
 
