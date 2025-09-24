@@ -15,7 +15,13 @@ export const metadata: Metadata = {
   description: "Gelatin Manufacturing CRM System",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icons/icon-192.png",
+    icon: [
+      { url: "/images/Logo-Final-Vector-22.png", type: "image/png" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    shortcut: [
+      "/images/Logo-Final-Vector-22.png",
+    ],
     apple: "/apple-touch-icon.png",
   },
 };
