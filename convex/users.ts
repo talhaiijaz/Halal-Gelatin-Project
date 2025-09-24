@@ -7,8 +7,41 @@ export const getCurrentUserRole = query({
   args: {},
   returns: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user"), v.null()),
   handler: async (ctx) => {
-    // For now, we'll return null and handle this in the frontend
-    return null;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) return null;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .unique();
+
+    return user?.role ?? null;
+  },
+});
+
+// Check if the current user is in any of the required roles
+export const isUserInRoles = query({
+  args: {
+    roles: v.array(v.union(
+      v.literal("admin"),
+      v.literal("sales"),
+      v.literal("finance"),
+      v.literal("operations"),
+      v.literal("user")
+    )),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity?.email) return false;
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", identity.email!))
+      .unique();
+
+    if (!user) return false;
+    return args.roles.includes(user.role);
   },
 });
 
@@ -17,7 +50,7 @@ export const isUserAdmin = query({
   args: { userId: v.string() },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    // All users have full permissions
+    // Deprecated: prefer isUserInRoles/getCurrentUserRole. Keep returning true for now.
     return true;
   },
 });

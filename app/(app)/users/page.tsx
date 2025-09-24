@@ -3,6 +3,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useState } from "react";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { Plus, Edit, Shield, User } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -18,7 +19,7 @@ export default function UsersPage() {
   // Get all users
   const users = useQuery(api.users.getAllUsers);
   
-  // For now, assume all users have admin access since we're not using external auth
+  // Access is enforced by ProtectedRoute; within page we assume admin
   const isAdmin = true;
 
   // Mutations
@@ -61,18 +62,7 @@ export default function UsersPage() {
     setShowAddModal(true);
   };
 
-  // If not admin, show access denied
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Shield className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
-          <p className="text-gray-600">Only administrators can access the users page.</p>
-        </div>
-      </div>
-    );
-  }
+  // Note: top-level access handled by ProtectedRoute in layout export
 
   // Loading state
   if (users === undefined) {
@@ -83,7 +73,7 @@ export default function UsersPage() {
     );
   }
 
-  return (
+  const content = (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -233,5 +223,11 @@ export default function UsersPage() {
         </div>
       )}
     </div>
+  );
+
+  return (
+    <ProtectedRoute requiredRoles={["admin"]}>
+      {content}
+    </ProtectedRoute>
   );
 }
