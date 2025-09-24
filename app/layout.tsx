@@ -35,7 +35,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${inter.className} h-full bg-white`}>
-        <ClerkProvider>
+        <ClerkProvider
+          signInUrl="/login"
+          afterSignInUrl="/sso-callback"
+        >
           <ErrorBoundary>
             <AuthProvider>
               <ConvexClientProvider>

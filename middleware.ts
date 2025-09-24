@@ -17,8 +17,6 @@ const isProtectedRoute = createRouteMatcher([
 
 const isPublicRoute = createRouteMatcher([
   '/login(.*)',
-  '/sign-up(.*)',
-  '/verify-mfa(.*)',
   '/sso-callback(.*)',
   '/test-sso(.*)',
   '/',
@@ -35,17 +33,6 @@ export default clerkMiddleware(async (auth, req) => {
   // Protect all other routes
   if (isProtectedRoute(req)) {
     await auth.protect()
-    
-    // Check MFA status for authenticated users
-    if (userId && sessionClaims) {
-      // Check if user has completed MFA verification
-      const isMfaVerified = sessionClaims.mfa_verified
-      
-      // If MFA is required but not verified, redirect to verification page
-      if (isMfaVerified === false) {
-        return NextResponse.redirect(new URL('/verify-mfa', req.url))
-      }
-    }
   }
   
   return NextResponse.next()
