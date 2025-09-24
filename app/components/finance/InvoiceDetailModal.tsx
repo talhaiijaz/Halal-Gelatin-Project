@@ -322,11 +322,15 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-gray-600">From:</span>
-                              <span className="font-medium">{transfer.fromBank?.bankName} ({transfer.fromBank?.country || 'Unknown'})</span>
+                              <span className="font-medium">
+                                {transfer.fromBank?.accountName} - {transfer.fromBank?.bankName} ({transfer.fromBank?.country || 'Unknown'})
+                              </span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-gray-600">To:</span>
-                              <span className="font-medium">{transfer.toBank?.bankName} ({transfer.toBank?.country || 'Unknown'})</span>
+                              <span className="font-medium">
+                                {transfer.toBank?.accountName} - {transfer.toBank?.bankName} ({transfer.toBank?.country || 'Unknown'})
+                              </span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-gray-600">Status:</span>

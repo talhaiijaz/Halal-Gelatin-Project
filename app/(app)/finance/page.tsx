@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -60,13 +60,16 @@ export default function FinancePage() {
   // Search states
   const [invoicesSearchTerm, setInvoicesSearchTerm] = useState("");
   const [paymentsSearchTerm, setPaymentsSearchTerm] = useState("");
+  const [pakistanSearchTerm, setPakistanSearchTerm] = useState("");
   
   // Filter states
   const [invoicesStatusFilter, setInvoicesStatusFilter] = useState<string>("all");
+  const [pakistanTransferFilter, setPakistanTransferFilter] = useState<string>("all");
   
   // Pagination hooks
   const paymentsPagination = usePagination({ pageSize: 10 });
   const invoicesPagination = usePagination({ pageSize: 10 });
+  const pakistanFilterPagination = usePagination({ pageSize: 10 });
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <TrendingUp className="h-4 w-4" /> },
@@ -77,6 +80,11 @@ export default function FinancePage() {
 
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
 
+  // Reset Pakistan filter pagination when filter changes
+  useEffect(() => {
+    pakistanFilterPagination.goToPage(0);
+  }, [pakistanTransferFilter, invoicesStatusFilter]);
+
   // Fetch dashboard data
   const dashboardStats = useQuery(api.finance.getDashboardStats, { year: currentFiscalYear });
   
@@ -85,6 +93,11 @@ export default function FinancePage() {
     search: invoicesSearchTerm || undefined,
     status: invoicesStatusFilter !== "all" ? invoicesStatusFilter : undefined,
     paginationOpts: invoicesPagination.paginationOpts
+  });
+
+  // Fetch all invoices for Pakistan transfer filtering (needed for the Invoices tab)
+  const allInvoicesForPakistanFilter = useQuery(api.invoices.list, {
+    paginationOpts: { numItems: 1000, cursor: null }
   });
   // const invoiceStats = useQuery(api.finance.getInvoiceStats, { 
   //   fiscalYear: invoiceFiscalYearFilter === "all" ? undefined : invoiceFiscalYearFilter
@@ -115,6 +128,38 @@ export default function FinancePage() {
     invoicesData?.page?.map(invoice => invoice._id) || [];
   const batchTransferStatus = useQuery(api.interBankTransfers.getBatchTransferStatus, 
     invoiceIds.length > 0 ? { invoiceIds } : "skip"
+  );
+
+  // Fetch invoices that need to come to Pakistan (international, <70% transferred)
+  const needToComeInvoices = useQuery(api.invoices.listForInterbankTransfers, {
+    paginationOpts: { numItems: 10, cursor: null }
+  });
+
+  // Fetch all international invoices to check which ones have come to Pakistan
+  const allInternationalInvoices = useQuery(api.invoices.list, {
+    paginationOpts: { numItems: 1000, cursor: null }
+  });
+
+  // Get international invoice IDs for Pakistan transfer status check
+  const internationalInvoiceIds = Array.isArray(allInternationalInvoices) ? 
+    allInternationalInvoices
+      .filter(invoice => invoice.client?.type === "international")
+      .map(invoice => invoice._id) : 
+    allInternationalInvoices?.page
+      ?.filter(invoice => invoice.client?.type === "international")
+      .map(invoice => invoice._id) || [];
+  
+  const internationalTransferStatus = useQuery(api.interBankTransfers.getBatchTransferStatus, 
+    internationalInvoiceIds.length > 0 ? { invoiceIds: internationalInvoiceIds } : "skip"
+  );
+
+  // Get all invoice IDs for Pakistan transfer filtering on Invoices tab
+  const allInvoiceIdsForPakistanFilter = Array.isArray(allInvoicesForPakistanFilter) ? 
+    allInvoicesForPakistanFilter.map(invoice => invoice._id) : 
+    allInvoicesForPakistanFilter?.page?.map(invoice => invoice._id) || [];
+  
+  const allTransferStatus = useQuery(api.interBankTransfers.getBatchTransferStatus, 
+    allInvoiceIdsForPakistanFilter.length > 0 ? { invoiceIds: allInvoiceIdsForPakistanFilter } : "skip"
   );
   
   // const bankStats = useQuery(api.banks.getStats);
@@ -173,10 +218,153 @@ export default function FinancePage() {
     }
   };
 
-  // Get invoices from paginated data and sort by issue date (latest first)
-  const sortedInvoices = (Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [])?.sort((a, b) => {
-    // Sort by issue date (descending - latest first)
-    return b.issueDate - a.issueDate;
+  // Get invoices from paginated data
+  let baseInvoices: any[] = [];
+  let totalFilteredCount = 0;
+  let isUsingPakistanFilter = false;
+  
+  // Apply Pakistan transfer filters if selected (only on Invoices tab)
+  if (activeTab === "invoices" && pakistanTransferFilter !== "all") {
+    isUsingPakistanFilter = true;
+    // Use all invoices data for Pakistan filtering to get complete dataset
+    const allInvoices = Array.isArray(allInvoicesForPakistanFilter) ? allInvoicesForPakistanFilter : allInvoicesForPakistanFilter?.page || [];
+    
+    // First apply Pakistan transfer filter
+    let pakistanFilteredInvoices = allInvoices;
+    if (pakistanTransferFilter === "need_to_come") {
+      pakistanFilteredInvoices = allInvoices.filter((invoice: any) => {
+        if (invoice.client?.type !== "international") return false;
+        const transferStatus = allTransferStatus?.[invoice._id];
+        return !transferStatus?.hasMetThreshold;
+      });
+    } else if (pakistanTransferFilter === "came_to_pakistan") {
+      pakistanFilteredInvoices = allInvoices.filter((invoice: any) => {
+        if (invoice.client?.type !== "international") return false;
+        const transferStatus = allTransferStatus?.[invoice._id];
+        return transferStatus?.hasMetThreshold === true;
+      });
+    }
+    
+    // Then apply payment status filter on the Pakistan-filtered results
+    if (invoicesStatusFilter !== "all") {
+      pakistanFilteredInvoices = pakistanFilteredInvoices.filter((invoice: any) => invoice.status === invoicesStatusFilter);
+    }
+    
+    // Sort the filtered results based on Pakistan transfer type
+    let sortedFilteredInvoices;
+    if (pakistanTransferFilter === "need_to_come") {
+      // Sort by factory departure date (earliest first) - most urgent at top
+      sortedFilteredInvoices = pakistanFilteredInvoices.sort((a: any, b: any) => {
+        const aFactoryDate = (a.order as any)?.factoryDepartureDate;
+        const bFactoryDate = (b.order as any)?.factoryDepartureDate;
+        
+        // Use factory departure date if available, otherwise use issue date
+        const aShippedDate = aFactoryDate || a.issueDate;
+        const bShippedDate = bFactoryDate || b.issueDate;
+        
+        return aShippedDate - bShippedDate;
+      });
+    } else if (pakistanTransferFilter === "came_to_pakistan") {
+      // Sort by latest fulfillment (most recent first) - newest completions at top
+      sortedFilteredInvoices = pakistanFilteredInvoices.sort((a: any, b: any) => {
+        const aTransferStatus = allTransferStatus?.[a._id];
+        const bTransferStatus = allTransferStatus?.[b._id];
+        
+        // Get the latest transfer date for each invoice
+        const aLatestTransfer = aTransferStatus?.transfers?.length > 0 
+          ? Math.max(...aTransferStatus.transfers.map((t: any) => t.createdAt || 0))
+          : 0;
+        const bLatestTransfer = bTransferStatus?.transfers?.length > 0 
+          ? Math.max(...bTransferStatus.transfers.map((t: any) => t.createdAt || 0))
+          : 0;
+        
+        return bLatestTransfer - aLatestTransfer;
+      });
+    } else {
+      // Default sort by issue date for other filters
+      sortedFilteredInvoices = pakistanFilteredInvoices.sort((a: any, b: any) => {
+        return b.issueDate - a.issueDate;
+      });
+    }
+    
+    // Apply pagination to the filtered results
+    totalFilteredCount = sortedFilteredInvoices.length;
+    const startIndex = pakistanFilterPagination.currentPage * pakistanFilterPagination.pageSize;
+    const endIndex = startIndex + pakistanFilterPagination.pageSize;
+    baseInvoices = sortedFilteredInvoices.slice(startIndex, endIndex);
+  } else {
+    // Use regular pagination for normal invoice queries
+    const regularInvoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
+    const sortedInvoices = regularInvoices?.sort((a: any, b: any) => {
+      return b.issueDate - a.issueDate;
+    });
+    baseInvoices = sortedInvoices || [];
+  }
+
+  // Process Pakistan transfer lists
+  const needToComeList = Array.isArray(needToComeInvoices) ? needToComeInvoices : needToComeInvoices?.page || [];
+  
+  // Filter international invoices that have come to Pakistan (≥70% transferred)
+  const cameToPakistanList = Array.isArray(allInternationalInvoices) ? 
+    allInternationalInvoices.filter(invoice => {
+      if (invoice.client?.type !== "international") return false;
+      const transferStatus = internationalTransferStatus?.[invoice._id];
+      return transferStatus?.hasMetThreshold === true;
+    }) : 
+    allInternationalInvoices?.page?.filter(invoice => {
+      if (invoice.client?.type !== "international") return false;
+      const transferStatus = internationalTransferStatus?.[invoice._id];
+      return transferStatus?.hasMetThreshold === true;
+    }) || [];
+
+  // Sort Pakistan transfer lists by priority
+  const sortedNeedToComeList = needToComeList.sort((a: any, b: any) => {
+    // Sort by factory departure date (earliest first) - most urgent at top
+    const aFactoryDate = (a.order as any)?.factoryDepartureDate;
+    const bFactoryDate = (b.order as any)?.factoryDepartureDate;
+    
+    // Use factory departure date if available, otherwise use issue date
+    const aShippedDate = aFactoryDate || a.issueDate;
+    const bShippedDate = bFactoryDate || b.issueDate;
+    
+    return aShippedDate - bShippedDate;
+  });
+
+  const sortedCameToPakistanList = cameToPakistanList.sort((a: any, b: any) => {
+    // Sort by latest fulfillment (most recent first) - newest completions at top
+    const aTransferStatus = internationalTransferStatus?.[a._id];
+    const bTransferStatus = internationalTransferStatus?.[b._id];
+    
+    // Get the latest transfer date for each invoice
+    const aLatestTransfer = aTransferStatus?.transfers?.length > 0 
+      ? Math.max(...aTransferStatus.transfers.map((t: any) => t.createdAt || 0))
+      : 0;
+    const bLatestTransfer = bTransferStatus?.transfers?.length > 0 
+      ? Math.max(...bTransferStatus.transfers.map((t: any) => t.createdAt || 0))
+      : 0;
+    
+    return bLatestTransfer - aLatestTransfer;
+  });
+
+  // Filter Pakistan lists by search term
+  const filteredNeedToComeList = sortedNeedToComeList.filter(invoice => {
+    if (!pakistanSearchTerm) return true;
+    const searchLower = pakistanSearchTerm.toLowerCase();
+    return (
+      invoice.invoiceNumber?.toLowerCase().includes(searchLower) ||
+      invoice.client?.name?.toLowerCase().includes(searchLower) ||
+      invoice.client?.email?.toLowerCase().includes(searchLower)
+    );
+  });
+
+  const filteredCameToPakistanList = sortedCameToPakistanList.filter(invoice => {
+    if (!pakistanSearchTerm) return true;
+    const searchLower = pakistanSearchTerm.toLowerCase();
+    return (
+      invoice.invoiceNumber?.toLowerCase().includes(searchLower) ||
+      invoice.client?.name?.toLowerCase().includes(searchLower) ||
+      invoice.client?.email?.toLowerCase().includes(searchLower)
+    );
   });
   return (
     <div>
@@ -296,7 +484,231 @@ export default function FinancePage() {
             </div>
           </div>
 
-          
+          {/* Pakistan Transfer Lists Search */}
+          <div className="card p-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex-1">
+                <label htmlFor="pakistan-search" className="block text-sm font-medium text-gray-700 mb-1">
+                  Search Pakistan Transfer Lists
+                </label>
+                <input
+                  id="pakistan-search"
+                  type="text"
+                  placeholder="Search by invoice number, client name, email..."
+                  value={pakistanSearchTerm}
+                  onChange={(e) => setPakistanSearchTerm(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Pakistan Transfer Lists */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Need to Come to Pakistan */}
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <Clock className="h-5 w-5 mr-2 text-orange-600" />
+                  Need to Come to Pakistan
+                </h2>
+                <span className="text-sm text-gray-500">{filteredNeedToComeList.length} invoices</span>
+              </div>
+              
+              <div className="space-y-3">
+                {!needToComeInvoices ? (
+                  // Loading skeletons
+                  [...Array(3)].map((_, i) => (
+                    <div key={i} className="bg-orange-50 rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <div className="h-4 w-20 bg-orange-200 rounded animate-pulse" />
+                          <div className="h-3 w-32 bg-orange-200 rounded animate-pulse" />
+                        </div>
+                        <div className="h-6 w-16 bg-orange-200 rounded animate-pulse" />
+                      </div>
+                    </div>
+                  ))
+                ) : filteredNeedToComeList.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Clock className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                    <p>All international invoices have been transferred to Pakistan</p>
+                  </div>
+                ) : (
+                  filteredNeedToComeList.slice(0, 5).map((invoice: any) => {
+                    const transferStatus = internationalTransferStatus?.[invoice._id];
+                    
+                    // Calculate days since factory departure for Pakistan transfer
+                    const factoryDepartureDate = (invoice.order as any)?.factoryDepartureDate;
+                    const currentDate = Date.now();
+                    
+                    let daysDisplay = "";
+                    let daysColor = "";
+                    
+                    if (factoryDepartureDate) {
+                      // Check if factory departure date is in the future
+                      if (factoryDepartureDate > currentDate) {
+                        daysDisplay = "Not yet shipped";
+                        daysColor = "text-gray-500";
+                      } else {
+                        // Calculate days since factory departure
+                        const daysSinceShipped = Math.floor((currentDate - factoryDepartureDate) / (1000 * 60 * 60 * 24));
+                        
+                        if (daysSinceShipped < 20) {
+                          const daysLeft = 20 - daysSinceShipped;
+                          daysDisplay = `${daysSinceShipped} days since shipped (${daysLeft} days left)`;
+                          daysColor = daysLeft <= 5 ? "text-red-600" : daysLeft <= 10 ? "text-orange-600" : "text-green-600";
+                        } else {
+                          daysDisplay = `${daysSinceShipped} days since shipped (overdue)`;
+                          daysColor = "text-red-600";
+                        }
+                      }
+                    } else {
+                      // No factory departure date - not yet shipped
+                      daysDisplay = "Not yet shipped";
+                      daysColor = "text-gray-500";
+                    }
+                    
+                    
+                    return (
+                      <button
+                        key={invoice._id}
+                        className="w-full text-left bg-orange-50 rounded-lg p-4 hover:bg-orange-100 transition-colors"
+                        onClick={() => {
+                          setSelectedInvoiceId(invoice._id);
+                          setIsInvoiceModalOpen(true);
+                        }}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium text-orange-800">
+                              {invoice.invoiceNumber || "N/A"}
+                            </div>
+                            <div className="text-xs text-orange-600">
+                              {invoice.client?.name}
+                            </div>
+                            <div className="text-xs text-orange-700 font-medium">
+                              {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
+                            </div>
+                            <div className={`text-xs font-medium ${daysColor}`}>
+                              {daysDisplay}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-orange-600">
+                              {transferStatus ? `${transferStatus.percentageTransferred.toFixed(1)}%` : "0%"}
+                            </div>
+                            <div className="text-xs text-orange-500">
+                              {invoice.order?.status || "N/A"}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* View All Button */}
+              {filteredNeedToComeList.length > 5 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => {
+                      setActiveTab("invoices");
+                      setPakistanTransferFilter("need_to_come");
+                    }}
+                    className="text-sm text-orange-600 hover:text-orange-800 font-medium"
+                  >
+                    View All {filteredNeedToComeList.length} Invoices →
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Came to Pakistan */}
+            <div className="card p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
+                  Came to Pakistan
+                </h2>
+                <span className="text-sm text-gray-500">{filteredCameToPakistanList.length} invoices</span>
+              </div>
+              
+              <div className="space-y-3">
+                {!allInternationalInvoices ? (
+                  // Loading skeletons
+                  [...Array(3)].map((_, i) => (
+                    <div key={i} className="bg-green-50 rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-2">
+                          <div className="h-4 w-20 bg-green-200 rounded animate-pulse" />
+                          <div className="h-3 w-32 bg-green-200 rounded animate-pulse" />
+                        </div>
+                        <div className="h-6 w-16 bg-green-200 rounded animate-pulse" />
+                      </div>
+                    </div>
+                  ))
+                ) : filteredCameToPakistanList.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <CheckCircle className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                    <p>No international invoices have reached 70% transfer threshold</p>
+                  </div>
+                ) : (
+                  filteredCameToPakistanList.slice(0, 5).map((invoice) => {
+                    const transferStatus = internationalTransferStatus?.[invoice._id];
+                    return (
+                      <button
+                        key={invoice._id}
+                        className="w-full text-left bg-green-50 rounded-lg p-4 hover:bg-green-100 transition-colors"
+                        onClick={() => {
+                          setSelectedInvoiceId(invoice._id);
+                          setIsInvoiceModalOpen(true);
+                        }}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <div className="text-sm font-medium text-green-800">
+                              {invoice.invoiceNumber || "N/A"}
+                            </div>
+                            <div className="text-xs text-green-600">
+                              {invoice.client?.name}
+                            </div>
+                            <div className="text-xs text-green-700 font-medium">
+                              {formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-green-600">
+                              {transferStatus ? `${transferStatus.percentageTransferred.toFixed(1)}%` : "0%"}
+                            </div>
+                            <div className="text-xs text-green-500">
+                              {invoice.order?.status || "N/A"}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+              
+              {/* View All Button */}
+              {filteredCameToPakistanList.length > 5 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => {
+                      setActiveTab("invoices");
+                      setPakistanTransferFilter("came_to_pakistan");
+                    }}
+                    className="text-sm text-green-600 hover:text-green-800 font-medium"
+                  >
+                    View All {filteredCameToPakistanList.length} Invoices →
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
         </div>
       )}
@@ -361,7 +773,7 @@ export default function FinancePage() {
 
           {/* Search and Filter Inputs for Invoices */}
           <div className="card p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label htmlFor="invoices-search" className="block text-sm font-medium text-gray-700 mb-1">
                   Search Invoices
@@ -377,7 +789,7 @@ export default function FinancePage() {
               </div>
               <div>
                 <label htmlFor="invoices-status-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Filter by Status
+                  Filter by Payment Status
                 </label>
                 <select
                   id="invoices-status-filter"
@@ -385,10 +797,25 @@ export default function FinancePage() {
                   onChange={(e) => setInvoicesStatusFilter(e.target.value)}
                   className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="all">All Statuses</option>
+                  <option value="all">All Payment Statuses</option>
                   <option value="unpaid">Unpaid</option>
                   <option value="partially_paid">Partially Paid</option>
                   <option value="paid">Paid</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="pakistan-transfer-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter by Payment to Pakistan
+                </label>
+                <select
+                  id="pakistan-transfer-filter"
+                  value={pakistanTransferFilter}
+                  onChange={(e) => setPakistanTransferFilter(e.target.value)}
+                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Invoices</option>
+                  <option value="need_to_come">Need to Come to Pakistan</option>
+                  <option value="came_to_pakistan">Came to Pakistan</option>
                 </select>
               </div>
             </div>
@@ -409,14 +836,14 @@ export default function FinancePage() {
               </div>
             </div>
           ))
-        ) : sortedInvoices?.length === 0 ? (
+        ) : baseInvoices?.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-8 text-center">
             <FileText className="mx-auto h-12 w-12 text-gray-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices found</h3>
             <p className="mt-1 text-sm text-gray-500">Invoices will appear here once orders move to production.</p>
           </div>
         ) : (
-          sortedInvoices?.map((invoice) => {
+          baseInvoices?.map((invoice) => {
             const ordersList = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
             const associatedOrder = ordersList.find((order: any) => order._id === invoice.orderId);
             const bankAccount = bankAccounts?.find(bank => bank._id === associatedOrder?.bankAccountId);
@@ -492,9 +919,15 @@ export default function FinancePage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
-                      Order Status
-                    </th>
+                    {pakistanTransferFilter === "need_to_come" ? (
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                        Days Left/Due
+                      </th>
+                    ) : (
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                        Order Status
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -510,7 +943,7 @@ export default function FinancePage() {
                         <td className="px-6 py-4"><div className="w-16 h-4 bg-gray-200 rounded animate-pulse" /></td>
                       </tr>
                     ))
-                  ) : sortedInvoices?.length === 0 ? (
+                  ) : baseInvoices?.length === 0 ? (
                     // Empty state
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center">
@@ -523,7 +956,7 @@ export default function FinancePage() {
                     </tr>
                   ) : (
                     // Invoice rows
-                    sortedInvoices?.map((invoice) => {
+                    baseInvoices?.map((invoice) => {
                       // Find associated order and bank account for highlighting
                       const ordersList = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
                       const associatedOrder = ordersList.find((order: any) => order._id === invoice.orderId);
@@ -602,21 +1035,63 @@ export default function FinancePage() {
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            invoice.order?.status === "delivered" 
-                              ? "bg-green-100 text-green-800" 
-                              : invoice.order?.status === "shipped"
-                              ? "bg-blue-100 text-blue-800"
-                              : invoice.order?.status === "in_production"
-                              ? "bg-purple-100 text-purple-800"
-                              : invoice.order?.status === "pending"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : invoice.order?.status === "cancelled"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}>
-                            {invoice.order?.status || "N/A"}
-                          </span>
+                          {pakistanTransferFilter === "need_to_come" ? (
+                            // Show days since factory departure for "Need to Come to Pakistan" filter
+                            (() => {
+                              const factoryDepartureDate = (invoice.order as any)?.factoryDepartureDate;
+                              const currentDate = Date.now();
+                              
+                              let daysDisplay = "";
+                              let daysColor = "";
+                              
+                              if (factoryDepartureDate) {
+                                 // Check if factory departure date is in the future
+                                 if (factoryDepartureDate > currentDate) {
+                                   daysDisplay = "Not yet shipped";
+                                   daysColor = "text-gray-500";
+                                } else {
+                                  // Calculate days since factory departure
+                                  const daysSinceShipped = Math.floor((currentDate - factoryDepartureDate) / (1000 * 60 * 60 * 24));
+                                  
+                                  if (daysSinceShipped < 20) {
+                                    const daysLeft = 20 - daysSinceShipped;
+                                    daysDisplay = `${daysSinceShipped} days since shipped (${daysLeft} days left)`;
+                                    daysColor = daysLeft <= 5 ? "text-red-600" : daysLeft <= 10 ? "text-orange-600" : "text-green-600";
+                                  } else {
+                                    daysDisplay = `${daysSinceShipped} days since shipped (overdue)`;
+                                    daysColor = "text-red-600";
+                                  }
+                                }
+                              } else {
+                                // No factory departure date - not yet shipped
+                                daysDisplay = "Not yet shipped";
+                                daysColor = "text-gray-500";
+                              }
+                              
+                              return (
+                                <span className={`text-sm font-medium ${daysColor}`}>
+                                  {daysDisplay}
+                                </span>
+                              );
+                            })()
+                          ) : (
+                            // Show order status for other filters
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              invoice.order?.status === "delivered" 
+                                ? "bg-green-100 text-green-800" 
+                                : invoice.order?.status === "shipped"
+                                ? "bg-blue-100 text-blue-800"
+                                : invoice.order?.status === "in_production"
+                                ? "bg-purple-100 text-purple-800"
+                                : invoice.order?.status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : invoice.order?.status === "cancelled"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}>
+                              {invoice.order?.status || "N/A"}
+                            </span>
+                          )}
                         </td>
                       </tr>
                       );
@@ -625,11 +1100,14 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
-            {invoicesData && (Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || []).length > 0 && (
+            {invoicesData && baseInvoices.length > 0 && (
               <Pagination
-                currentPage={invoicesPagination.currentPage}
-              totalPages={Math.ceil((!Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize)}
-                onPageChange={invoicesPagination.goToPage}
+                currentPage={isUsingPakistanFilter ? pakistanFilterPagination.currentPage : invoicesPagination.currentPage}
+                totalPages={isUsingPakistanFilter 
+                  ? Math.ceil(totalFilteredCount / pakistanFilterPagination.pageSize)
+                  : Math.ceil((!Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize)
+                }
+                onPageChange={isUsingPakistanFilter ? pakistanFilterPagination.goToPage : invoicesPagination.goToPage}
                 isLoading={!invoicesData}
               />
             )}
