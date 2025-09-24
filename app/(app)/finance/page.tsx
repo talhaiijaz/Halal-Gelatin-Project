@@ -64,12 +64,10 @@ export default function FinancePage() {
   
   // Filter states
   const [invoicesStatusFilter, setInvoicesStatusFilter] = useState<string>("all");
-  const [pakistanTransferFilter, setPakistanTransferFilter] = useState<string>("all");
   
   // Pagination hooks
   const paymentsPagination = usePagination({ pageSize: 10 });
   const invoicesPagination = usePagination({ pageSize: 10 });
-  const pakistanFilterPagination = usePagination({ pageSize: 10 });
 
   const tabs = [
     { id: "dashboard", label: "Dashboard", icon: <TrendingUp className="h-4 w-4" /> },
@@ -80,10 +78,6 @@ export default function FinancePage() {
 
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
 
-  // Reset Pakistan filter pagination when filter changes
-  useEffect(() => {
-    pakistanFilterPagination.goToPage(0);
-  }, [pakistanTransferFilter, invoicesStatusFilter]);
 
   // Fetch dashboard data
   const dashboardStats = useQuery(api.finance.getDashboardStats, { year: currentFiscalYear });
@@ -132,7 +126,7 @@ export default function FinancePage() {
 
   // Fetch invoices that need to come to Pakistan (international, <70% transferred)
   const needToComeInvoices = useQuery(api.invoices.listForInterbankTransfers, {
-    paginationOpts: { numItems: 10, cursor: null }
+    paginationOpts: { numItems: 1000, cursor: null }
   });
 
   // Fetch all international invoices to check which ones have come to Pakistan
@@ -220,86 +214,13 @@ export default function FinancePage() {
 
   // Get invoices from paginated data
   let baseInvoices: any[] = [];
-  let totalFilteredCount = 0;
-  let isUsingPakistanFilter = false;
   
-  // Apply Pakistan transfer filters if selected (only on Invoices tab)
-  if (activeTab === "invoices" && pakistanTransferFilter !== "all") {
-    isUsingPakistanFilter = true;
-    // Use all invoices data for Pakistan filtering to get complete dataset
-    const allInvoices = Array.isArray(allInvoicesForPakistanFilter) ? allInvoicesForPakistanFilter : allInvoicesForPakistanFilter?.page || [];
-    
-    // First apply Pakistan transfer filter
-    let pakistanFilteredInvoices = allInvoices;
-    if (pakistanTransferFilter === "need_to_come") {
-      pakistanFilteredInvoices = allInvoices.filter((invoice: any) => {
-        if (invoice.client?.type !== "international") return false;
-        const transferStatus = allTransferStatus?.[invoice._id];
-        return !transferStatus?.hasMetThreshold;
-      });
-    } else if (pakistanTransferFilter === "came_to_pakistan") {
-      pakistanFilteredInvoices = allInvoices.filter((invoice: any) => {
-        if (invoice.client?.type !== "international") return false;
-        const transferStatus = allTransferStatus?.[invoice._id];
-        return transferStatus?.hasMetThreshold === true;
-      });
-    }
-    
-    // Then apply payment status filter on the Pakistan-filtered results
-    if (invoicesStatusFilter !== "all") {
-      pakistanFilteredInvoices = pakistanFilteredInvoices.filter((invoice: any) => invoice.status === invoicesStatusFilter);
-    }
-    
-    // Sort the filtered results based on Pakistan transfer type
-    let sortedFilteredInvoices;
-    if (pakistanTransferFilter === "need_to_come") {
-      // Sort by factory departure date (earliest first) - most urgent at top
-      sortedFilteredInvoices = pakistanFilteredInvoices.sort((a: any, b: any) => {
-        const aFactoryDate = (a.order as any)?.factoryDepartureDate;
-        const bFactoryDate = (b.order as any)?.factoryDepartureDate;
-        
-        // Use factory departure date if available, otherwise use issue date
-        const aShippedDate = aFactoryDate || a.issueDate;
-        const bShippedDate = bFactoryDate || b.issueDate;
-        
-        return aShippedDate - bShippedDate;
-      });
-    } else if (pakistanTransferFilter === "came_to_pakistan") {
-      // Sort by latest fulfillment (most recent first) - newest completions at top
-      sortedFilteredInvoices = pakistanFilteredInvoices.sort((a: any, b: any) => {
-        const aTransferStatus = allTransferStatus?.[a._id];
-        const bTransferStatus = allTransferStatus?.[b._id];
-        
-        // Get the latest transfer date for each invoice
-        const aLatestTransfer = aTransferStatus?.transfers?.length > 0 
-          ? Math.max(...aTransferStatus.transfers.map((t: any) => t.createdAt || 0))
-          : 0;
-        const bLatestTransfer = bTransferStatus?.transfers?.length > 0 
-          ? Math.max(...bTransferStatus.transfers.map((t: any) => t.createdAt || 0))
-          : 0;
-        
-        return bLatestTransfer - aLatestTransfer;
-      });
-    } else {
-      // Default sort by issue date for other filters
-      sortedFilteredInvoices = pakistanFilteredInvoices.sort((a: any, b: any) => {
-        return b.issueDate - a.issueDate;
-      });
-    }
-    
-    // Apply pagination to the filtered results
-    totalFilteredCount = sortedFilteredInvoices.length;
-    const startIndex = pakistanFilterPagination.currentPage * pakistanFilterPagination.pageSize;
-    const endIndex = startIndex + pakistanFilterPagination.pageSize;
-    baseInvoices = sortedFilteredInvoices.slice(startIndex, endIndex);
-  } else {
-    // Use regular pagination for normal invoice queries
-    const regularInvoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
-    const sortedInvoices = regularInvoices?.sort((a: any, b: any) => {
-      return b.issueDate - a.issueDate;
-    });
-    baseInvoices = sortedInvoices || [];
-  }
+  // Use regular pagination for normal invoice queries
+  const regularInvoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
+  const sortedInvoices = regularInvoices?.sort((a: any, b: any) => {
+    return b.issueDate - a.issueDate;
+  });
+  baseInvoices = sortedInvoices || [];
 
   // Process Pakistan transfer lists
   const needToComeList = Array.isArray(needToComeInvoices) ? needToComeInvoices : needToComeInvoices?.page || [];
@@ -745,7 +666,7 @@ export default function FinancePage() {
 
           {/* Search and Filter Inputs for Invoices */}
           <div className="card p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label htmlFor="invoices-search" className="block text-sm font-medium text-gray-700 mb-1">
                   Search Invoices
@@ -773,25 +694,6 @@ export default function FinancePage() {
                   <option value="unpaid">Unpaid</option>
                   <option value="partially_paid">Partially Paid</option>
                   <option value="paid">Paid</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="pakistan-transfer-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                  Filter by Payment to Pakistan
-                </label>
-                <select
-                  id="pakistan-transfer-filter"
-                  value={pakistanTransferFilter}
-                  onChange={(e) => {
-                    setPakistanTransferFilter(e.target.value);
-                    // Automatically switch to invoices tab when any Pakistan filter is selected
-                    setActiveTab("invoices");
-                  }}
-                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="all">All Invoices</option>
-                  <option value="need_to_come">Need to Come to Pakistan</option>
-                  <option value="came_to_pakistan">Came to Pakistan</option>
                 </select>
               </div>
             </div>
@@ -895,15 +797,9 @@ export default function FinancePage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
                       Status
                     </th>
-                    {pakistanTransferFilter === "need_to_come" ? (
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
-                        Days Left/Due
-                      </th>
-                    ) : (
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
-                        Order Status
-                      </th>
-                    )}
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[12%]">
+                      Order Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1011,63 +907,21 @@ export default function FinancePage() {
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          {pakistanTransferFilter === "need_to_come" ? (
-                            // Show days since factory departure for "Need to Come to Pakistan" filter
-                            (() => {
-                              const factoryDepartureDate = (invoice.order as any)?.factoryDepartureDate;
-                              const currentDate = Date.now();
-                              
-                              let daysDisplay = "";
-                              let daysColor = "";
-                              
-                              if (factoryDepartureDate) {
-                                 // Check if factory departure date is in the future
-                                 if (factoryDepartureDate > currentDate) {
-                                   daysDisplay = "Not yet shipped";
-                                   daysColor = "text-gray-500";
-                                } else {
-                                  // Calculate days since factory departure
-                                  const daysSinceShipped = Math.floor((currentDate - factoryDepartureDate) / (1000 * 60 * 60 * 24));
-                                  
-                                  if (daysSinceShipped < 20) {
-                                    const daysLeft = 20 - daysSinceShipped;
-                                    daysDisplay = `${daysSinceShipped} days since shipped (${daysLeft} days left)`;
-                                    daysColor = daysLeft <= 5 ? "text-red-600" : daysLeft <= 10 ? "text-orange-600" : "text-green-600";
-                                  } else {
-                                    daysDisplay = `${daysSinceShipped} days since shipped (overdue)`;
-                                    daysColor = "text-red-600";
-                                  }
-                                }
-                              } else {
-                                // No factory departure date - not yet shipped
-                                daysDisplay = "Not yet shipped";
-                                daysColor = "text-gray-500";
-                              }
-                              
-                              return (
-                                <span className={`text-sm font-medium ${daysColor}`}>
-                                  {daysDisplay}
-                                </span>
-                              );
-                            })()
-                          ) : (
-                            // Show order status for other filters
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              invoice.order?.status === "delivered" 
-                                ? "bg-green-100 text-green-800" 
-                                : invoice.order?.status === "shipped"
-                                ? "bg-blue-100 text-blue-800"
-                                : invoice.order?.status === "in_production"
-                                ? "bg-purple-100 text-purple-800"
-                                : invoice.order?.status === "pending"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : invoice.order?.status === "cancelled"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-gray-100 text-gray-800"
-                            }`}>
-                              {invoice.order?.status || "N/A"}
-                            </span>
-                          )}
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            invoice.order?.status === "delivered" 
+                              ? "bg-green-100 text-green-800" 
+                              : invoice.order?.status === "shipped"
+                              ? "bg-blue-100 text-blue-800"
+                              : invoice.order?.status === "in_production"
+                              ? "bg-purple-100 text-purple-800"
+                              : invoice.order?.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : invoice.order?.status === "cancelled"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}>
+                            {invoice.order?.status || "N/A"}
+                          </span>
                         </td>
                       </tr>
                       );
@@ -1078,12 +932,9 @@ export default function FinancePage() {
             </div>
             {invoicesData && baseInvoices.length > 0 && (
               <Pagination
-                currentPage={isUsingPakistanFilter ? pakistanFilterPagination.currentPage : invoicesPagination.currentPage}
-                totalPages={isUsingPakistanFilter 
-                  ? Math.ceil(totalFilteredCount / pakistanFilterPagination.pageSize)
-                  : Math.ceil((!Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize)
-                }
-                onPageChange={isUsingPakistanFilter ? pakistanFilterPagination.goToPage : invoicesPagination.goToPage}
+                currentPage={invoicesPagination.currentPage}
+                totalPages={Math.ceil((!Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize)}
+                onPageChange={invoicesPagination.goToPage}
                 isLoading={!invoicesData}
               />
             )}
