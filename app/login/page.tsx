@@ -1,8 +1,18 @@
 "use client";
 
 import { SignIn } from '@clerk/nextjs';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function LoginPage() {
+  const router = useRouter();
+
+  const handleSignInSuccess = () => {
+    // After successful sign-in, check if MFA is required
+    // The middleware will handle redirecting to /verify-mfa if needed
+    router.push('/dashboard');
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-6 sm:space-y-8">
@@ -35,6 +45,8 @@ export default function LoginPage() {
               }
             }}
             redirectUrl="/dashboard"
+            afterSignInUrl="/dashboard"
+            afterSignUpUrl="/dashboard"
           />
         </div>
       </div>
