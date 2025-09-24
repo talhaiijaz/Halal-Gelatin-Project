@@ -1,4 +1,4 @@
-# Halal Gelatin CRM!
+# Halal Gelatin CRM!!
 
 A modern, real-time CRM system for managing gelatin manufacturing operations, built with Next.js 14, Convex, and Tailwind CSS.
 
