@@ -10,11 +10,17 @@ export async function GET(
   { params }: { params: { storageId: string } }
 ) {
   // Check if user is authenticated
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
   try {
+    // Forward Clerk session token to Convex so the call is authorized as the user
+    const token = await getToken();
+    if (token) {
+      await convex.setAuth(token);
+    }
+
     const url = await convex.mutation(api.files.getFileUrl, {
       storageId: params.storageId,
     });

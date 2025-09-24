@@ -3,7 +3,6 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import ConvexClientProvider from "./providers/ConvexClientProvider";
 import { ClerkProvider } from '@clerk/nextjs';
-import { AuthProvider } from "./components/AuthProvider";
 import { Toaster } from "react-hot-toast";
 import ErrorBoundary from "./components/ErrorBoundary";
 import InstallPrompt from "./components/InstallPrompt";
@@ -46,32 +45,30 @@ export default function RootLayout({
           afterSignInUrl="/sso-callback"
         >
           <ErrorBoundary>
-            <AuthProvider>
-              <ConvexClientProvider>
-                {children}
-                <InstallPrompt />
-                <Toaster
-                  position="top-right"
-                  toastOptions={{
-                    duration: 3000,
+            <ConvexClientProvider>
+              {children}
+              <InstallPrompt />
+              <Toaster
+                position="top-right"
+                toastOptions={{
+                  duration: 3000,
+                  style: {
+                    background: '#363636',
+                    color: '#fff',
+                  },
+                  success: {
                     style: {
-                      background: '#363636',
-                      color: '#fff',
+                      background: '#10b981',
                     },
-                    success: {
-                      style: {
-                        background: '#10b981',
-                      },
+                  },
+                  error: {
+                    style: {
+                      background: '#ef4444',
                     },
-                    error: {
-                      style: {
-                        background: '#ef4444',
-                      },
-                    },
-                  }}
-                />
-              </ConvexClientProvider>
-            </AuthProvider>
+                  },
+                }}
+              />
+            </ConvexClientProvider>
           </ErrorBoundary>
         </ClerkProvider>
       </body>
