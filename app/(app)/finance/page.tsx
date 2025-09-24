@@ -391,7 +391,7 @@ export default function FinancePage() {
       {/* Tab Navigation */}
       <TabNavigation
         tabs={tabs}
-        defaultTab={activeTab}
+        value={activeTab}
         onTabChange={setActiveTab}
         className="mb-6"
       />
@@ -810,7 +810,11 @@ export default function FinancePage() {
                 <select
                   id="pakistan-transfer-filter"
                   value={pakistanTransferFilter}
-                  onChange={(e) => setPakistanTransferFilter(e.target.value)}
+                  onChange={(e) => {
+                    setPakistanTransferFilter(e.target.value);
+                    // Automatically switch to invoices tab when any Pakistan filter is selected
+                    setActiveTab("invoices");
+                  }}
                   className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Invoices</option>

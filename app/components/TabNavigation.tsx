@@ -11,6 +11,7 @@ interface Tab {
 interface TabNavigationProps {
   tabs: Tab[];
   defaultTab?: string;
+  value?: string; // Controlled component prop
   onTabChange?: (tabId: string) => void;
   className?: string;
 }
@@ -18,13 +19,17 @@ interface TabNavigationProps {
 export default function TabNavigation({ 
   tabs, 
   defaultTab, 
+  value,
   onTabChange,
   className = ""
 }: TabNavigationProps) {
-  const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id);
+  const [internalActiveTab, setInternalActiveTab] = useState(defaultTab || tabs[0]?.id);
+  
+  // Use controlled value if provided, otherwise use internal state
+  const activeTab = value !== undefined ? value : internalActiveTab;
 
   const handleTabClick = (tabId: string) => {
-    setActiveTab(tabId);
+    setInternalActiveTab(tabId);
     onTabChange?.(tabId);
   };
 
