@@ -64,6 +64,7 @@ export default function FinancePage() {
   
   // Filter states
   const [invoicesStatusFilter, setInvoicesStatusFilter] = useState<string>("all");
+  const [invoicesPakistanFilter, setInvoicesPakistanFilter] = useState<string>("all");
   
   // Pagination hooks
   const paymentsPagination = usePagination({ pageSize: 10 });
@@ -77,6 +78,11 @@ export default function FinancePage() {
   ];
 
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
+
+  // Reset pagination to page 1 when Pakistan filter changes
+  useEffect(() => {
+    invoicesPagination.goToPage(1);
+  }, [invoicesPakistanFilter]);
 
 
   // Fetch dashboard data
@@ -214,13 +220,72 @@ export default function FinancePage() {
 
   // Get invoices from paginated data
   let baseInvoices: any[] = [];
+  let paginationInfo: { currentPage: number; totalPages: number; totalCount: number } = {
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0
+  };
   
-  // Use regular pagination for normal invoice queries
-  const regularInvoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
-  const sortedInvoices = regularInvoices?.sort((a: any, b: any) => {
-    return b.issueDate - a.issueDate;
-  });
-  baseInvoices = sortedInvoices || [];
+  // Check if Pakistan filter is active
+  const isPakistanFilterActive = invoicesPakistanFilter !== "all" && allTransferStatus;
+  
+  if (isPakistanFilterActive) {
+    // When Pakistan filter is active, use all invoices data and implement client-side pagination
+    const allInvoices = Array.isArray(allInvoicesForPakistanFilter) ? 
+      allInvoicesForPakistanFilter : 
+      allInvoicesForPakistanFilter?.page || [];
+    
+    // Apply Pakistan filter to all invoices
+    const filteredInvoices = allInvoices.filter(invoice => {
+      const transferStatus = allTransferStatus[invoice._id];
+      
+      if (invoicesPakistanFilter === "need_to_come") {
+        // Show only international invoices that need to come to Pakistan (<70% transferred)
+        return invoice.client?.type === "international" && 
+               (!transferStatus || !transferStatus.hasMetThreshold);
+      } else if (invoicesPakistanFilter === "came_to_pakistan") {
+        // Show only international invoices that have come to Pakistan (≥70% transferred)
+        return invoice.client?.type === "international" && 
+               transferStatus?.hasMetThreshold === true;
+      }
+      
+      return true;
+    });
+    
+    // Sort filtered invoices
+    const sortedFilteredInvoices = filteredInvoices.sort((a: any, b: any) => {
+      return b.issueDate - a.issueDate;
+    });
+    
+    // Apply client-side pagination
+    const pageSize = invoicesPagination.pageSize;
+    const currentPage = invoicesPagination.currentPage;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    
+    baseInvoices = sortedFilteredInvoices.slice(startIndex, endIndex);
+    
+    // Update pagination info for filtered results
+    paginationInfo = {
+      currentPage,
+      totalPages: Math.ceil(sortedFilteredInvoices.length / pageSize),
+      totalCount: sortedFilteredInvoices.length
+    };
+  } else {
+    // When Pakistan filter is not active, use regular server-side pagination
+    const regularInvoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
+    const sortedInvoices = regularInvoices?.sort((a: any, b: any) => {
+      return b.issueDate - a.issueDate;
+    });
+    baseInvoices = sortedInvoices || [];
+    
+    // Use server-side pagination info
+    paginationInfo = {
+      currentPage: invoicesPagination.currentPage,
+      totalPages: Math.ceil((invoicesData && !Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize),
+      totalCount: invoicesData && !Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0
+    };
+  }
 
   // Process Pakistan transfer lists
   const needToComeList = Array.isArray(needToComeInvoices) ? needToComeInvoices : needToComeInvoices?.page || [];
@@ -666,7 +731,7 @@ export default function FinancePage() {
 
           {/* Search and Filter Inputs for Invoices */}
           <div className="card p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label htmlFor="invoices-search" className="block text-sm font-medium text-gray-700 mb-1">
                   Search Invoices
@@ -694,6 +759,21 @@ export default function FinancePage() {
                   <option value="unpaid">Unpaid</option>
                   <option value="partially_paid">Partially Paid</option>
                   <option value="paid">Paid</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="invoices-pakistan-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                  Filter by Pakistan Transfer Status
+                </label>
+                <select
+                  id="invoices-pakistan-filter"
+                  value={invoicesPakistanFilter}
+                  onChange={(e) => setInvoicesPakistanFilter(e.target.value)}
+                  className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Invoices</option>
+                  <option value="need_to_come">Need to Come to Pakistan</option>
+                  <option value="came_to_pakistan">Came to Pakistan</option>
                 </select>
               </div>
             </div>
@@ -930,12 +1010,12 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
-            {invoicesData && baseInvoices.length > 0 && (
+            {(invoicesData || (isPakistanFilterActive && allInvoicesForPakistanFilter)) && baseInvoices.length > 0 && (
               <Pagination
-                currentPage={invoicesPagination.currentPage}
-                totalPages={Math.ceil((!Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize)}
+                currentPage={paginationInfo.currentPage}
+                totalPages={paginationInfo.totalPages}
                 onPageChange={invoicesPagination.goToPage}
-                isLoading={!invoicesData}
+                isLoading={!invoicesData && !allInvoicesForPakistanFilter}
               />
             )}
           </div>
