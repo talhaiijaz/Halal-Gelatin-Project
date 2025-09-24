@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from 'react';
-import { saveScrollPosition, restoreScrollPosition } from '@/app/utils/scrollRestoration';
+import { saveScrollPosition } from '@/app/utils/scrollRestoration';
 
 /**
  * Hook to prevent body scrolling when a modal is open
@@ -48,11 +48,8 @@ export function useBodyScrollLock(isLocked: boolean) {
           document.body.style.width = originalStylesRef.current.width;
         }
         
-        // Restore the scroll position with a small delay to ensure DOM is ready
-        setTimeout(() => {
-          window.scrollTo(0, scrollPositionRef.current);
-          restoreScrollPosition();
-        }, 0);
+        // Restore the scroll position synchronously to avoid double-restores
+        window.scrollTo(0, scrollPositionRef.current);
       };
     }
   }, [isLocked]);

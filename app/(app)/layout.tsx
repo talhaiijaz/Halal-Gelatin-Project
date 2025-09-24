@@ -1,24 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
 import Sidebar from "@/app/components/Sidebar";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
-import { restoreScrollPosition } from "@/app/utils/scrollRestoration";
+import { useScrollRestoration } from "@/app/hooks/useScrollRestoration";
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Restore scroll position when layout mounts
-  useEffect(() => {
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      restoreScrollPosition();
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, []);
+  // Initialize global, path-aware scroll restoration
+  useScrollRestoration();
 
   return (
     <ProtectedRoute>

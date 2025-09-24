@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { saveScrollPosition, restoreScrollPosition } from '@/app/utils/scrollRestoration';
+import { getScrollPosition } from '@/app/utils/scrollRestoration';
 
 /**
  * Hook to handle scroll restoration on page navigation
@@ -11,27 +11,54 @@ export function useScrollRestoration() {
   const pathname = usePathname();
 
   useEffect(() => {
-    // Save scroll position when component unmounts
+    if (typeof window === 'undefined') return;
+
+    // Force manual browser restoration to avoid native jumps
+    if ('scrollRestoration' in window.history) {
+      try {
+        window.history.scrollRestoration = 'manual';
+      } catch {}
+    }
+
+    const storageKey = `scroll:${pathname}`;
+
+    // Try restoring only on back/forward navigations
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    const isBackForward = !!nav && (nav.type === 'back_forward' || nav.type === 'reload');
+
+    const saved = sessionStorage.getItem(storageKey);
+    if (saved && isBackForward) {
+      // Defer to the end of current frame to avoid layout flicker
+      requestAnimationFrame(() => {
+        const y = parseInt(saved, 10);
+        if (!Number.isNaN(y)) {
+          window.scrollTo(0, y);
+        }
+      });
+    }
+
     const handleBeforeUnload = () => {
-      saveScrollPosition();
+      sessionStorage.setItem(storageKey, String(getScrollPosition()));
     };
 
-    // Restore scroll position when component mounts
-    const restoreScroll = () => {
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
-        restoreScrollPosition();
-      }, 100);
+    const handlePopState = () => {
+      const val = sessionStorage.getItem(storageKey);
+      if (val) {
+        const y = parseInt(val, 10);
+        if (!Number.isNaN(y)) {
+          requestAnimationFrame(() => window.scrollTo(0, y));
+        }
+      }
     };
 
-    // Add event listener for page unload
     window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // Restore scroll position on mount
-    restoreScroll();
+    window.addEventListener('popstate', handlePopState);
 
     return () => {
+      // Save on route change
+      sessionStorage.setItem(storageKey, String(getScrollPosition()));
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, [pathname]);
 }
