@@ -15,7 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const CREDENTIALS = {
   username: "local",
-  password: "local"
+  password: "local@halal.gelatin-2025"
 };
 
 // 15 minutes in milliseconds
