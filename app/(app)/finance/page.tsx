@@ -496,7 +496,7 @@ export default function FinancePage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <Clock className="h-5 w-5 mr-2 text-orange-600" />
-                  Need to Come to Pakistan
+                  Payment Need to Come to Pakistan
                 </h2>
                 <span className="text-sm text-gray-500">{filteredNeedToComeList.length} invoices</span>
               </div>
@@ -602,7 +602,7 @@ export default function FinancePage() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
-                  Came to Pakistan
+                  Payment Came to Pakistan
                 </h2>
                 <span className="text-sm text-gray-500">{filteredCameToPakistanList.length} invoices</span>
               </div>
@@ -772,8 +772,8 @@ export default function FinancePage() {
                   className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="all">All Invoices</option>
-                  <option value="need_to_come">Need to Come to Pakistan</option>
-                  <option value="came_to_pakistan">Came to Pakistan</option>
+                  <option value="need_to_come">Payment Need to Come to Pakistan</option>
+                  <option value="came_to_pakistan">Payment Came to Pakistan</option>
                 </select>
               </div>
             </div>
