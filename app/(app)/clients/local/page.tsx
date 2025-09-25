@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
@@ -34,6 +34,7 @@ import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 export default function LocalClientsPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,6 +55,10 @@ export default function LocalClientsPage() {
   
   // State for expanded metric modal
   const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables' | 'total_quantity' | 'pending_quantity' | 'processed_quantity'; audience: 'local' }>(null);
+
+  // Manage scroll locking for expanded metric modal
+  const expandedMetricModalId = useId();
+  useModalManager(expandedMetricModalId, !!expandedMetric);
   
   // Load fiscal year setting from localStorage and listen for changes
   useEffect(() => {
@@ -159,12 +164,9 @@ export default function LocalClientsPage() {
   // Extract all orders array (handle both paginated and non-paginated responses)
   const allOrders = Array.isArray(allOrdersData) ? allOrdersData : allOrdersData?.page || [];
 
-  // Close modal on Escape and prevent body scroll
+  // Close modal on Escape
   useEffect(() => {
     if (!expandedMetric) return;
-    
-    // Prevent body scroll when modal is open
-    document.body.style.overflow = 'hidden';
     
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setExpandedMetric(null);
@@ -172,7 +174,6 @@ export default function LocalClientsPage() {
     window.addEventListener('keydown', onKey);
     
     return () => {
-      document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', onKey);
     };
   }, [expandedMetric]);

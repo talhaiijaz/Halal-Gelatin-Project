@@ -179,12 +179,9 @@ export default function InternationalClientsPage() {
   // Fetch bank accounts for highlighting
   const bankAccounts = useQuery(api.banks.list);
 
-  // Close modal on Escape and prevent body scroll
+  // Close modal on Escape
   useEffect(() => {
     if (!expandedMetric) return;
-    
-    // Prevent body scroll when modal is open
-    document.body.style.overflow = 'hidden';
     
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setExpandedMetric(null);
@@ -192,7 +189,6 @@ export default function InternationalClientsPage() {
     window.addEventListener('keydown', onKey);
     
     return () => {
-      document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', onKey);
     };
   }, [expandedMetric]);

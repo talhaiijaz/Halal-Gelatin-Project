@@ -61,16 +61,36 @@ class ModalManager {
   private unlockScroll(): void {
     if (typeof window === 'undefined' || !this.originalStyles) return;
 
-    // Restore original styles
-    document.body.style.overflow = this.originalStyles.overflow;
-    document.body.style.position = this.originalStyles.position;
-    document.body.style.top = this.originalStyles.top;
-    document.body.style.width = this.originalStyles.width;
-    
-    // Restore scroll position with a small delay
-    setTimeout(() => {
-      window.scrollTo(0, this.scrollPosition);
-    }, 0);
+    const { overflow, position, top, width } = this.originalStyles;
+    const targetScroll = this.scrollPosition;
+
+    document.body.style.overflow = overflow;
+    document.body.style.position = position;
+    document.body.style.width = width;
+
+    const restore = () => {
+      document.body.style.top = top;
+
+      const htmlStyle = document.documentElement.style;
+      const previousInlineBehavior = htmlStyle.scrollBehavior;
+      htmlStyle.scrollBehavior = 'auto';
+
+      window.scrollTo(0, Number.isFinite(targetScroll) ? targetScroll : 0);
+
+      if (previousInlineBehavior) {
+        htmlStyle.scrollBehavior = previousInlineBehavior;
+      } else {
+        htmlStyle.removeProperty('scroll-behavior');
+      }
+    };
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(restore);
+    } else {
+      restore();
+    }
+
+    this.originalStyles = null;
   }
 
   isModalOpen(): boolean {
