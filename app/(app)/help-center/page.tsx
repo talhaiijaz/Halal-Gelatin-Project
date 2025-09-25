@@ -14,7 +14,9 @@ import {
   Send,
   Trash2,
   Calendar,
+  Eye,
 } from "lucide-react";
+import Modal from "../../components/ui/Modal";
 
 const categoryIcons = {
   bug_report: Bug,
@@ -37,6 +39,10 @@ export default function HelpCenterPage() {
     description: "",
     category: "general_feedback" as "general_feedback" | "bug_report" | "feature_request",
   });
+
+  // Modal state
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Convex mutations and queries
   const submitFeedback = useMutation(api.feedback.submitFeedback);
@@ -81,6 +87,73 @@ export default function HelpCenterPage() {
       toast.error("Failed to delete ticket");
       console.error(error);
     }
+  };
+
+  const handleViewTicket = (ticket: any) => {
+    setSelectedTicket(ticket);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedTicket(null);
+  };
+
+  // TicketDetailModal component
+  const TicketDetailModal = () => {
+    if (!selectedTicket) return null;
+
+    const CategoryIcon = categoryIcons[selectedTicket.category as keyof typeof categoryIcons];
+
+    return (
+      <Modal
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseModal}
+        title="Ticket Details"
+        maxWidth="lg"
+      >
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-start space-x-3">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <CategoryIcon className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {selectedTicket.title}
+              </h3>
+              <div className="flex items-center space-x-3">
+                <span className="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-600">
+                  {categoryLabels[selectedTicket.category as keyof typeof categoryLabels]}
+                </span>
+                <div className="flex items-center space-x-1 text-sm text-gray-500">
+                  <Calendar className="h-4 w-4" />
+                  <span>{new Date(selectedTicket.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Description</h4>
+            <p className="text-gray-900 whitespace-pre-wrap">{selectedTicket.description}</p>
+          </div>
+
+          {/* Metadata */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Submitted By</h4>
+              <p className="text-gray-900">{selectedTicket.submittedBy}</p>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">Created</h4>
+              <p className="text-gray-900">{new Date(selectedTicket.createdAt).toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
   };
 
   return (
@@ -239,13 +312,22 @@ export default function HelpCenterPage() {
                         </div>
                       </div>
                       
-                      <button
-                        onClick={() => handleDelete(ticket._id)}
-                        className="ml-4 p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete ticket"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center space-x-2 ml-4">
+                        <button
+                          onClick={() => handleViewTicket(ticket)}
+                          className="p-2 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="View full ticket details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(ticket._id)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete ticket"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -262,6 +344,9 @@ export default function HelpCenterPage() {
           </div>
         </div>
       </div>
+
+      {/* Ticket Detail Modal */}
+      <TicketDetailModal />
     </div>
   );
 }
