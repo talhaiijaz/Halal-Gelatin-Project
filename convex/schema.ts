@@ -263,6 +263,12 @@ export default defineSchema({
     originalCurrency: v.optional(v.string()), // Original currency before conversion
     exchangeRate: v.optional(v.number()), // Exchange rate used for conversion (1 originalCurrency = ? targetCurrency)
     convertedAmountUSD: v.optional(v.number()), // Amount converted to USD for reporting
+    // Tax deduction fields for inter-bank transfers
+    hasTaxDeduction: v.optional(v.boolean()), // Whether tax was deducted
+    taxDeductionRate: v.optional(v.number()), // Tax deduction percentage (e.g., 5 for 5%)
+    taxDeductionAmount: v.optional(v.number()), // Tax deduction amount
+    taxDeductionCurrency: v.optional(v.string()), // Currency of tax deduction
+    netAmountReceived: v.optional(v.number()), // Amount actually received after tax deduction
     // Transaction details
     transactionDate: v.number(),
     effectiveDate: v.optional(v.number()), // When transaction actually takes effect
@@ -354,6 +360,12 @@ export default defineSchema({
     invoiceId: v.optional(v.id("invoices")), // Optional invoice this transfer is for
     reference: v.optional(v.string()),       // Transfer reference number
     notes: v.optional(v.string()),           // Additional notes
+    // Tax deduction fields
+    hasTaxDeduction: v.optional(v.boolean()), // Whether tax was deducted
+    taxDeductionRate: v.optional(v.number()), // Tax deduction percentage (e.g., 5 for 5%)
+    taxDeductionAmount: v.optional(v.number()), // Tax deduction amount in destination currency
+    taxDeductionCurrency: v.optional(v.string()), // Currency of tax deduction (usually destination currency)
+    netAmountReceived: v.optional(v.number()), // Amount actually received after tax deduction
     status: v.union(
       v.literal("pending"),    // Transfer initiated but not completed
       v.literal("completed"),  // Transfer completed successfully

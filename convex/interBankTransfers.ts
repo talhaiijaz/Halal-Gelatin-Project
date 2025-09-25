@@ -18,6 +18,12 @@ export const create = mutation({
     invoiceId: v.optional(v.id("invoices")),
     reference: v.optional(v.string()),
     notes: v.optional(v.string()),
+    // Tax deduction fields
+    hasTaxDeduction: v.optional(v.boolean()),
+    taxDeductionRate: v.optional(v.number()),
+    taxDeductionAmount: v.optional(v.number()),
+    taxDeductionCurrency: v.optional(v.string()),
+    netAmountReceived: v.optional(v.number()),
   },
   returns: v.id("interBankTransfers"),
   handler: async (ctx, args) => {
@@ -51,6 +57,12 @@ export const create = mutation({
       invoiceId: args.invoiceId,
       reference: args.reference,
       notes: args.notes,
+      // Tax deduction fields
+      hasTaxDeduction: args.hasTaxDeduction,
+      taxDeductionRate: args.taxDeductionRate,
+      taxDeductionAmount: args.taxDeductionAmount,
+      taxDeductionCurrency: args.taxDeductionCurrency,
+      netAmountReceived: args.netAmountReceived,
       status: "pending",
       createdAt: now,
       updatedAt: now,
@@ -90,16 +102,18 @@ export const updateStatus = mutation({
       const toBank = await ctx.db.get(transfer.toBankAccountId);
       
       if (fromBank) {
-        // Decrease source bank balance
+        // Decrease source bank balance by the full transfer amount
         await ctx.db.patch(transfer.fromBankAccountId, {
           currentBalance: (fromBank.currentBalance || 0) - transfer.amount,
         });
       }
       
       if (toBank) {
-        // Increase destination bank balance
+        // Increase destination bank balance by the net amount received (after tax deduction)
+        // If no tax deduction, use the full amount; otherwise use netAmountReceived
+        const amountToAdd = transfer.netAmountReceived || transfer.amount;
         await ctx.db.patch(transfer.toBankAccountId, {
-          currentBalance: (toBank.currentBalance || 0) + transfer.amount,
+          currentBalance: (toBank.currentBalance || 0) + amountToAdd,
         });
       }
     }
@@ -146,6 +160,12 @@ export const getBatchTransferStatus = query({
       amount: v.number(),
       status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
       toBankCountry: v.optional(v.string()),
+      // Tax deduction fields
+      hasTaxDeduction: v.optional(v.boolean()),
+      taxDeductionRate: v.optional(v.number()),
+      taxDeductionAmount: v.optional(v.number()),
+      taxDeductionCurrency: v.optional(v.string()),
+      netAmountReceived: v.optional(v.number()),
     })),
   })),
   handler: async (ctx, args) => {
@@ -183,6 +203,12 @@ export const getByBankAccount = query({
     invoiceId: v.optional(v.id("invoices")),
     reference: v.optional(v.string()),
     notes: v.optional(v.string()),
+    // Tax deduction fields
+    hasTaxDeduction: v.optional(v.boolean()),
+    taxDeductionRate: v.optional(v.number()),
+    taxDeductionAmount: v.optional(v.number()),
+    taxDeductionCurrency: v.optional(v.string()),
+    netAmountReceived: v.optional(v.number()),
     status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
     transferDate: v.optional(v.number()),
     createdAt: v.number(),
@@ -295,6 +321,12 @@ export const getByInvoice = query({
     invoiceId: v.optional(v.id("invoices")),
     reference: v.optional(v.string()),
     notes: v.optional(v.string()),
+    // Tax deduction fields
+    hasTaxDeduction: v.optional(v.boolean()),
+    taxDeductionRate: v.optional(v.number()),
+    taxDeductionAmount: v.optional(v.number()),
+    taxDeductionCurrency: v.optional(v.string()),
+    netAmountReceived: v.optional(v.number()),
     status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
     transferDate: v.optional(v.number()),
     createdAt: v.number(),
@@ -368,6 +400,12 @@ export const checkInvoicePakistanTransferStatus = query({
       amount: v.number(),
       status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
       toBankCountry: v.optional(v.string()),
+      // Tax deduction fields
+      hasTaxDeduction: v.optional(v.boolean()),
+      taxDeductionRate: v.optional(v.number()),
+      taxDeductionAmount: v.optional(v.number()),
+      taxDeductionCurrency: v.optional(v.string()),
+      netAmountReceived: v.optional(v.number()),
     })),
   }),
   handler: async (ctx, args) => {
@@ -403,6 +441,12 @@ export const checkInvoicePakistanTransferStatus = query({
         amount: transfer.amount, // Keep display amount as converted amount
         status: transfer.status,
         toBankCountry: toBank?.country,
+        // Tax deduction fields
+        hasTaxDeduction: transfer.hasTaxDeduction,
+        taxDeductionRate: transfer.taxDeductionRate,
+        taxDeductionAmount: transfer.taxDeductionAmount,
+        taxDeductionCurrency: transfer.taxDeductionCurrency,
+        netAmountReceived: transfer.netAmountReceived,
       });
     }
     
@@ -440,6 +484,12 @@ export const list = query({
       invoiceId: v.optional(v.id("invoices")),
       reference: v.optional(v.string()),
       notes: v.optional(v.string()),
+      // Tax deduction fields
+      hasTaxDeduction: v.optional(v.boolean()),
+      taxDeductionRate: v.optional(v.number()),
+      taxDeductionAmount: v.optional(v.number()),
+      taxDeductionCurrency: v.optional(v.string()),
+      netAmountReceived: v.optional(v.number()),
       status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed"), v.literal("cancelled")),
       transferDate: v.optional(v.number()),
       createdAt: v.number(),

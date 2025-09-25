@@ -280,6 +280,48 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                 <div className="text-purple-600">
                   This transaction is part of an inter-bank transfer for compliance tracking.
                 </div>
+                
+                {/* Tax Deduction Information */}
+                {transaction.interBankTransferId && (
+                  <div className="mt-3 pt-3 border-t border-purple-200">
+                    <div className="text-purple-800 font-medium mb-2">Transfer Details:</div>
+                    <div className="space-y-1 text-xs">
+                      <div>
+                        <span className="text-purple-600">Full Transfer Amount:</span> 
+                        <span className="ml-2 font-medium">{formatCurrency(Math.abs(transaction.amount), transaction.currency as any)}</span>
+                      </div>
+                      {transaction.originalAmount && transaction.originalCurrency && transaction.originalCurrency !== transaction.currency && (
+                        <div>
+                          <span className="text-purple-600">Original Amount:</span> 
+                          <span className="ml-2 font-medium">{formatCurrency(transaction.originalAmount, transaction.originalCurrency as any)}</span>
+                        </div>
+                      )}
+                      
+                      {/* Tax Deduction Details */}
+                      {transaction.hasTaxDeduction && transaction.taxDeductionRate && transaction.taxDeductionAmount && (
+                        <div className="mt-2 pt-2 border-t border-purple-300">
+                          <div className="text-purple-800 font-medium mb-1">Tax Deduction:</div>
+                          <div className="space-y-1">
+                            <div>
+                              <span className="text-purple-600">Tax Rate:</span> 
+                              <span className="ml-2 font-medium">{transaction.taxDeductionRate}%</span>
+                            </div>
+                            <div>
+                              <span className="text-purple-600">Tax Amount:</span> 
+                              <span className="ml-2 font-medium text-red-600">{formatCurrency(transaction.taxDeductionAmount, transaction.taxDeductionCurrency as any || transaction.currency as any)}</span>
+                            </div>
+                            {transaction.netAmountReceived && (
+                              <div>
+                                <span className="text-purple-600">Net Amount Received:</span> 
+                                <span className="ml-2 font-medium text-green-600">{formatCurrency(transaction.netAmountReceived, transaction.currency as any)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -297,7 +339,7 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                   <span className="mx-2">→</span>
                   <span className="font-medium">
                     {transaction.originalCurrency !== transaction.currency ? 
-                      formatCurrency(Math.abs(transaction.amount), transaction.currency as any) :
+                      formatCurrency(transaction.originalAmount * transaction.exchangeRate, transaction.currency as any) :
                       relatedBankAccount?.currency ? 
                         formatCurrency(transaction.originalAmount * transaction.exchangeRate, relatedBankAccount.currency as any) :
                         formatCurrency(transaction.originalAmount * transaction.exchangeRate, 'PKR' as any)
@@ -305,6 +347,21 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                   </span>
                 </div>
                 <div className="text-blue-600">Exchange Rate: {transaction.exchangeRate.toFixed(4)}</div>
+                
+                {/* Show tax deduction info if applicable */}
+                {transaction.hasTaxDeduction && transaction.taxDeductionRate && transaction.taxDeductionAmount && (
+                  <div className="mt-3 pt-3 border-t border-blue-300">
+                    <div className="text-blue-800 font-medium mb-2">Tax Deduction:</div>
+                    <div className="space-y-1">
+                      <div className="text-blue-700">
+                        Tax Rate: {transaction.taxDeductionRate}% = {formatCurrency(transaction.taxDeductionAmount, transaction.taxDeductionCurrency as any || transaction.currency as any)}
+                      </div>
+                      <div className="text-green-600 font-medium">
+                        Net Amount Received: {formatCurrency(transaction.netAmountReceived || Math.abs(transaction.amount), transaction.currency as any)}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

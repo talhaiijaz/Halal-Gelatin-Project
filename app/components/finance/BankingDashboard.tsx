@@ -404,13 +404,28 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                             {formatCurrency(transaction.originalAmount, transaction.originalCurrency as any)} 
                             → {
                               transaction.originalCurrency !== transaction.currency ? 
-                                formatCurrency(Math.abs(transaction.amount), transaction.currency as any) :
+                                formatCurrency(transaction.originalAmount * transaction.exchangeRate, transaction.currency as any) :
                                 formatCurrency(transaction.originalAmount * transaction.exchangeRate, 'PKR' as any)
                             }
                             <span className="ml-2 text-blue-500">
                               (Rate: {transaction.exchangeRate.toFixed(4)})
                             </span>
                           </div>
+                          
+                          {/* Show tax deduction info if applicable */}
+                          {transaction.hasTaxDeduction && transaction.taxDeductionRate && transaction.taxDeductionAmount && (
+                            <div className="mt-2 pt-2 border-t border-blue-300">
+                              <div className="text-blue-700 font-medium mb-1">Tax Deduction:</div>
+                              <div className="space-y-1">
+                                <div className="text-blue-600">
+                                  Tax Rate: {transaction.taxDeductionRate}% = {formatCurrency(transaction.taxDeductionAmount, transaction.taxDeductionCurrency as any || transaction.currency as any)}
+                                </div>
+                                <div className="text-green-600 font-medium">
+                                  Net Received: {formatCurrency(transaction.netAmountReceived || Math.abs(transaction.amount), transaction.currency as any)}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </td>

@@ -392,6 +392,12 @@ export const transferBetweenAccounts = mutation({
     originalCurrency: v.optional(v.string()), // Source currency
     // Link to inter-bank transfer
     interBankTransferId: v.optional(v.id("interBankTransfers")),
+    // Tax deduction fields
+    hasTaxDeduction: v.optional(v.boolean()),
+    taxDeductionRate: v.optional(v.number()),
+    taxDeductionAmount: v.optional(v.number()),
+    taxDeductionCurrency: v.optional(v.string()),
+    netAmountReceived: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     try {
@@ -470,12 +476,24 @@ export const transferBetweenAccounts = mutation({
     // Create transfer out transaction
     const now = Date.now();
     const userTransactionDate = args.transactionDate || now;
+    
+    // For outgoing transaction, we need to show the full amount that was sent
+    // (before tax deduction) but indicate tax was deducted
+    const outgoingAmount = needsConversion ? (args.originalAmount || 0) : args.amount;
+    const outgoingCurrency = needsConversion ? args.originalCurrency : args.currency;
+    
+    // Create description with tax deduction info
+    let outgoingDescription = `Transfer to ${toAccount.accountName}: ${args.description}`;
+    if (args.hasTaxDeduction && args.taxDeductionAmount && args.taxDeductionRate) {
+      outgoingDescription += ` (Tax deducted: ${args.taxDeductionRate}% = ${formatCurrency(args.taxDeductionAmount, args.taxDeductionCurrency || args.currency)})`;
+    }
+    
     const transferOutData: any = {
       bankAccountId: args.fromBankAccountId,
       transactionType: "transfer_out",
-      amount: needsConversion ? -(args.originalAmount || 0) : -args.amount,
-      currency: needsConversion ? args.originalCurrency : args.currency,
-      description: `Transfer to ${toAccount.accountName}: ${args.description}`,
+      amount: -outgoingAmount, // Negative for outgoing
+      currency: outgoingCurrency,
+      description: outgoingDescription,
       reference: args.reference,
       relatedBankAccountId: args.toBankAccountId,
       transactionDate: userTransactionDate, // Use same transaction date as transfer in
@@ -493,6 +511,15 @@ export const transferBetweenAccounts = mutation({
       transferOutData.convertedAmountUSD = convertedAmountUSD;
     }
 
+    // Add tax deduction fields for outgoing transaction
+    if (args.hasTaxDeduction) {
+      transferOutData.hasTaxDeduction = args.hasTaxDeduction;
+      transferOutData.taxDeductionRate = args.taxDeductionRate;
+      transferOutData.taxDeductionAmount = args.taxDeductionAmount;
+      transferOutData.taxDeductionCurrency = args.taxDeductionCurrency;
+      transferOutData.netAmountReceived = args.netAmountReceived;
+    }
+
     // Add inter-bank transfer link if provided
     if (args.interBankTransferId) {
       transferOutData.interBankTransferId = args.interBankTransferId;
@@ -501,12 +528,21 @@ export const transferBetweenAccounts = mutation({
     const transferOutId = await ctx.db.insert("bankTransactions", transferOutData);
 
     // Create transfer in transaction
+    // Use net amount received if tax was deducted, otherwise use full amount
+    const incomingAmount = args.netAmountReceived || args.amount;
+    
+    // Create description with tax deduction info for incoming transaction
+    let incomingDescription = `Transfer from ${fromAccount.accountName}: ${args.description}`;
+    if (args.hasTaxDeduction && args.taxDeductionAmount && args.taxDeductionRate) {
+      incomingDescription += ` (Net received after ${args.taxDeductionRate}% tax deduction)`;
+    }
+    
     const transferInData: any = {
       bankAccountId: args.toBankAccountId,
       transactionType: "transfer_in",
-      amount: args.amount, // Positive for incoming transfer
+      amount: incomingAmount, // Positive for incoming transfer
       currency: args.currency,
-      description: `Transfer from ${fromAccount.accountName}: ${args.description}`,
+      description: incomingDescription,
       reference: args.reference,
       relatedBankAccountId: args.fromBankAccountId,
       transactionDate: userTransactionDate, // Use user-selected transaction date
@@ -524,6 +560,15 @@ export const transferBetweenAccounts = mutation({
       transferInData.convertedAmountUSD = convertedAmountUSD;
     }
 
+    // Add tax deduction fields for incoming transaction
+    if (args.hasTaxDeduction) {
+      transferInData.hasTaxDeduction = args.hasTaxDeduction;
+      transferInData.taxDeductionRate = args.taxDeductionRate;
+      transferInData.taxDeductionAmount = args.taxDeductionAmount;
+      transferInData.taxDeductionCurrency = args.taxDeductionCurrency;
+      transferInData.netAmountReceived = args.netAmountReceived;
+    }
+
     // Add inter-bank transfer link if provided
     if (args.interBankTransferId) {
       transferInData.interBankTransferId = args.interBankTransferId;
@@ -539,10 +584,18 @@ export const transferBetweenAccounts = mutation({
     await updateBankAccountBalance(ctx, args.fromBankAccountId);
     await updateBankAccountBalance(ctx, args.toBankAccountId);
 
-    // Log the transfer with conversion details
-    const logMessage = needsConversion 
-      ? `Transfer completed: ${formatCurrency(args.originalAmount || 0, args.originalCurrency || '')} → ${formatCurrency(args.amount, args.currency)} (Rate: ${args.exchangeRate || 1}) from ${fromAccount.accountName} to ${toAccount.accountName}`
-      : `Transfer completed: ${formatCurrency(args.amount, args.currency)} from ${fromAccount.accountName} to ${toAccount.accountName}`;
+    // Log the transfer with conversion and tax deduction details
+    let logMessage = '';
+    if (needsConversion) {
+      logMessage = `Transfer completed: ${formatCurrency(args.originalAmount || 0, args.originalCurrency || '')} → ${formatCurrency(args.amount, args.currency)} (Rate: ${args.exchangeRate || 1}) from ${fromAccount.accountName} to ${toAccount.accountName}`;
+    } else {
+      logMessage = `Transfer completed: ${formatCurrency(args.amount, args.currency)} from ${fromAccount.accountName} to ${toAccount.accountName}`;
+    }
+    
+    // Add tax deduction information to log
+    if (args.hasTaxDeduction && args.taxDeductionAmount && args.taxDeductionRate) {
+      logMessage += ` (Tax deducted: ${args.taxDeductionRate}% = ${formatCurrency(args.taxDeductionAmount, args.taxDeductionCurrency || args.currency)}, Net received: ${formatCurrency(incomingAmount, args.currency)})`;
+    }
 
     await logBankTransactionEvent(ctx, {
       entityId: String(transferOutId),
@@ -559,6 +612,13 @@ export const transferBetweenAccounts = mutation({
         originalCurrency: args.originalCurrency,
         exchangeRate: args.exchangeRate,
         convertedAmountUSD,
+        // Tax deduction metadata
+        hasTaxDeduction: args.hasTaxDeduction,
+        taxDeductionRate: args.taxDeductionRate,
+        taxDeductionAmount: args.taxDeductionAmount,
+        taxDeductionCurrency: args.taxDeductionCurrency,
+        netAmountReceived: args.netAmountReceived,
+        incomingAmount,
       },
     });
 

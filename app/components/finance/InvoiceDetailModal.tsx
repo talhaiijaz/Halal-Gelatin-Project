@@ -321,6 +321,24 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                                 )}
                               </span>
                             </div>
+                            
+                            {/* Tax Deduction Information */}
+                            {transfer.hasTaxDeduction && transfer.taxDeductionRate && transfer.taxDeductionAmount && (
+                              <>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Tax Deduction:</span>
+                                  <span className="font-medium text-red-600">
+                                    {transfer.taxDeductionRate}% = {formatCurrency(transfer.taxDeductionAmount, transfer.taxDeductionCurrency as SupportedCurrency || transfer.currency as SupportedCurrency)}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-600">Net Amount Received:</span>
+                                  <span className="font-medium text-green-600">
+                                    {formatCurrency(transfer.netAmountReceived || transfer.amount, transfer.currency as SupportedCurrency)}
+                                  </span>
+                                </div>
+                              </>
+                            )}
                             <div className="flex justify-between items-center">
                               <span className="text-gray-600">From:</span>
                               <span className="font-medium">

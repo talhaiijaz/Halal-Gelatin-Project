@@ -43,6 +43,10 @@ export default function BankTransactionModal({
     originalAmount: "",
     // Invoice selection for transfers
     invoiceId: "",
+    // Tax deduction fields
+    hasTaxDeduction: false,
+    taxDeductionRate: "",
+    taxDeductionAmount: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -76,6 +80,9 @@ export default function BankTransactionModal({
         exchangeRate: "",
         originalAmount: "",
         invoiceId: "",
+        hasTaxDeduction: false,
+        taxDeductionRate: "",
+        taxDeductionAmount: "",
       });
     }
   }, [isOpen]);
@@ -98,6 +105,35 @@ export default function BankTransactionModal({
         parseFloat(formData.exchangeRate)
       )
     : null;
+
+  // Calculate tax deduction amounts
+  const calculateTaxDeduction = () => {
+    if (!formData.hasTaxDeduction || !formData.taxDeductionRate) {
+      return null;
+    }
+
+    const taxRate = parseFloat(formData.taxDeductionRate);
+    if (isNaN(taxRate) || taxRate <= 0) {
+      return null;
+    }
+
+    // Use the converted amount for tax calculation (after currency conversion)
+    const amountForTaxCalculation = needsConversion && convertedAmount 
+      ? convertedAmount.convertedAmount 
+      : parseFloat(formData.amount) || 0;
+
+    const taxAmount = (amountForTaxCalculation * taxRate) / 100;
+    const netAmount = amountForTaxCalculation - taxAmount;
+
+    return {
+      taxRate,
+      taxAmount,
+      netAmount,
+      grossAmount: amountForTaxCalculation
+    };
+  };
+
+  const taxCalculation = calculateTaxDeduction();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +184,11 @@ export default function BankTransactionModal({
           // Use converted amount for the transfer
           const convertedAmount = originalAmount * exchangeRate;
           
+          // Calculate tax deduction if applicable
+          const taxDeductionRate = formData.hasTaxDeduction ? parseFloat(formData.taxDeductionRate) : undefined;
+          const taxDeductionAmount = taxDeductionRate ? (convertedAmount * taxDeductionRate) / 100 : undefined;
+          const netAmountReceived = taxDeductionAmount ? convertedAmount - taxDeductionAmount : undefined;
+          
           // Create inter-bank transfer record
           const transferId = await createInterBankTransfer({
             fromBankAccountId: bankAccountId,
@@ -160,6 +201,12 @@ export default function BankTransactionModal({
             invoiceId: formData.invoiceId ? formData.invoiceId as Id<"invoices"> : undefined,
             reference: formData.reference || undefined,
             notes: formData.notes || undefined,
+            // Tax deduction fields
+            hasTaxDeduction: formData.hasTaxDeduction,
+            taxDeductionRate: taxDeductionRate,
+            taxDeductionAmount: taxDeductionAmount,
+            taxDeductionCurrency: destinationAccount.currency,
+            netAmountReceived: netAmountReceived,
           });
           
           // Also create the bank transaction records for balance updates
@@ -181,6 +228,12 @@ export default function BankTransactionModal({
             originalAmount: originalAmount,
             originalCurrency: sourceAccount.currency,
             interBankTransferId: transferId,
+            // Tax deduction fields
+            hasTaxDeduction: formData.hasTaxDeduction,
+            taxDeductionRate: taxDeductionRate,
+            taxDeductionAmount: taxDeductionAmount,
+            taxDeductionCurrency: destinationAccount.currency,
+            netAmountReceived: netAmountReceived,
           });
           
           // Mark transfer as completed
@@ -190,7 +243,11 @@ export default function BankTransactionModal({
             transferDate: dateStringToTimestamp(formData.transactionDate),
           });
           
-          toast.success(`Transfer completed: ${formatCurrencyAmount(originalAmount, sourceAccount.currency)} → ${formatCurrencyAmount(convertedAmount, destinationAccount.currency)}`);
+          let successMessage = `Transfer completed: ${formatCurrencyAmount(originalAmount, sourceAccount.currency)} → ${formatCurrencyAmount(convertedAmount, destinationAccount.currency)}`;
+          if (formData.hasTaxDeduction && taxDeductionAmount && netAmountReceived) {
+            successMessage += ` (Tax deducted: ${taxDeductionRate}% = ${formatCurrencyAmount(taxDeductionAmount, destinationAccount.currency)}, Net received: ${formatCurrencyAmount(netAmountReceived, destinationAccount.currency)})`;
+          }
+          toast.success(successMessage);
         } else {
           // Same currency transfer
           if (!formData.amount) {
@@ -206,6 +263,11 @@ export default function BankTransactionModal({
             return;
           }
 
+          // Calculate tax deduction if applicable
+          const taxDeductionRate = formData.hasTaxDeduction ? parseFloat(formData.taxDeductionRate) : undefined;
+          const taxDeductionAmount = taxDeductionRate ? (amount * taxDeductionRate) / 100 : undefined;
+          const netAmountReceived = taxDeductionAmount ? amount - taxDeductionAmount : undefined;
+
           // Create inter-bank transfer record
           const transferId = await createInterBankTransfer({
             fromBankAccountId: bankAccountId,
@@ -218,6 +280,12 @@ export default function BankTransactionModal({
             invoiceId: formData.invoiceId ? formData.invoiceId as Id<"invoices"> : undefined,
             reference: formData.reference || undefined,
             notes: formData.notes || undefined,
+            // Tax deduction fields
+            hasTaxDeduction: formData.hasTaxDeduction,
+            taxDeductionRate: taxDeductionRate,
+            taxDeductionAmount: taxDeductionAmount,
+            taxDeductionCurrency: sourceAccount.currency,
+            netAmountReceived: netAmountReceived,
           });
           
           // Also create the bank transaction records for balance updates
@@ -236,6 +304,12 @@ export default function BankTransactionModal({
             notes: formData.notes || undefined,
             transactionDate: dateStringToTimestamp(formData.transactionDate),
             interBankTransferId: transferId,
+            // Tax deduction fields
+            hasTaxDeduction: formData.hasTaxDeduction,
+            taxDeductionRate: taxDeductionRate,
+            taxDeductionAmount: taxDeductionAmount,
+            taxDeductionCurrency: sourceAccount.currency,
+            netAmountReceived: netAmountReceived,
           });
           
           // Mark transfer as completed
@@ -245,7 +319,11 @@ export default function BankTransactionModal({
             transferDate: dateStringToTimestamp(formData.transactionDate),
           });
           
-          toast.success(`Transfer completed: ${formatCurrencyAmount(amount, sourceAccount.currency)}`);
+          let successMessage = `Transfer completed: ${formatCurrencyAmount(amount, sourceAccount.currency)}`;
+          if (formData.hasTaxDeduction && taxDeductionAmount && netAmountReceived) {
+            successMessage += ` (Tax deducted: ${taxDeductionRate}% = ${formatCurrencyAmount(taxDeductionAmount, sourceAccount.currency)}, Net received: ${formatCurrencyAmount(netAmountReceived, sourceAccount.currency)})`;
+          }
+          toast.success(successMessage);
         }
       } else {
         // Deposit or withdrawal
@@ -450,6 +528,14 @@ export default function BankTransactionModal({
                       <span className="font-medium text-green-600">
                         You will receive: {formatCurrencyAmount(convertedAmount.convertedAmount, destinationAccount?.currency || '')}
                       </span>
+                      {taxCalculation && (
+                        <>
+                          <br />
+                          <span className="font-medium text-blue-600">
+                            After tax deduction: {formatCurrencyAmount(taxCalculation.netAmount, destinationAccount?.currency || '')}
+                          </span>
+                        </>
+                      )}
                     </>
                   )}
                 </p>
@@ -471,6 +557,58 @@ export default function BankTransactionModal({
                 required
               />
             </div>
+          )}
+
+          {/* Tax Deduction Section - Only for transfers */}
+          {transactionType === "transfer" && (
+            <>
+              <div className="border-t pt-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <input
+                    type="checkbox"
+                    id="hasTaxDeduction"
+                    checked={formData.hasTaxDeduction}
+                    onChange={(e) => setFormData({ ...formData, hasTaxDeduction: e.target.checked })}
+                    className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                  />
+                  <label htmlFor="hasTaxDeduction" className="text-sm font-medium text-gray-700">
+                    Tax was deducted during transfer
+                  </label>
+                </div>
+
+                {formData.hasTaxDeduction && (
+                  <div className="space-y-3 pl-6 border-l-2 border-gray-200">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Tax Deduction Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={formData.taxDeductionRate}
+                        onChange={(e) => setFormData({ ...formData, taxDeductionRate: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-primary focus:border-primary bg-white"
+                        placeholder="e.g., 5.0 for 5%"
+                      />
+                    </div>
+
+                    {taxCalculation && (
+                      <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
+                        <div className="text-sm text-blue-800">
+                          <div className="font-medium mb-1">Tax Deduction Summary:</div>
+                          <div>Gross Amount: {formatCurrencyAmount(taxCalculation.grossAmount, needsConversion ? destinationAccount?.currency : sourceAccount?.currency)}</div>
+                          <div>Tax Rate: {taxCalculation.taxRate}%</div>
+                          <div>Tax Amount: {formatCurrencyAmount(taxCalculation.taxAmount, needsConversion ? destinationAccount?.currency : sourceAccount?.currency)}</div>
+                          <div className="font-medium text-green-600">Net Amount Received: {formatCurrencyAmount(taxCalculation.netAmount, needsConversion ? destinationAccount?.currency : sourceAccount?.currency)}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           <div>
