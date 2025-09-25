@@ -483,7 +483,7 @@ export const transferBetweenAccounts = mutation({
     const outgoingCurrency = needsConversion ? args.originalCurrency : args.currency;
     
     // Create description with tax deduction info
-    let outgoingDescription = `Transfer to ${toAccount.accountName}: ${args.description}`;
+    let outgoingDescription = `Transfer to ${toAccount.accountName} - ${toAccount.bankName} (${toAccount.currency}): ${args.description}`;
     if (args.hasTaxDeduction && args.taxDeductionAmount && args.taxDeductionRate) {
       outgoingDescription += ` (Tax deducted: ${args.taxDeductionRate}% = ${formatCurrency(args.taxDeductionAmount, args.taxDeductionCurrency || args.currency)})`;
     }
@@ -532,7 +532,7 @@ export const transferBetweenAccounts = mutation({
     const incomingAmount = args.netAmountReceived || args.amount;
     
     // Create description with tax deduction info for incoming transaction
-    let incomingDescription = `Transfer from ${fromAccount.accountName}: ${args.description}`;
+    let incomingDescription = `Transfer from ${fromAccount.accountName} - ${fromAccount.bankName} (${fromAccount.currency}): ${args.description}`;
     if (args.hasTaxDeduction && args.taxDeductionAmount && args.taxDeductionRate) {
       incomingDescription += ` (Net received after ${args.taxDeductionRate}% tax deduction)`;
     }

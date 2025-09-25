@@ -803,7 +803,7 @@ export default function CreateOrderModal({
                       <option value="">Select a bank account</option>
                       {bankAccounts?.map((bank) => (
                         <option key={bank._id} value={bank._id}>
-                          {bank.currency} - {bank.bankName} - {bank.accountName}
+                          {bank.accountName} - {bank.bankName} ({bank.currency})
                         </option>
                       ))}
                     </select>

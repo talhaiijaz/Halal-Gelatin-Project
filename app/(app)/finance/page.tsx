@@ -1122,7 +1122,7 @@ export default function FinancePage() {
                   </div>
                 </div>
                 {payment.bankAccount && (
-                  <div className="mt-2 text-xs text-gray-500">{payment.bankAccount.accountName} • {payment.bankAccount.bankName}</div>
+                  <div className="mt-2 text-xs text-gray-500">{payment.bankAccount.accountName} - {payment.bankAccount.bankName} ({payment.bankAccount.currency})</div>
                 )}
               </button>
             ))}
@@ -1328,7 +1328,7 @@ export default function FinancePage() {
                               }}
                               className="text-red-600 hover:text-red-800 underline"
                             >
-                              {bank.accountName} ({bank.bankName}) - {bank.accountNumber}
+                              {bank.accountName} - {bank.bankName} ({bank.currency}) - {bank.accountNumber}
                             </button>
                           </li>
                         ))}
