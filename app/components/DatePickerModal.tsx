@@ -77,7 +77,7 @@ export default function DatePickerModal({
 
   const modalContent = (
     <div 
-      className="fixed z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50"
+      className="fixed z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50"
       style={{ 
         top: 0, 
         left: 0, 

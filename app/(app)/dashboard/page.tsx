@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useModalManager } from "@/app/hooks/useModalManager";
 import { 
   Package, 
   DollarSign, 
@@ -38,6 +39,10 @@ export default function DashboardPage() {
   const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
   const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables'; audience: 'local' | 'international' }>(null);
   const [showUsdView, setShowUsdView] = useState(false);
+
+  // Generate unique modal ID and manage modal state for dashboard modal
+  const dashboardModalId = useId();
+  useModalManager(dashboardModalId, !!expandedMetric);
 
   // Get dashboard order limit from localStorage
   const [dashboardOrderLimit, setDashboardOrderLimit] = useState<number>(5);
@@ -646,7 +651,7 @@ export default function DashboardPage() {
         {/* Modal for Details */}
         {expandedMetric && createPortal((
           <div 
-            className="fixed z-[60] flex items-start justify-center pt-4" 
+            className="fixed z-[9999] flex items-start justify-center pt-4" 
             style={{ 
               top: 0, 
               left: 0, 

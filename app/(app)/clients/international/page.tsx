@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useModalManager } from "@/app/hooks/useModalManager";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
 // import CustomerCard from "@/app/components/clients/CustomerCard";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
@@ -56,6 +57,10 @@ export default function InternationalClientsPage() {
   
   // State for expanded metric modal
   const [expandedMetric, setExpandedMetric] = useState<null | { metric: 'revenue' | 'pending' | 'advance' | 'receivables' | 'total_quantity' | 'pending_quantity' | 'processed_quantity'; audience: 'international' }>(null);
+
+  // Generate unique modal ID and manage modal state for international clients modal
+  const internationalModalId = useId();
+  useModalManager(internationalModalId, !!expandedMetric);
   
   // Load fiscal year setting from localStorage and listen for changes
   useEffect(() => {

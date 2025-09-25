@@ -5,7 +5,8 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useState, useId } from "react";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 interface DeleteBankConfirmModalProps {
   isOpen: boolean;
@@ -27,6 +28,10 @@ export default function DeleteBankConfirmModal({
 }: DeleteBankConfirmModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const deleteBankAccount = useMutation(api.banks.remove);
+
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   const handleDelete = async () => {
     if (!bankAccount) return;
@@ -74,7 +79,7 @@ export default function DeleteBankConfirmModal({
   if (!isOpen || !bankAccount) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
       <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">

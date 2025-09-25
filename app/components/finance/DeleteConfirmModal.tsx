@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useId } from "react";
 import { createPortal } from "react-dom";
 import { X, AlertTriangle } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { useModalManager } from "@/app/hooks/useModalManager";
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -24,6 +25,10 @@ export default function DeleteConfirmModal({
 }: DeleteConfirmModalProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const deletePayment = useMutation(api.payments.deletePayment);
+
+  // Generate unique modal ID and manage modal state
+  const modalId = useId();
+  useModalManager(modalId, isOpen);
 
   const handleDelete = async () => {
     if (!paymentId || isDeleting) return;
@@ -72,7 +77,7 @@ export default function DeleteConfirmModal({
 
   const modalContent = (
     <div 
-      className="fixed z-[60] flex items-center justify-center p-4 bg-black bg-opacity-50"
+      className="fixed z-[9999] flex items-center justify-center p-4 bg-black bg-opacity-50"
       style={{ 
         top: 0, 
         left: 0, 

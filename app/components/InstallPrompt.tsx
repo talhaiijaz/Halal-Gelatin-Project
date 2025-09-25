@@ -36,7 +36,7 @@ export default function InstallPrompt() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 p-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
+    <div className="fixed bottom-0 left-0 right-0 z-[9999] p-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 16px)" }}>
       <div className="mx-auto max-w-md rounded-xl shadow-lg border border-gray-200 bg-white">
         <div className="p-4">
           <h3 className="text-sm font-semibold text-gray-900">Install app</h3>
