@@ -598,10 +598,10 @@ export default function BankTransactionModal({
                       <div className="bg-blue-50 p-3 rounded-md border border-blue-200">
                         <div className="text-sm text-blue-800">
                           <div className="font-medium mb-1">Tax Deduction Summary:</div>
-                          <div>Gross Amount: {formatCurrencyAmount(taxCalculation.grossAmount, needsConversion ? destinationAccount?.currency : sourceAccount?.currency)}</div>
+                          <div>Gross Amount: {formatCurrencyAmount(taxCalculation.grossAmount, needsConversion ? (destinationAccount?.currency || 'PKR') : (sourceAccount?.currency || 'USD'))}</div>
                           <div>Tax Rate: {taxCalculation.taxRate}%</div>
-                          <div>Tax Amount: {formatCurrencyAmount(taxCalculation.taxAmount, needsConversion ? destinationAccount?.currency : sourceAccount?.currency)}</div>
-                          <div className="font-medium text-green-600">Net Amount Received: {formatCurrencyAmount(taxCalculation.netAmount, needsConversion ? destinationAccount?.currency : sourceAccount?.currency)}</div>
+                          <div>Tax Amount: {formatCurrencyAmount(taxCalculation.taxAmount, needsConversion ? (destinationAccount?.currency || 'PKR') : (sourceAccount?.currency || 'USD'))}</div>
+                          <div className="font-medium text-green-600">Net Amount Received: {formatCurrencyAmount(taxCalculation.netAmount, needsConversion ? (destinationAccount?.currency || 'PKR') : (sourceAccount?.currency || 'USD'))}</div>
                         </div>
                       </div>
                     )}
