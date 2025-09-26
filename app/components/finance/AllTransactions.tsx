@@ -32,14 +32,6 @@ export default function AllTransactions() {
     } : "skip"
   );
 
-  const summary = useQuery(api.bankTransactions.getAllDailySummary,
-    startMs && endMs ? {
-      startMs,
-      endMs,
-      bankAccountId: selectedBankId && selectedBankId !== "all" ? (selectedBankId as Id<"bankAccounts">) : undefined,
-    } : "skip"
-  );
-
   const transactions = Array.isArray(page) ? page : page?.page || [];
 
   return (
@@ -81,25 +73,6 @@ export default function AllTransactions() {
                 ))}
               </select>
             </div>
-          </div>
-        </div>
-
-        <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div className="p-3 rounded border bg-white">
-            <div className="text-xs text-gray-500">Credits</div>
-            <div className="text-sm font-semibold text-green-700">{formatCurrency(summary?.totalCredits || 0, "USD")}</div>
-          </div>
-          <div className="p-3 rounded border bg-white">
-            <div className="text-xs text-gray-500">Debits</div>
-            <div className="text-sm font-semibold text-red-700">{formatCurrency(summary?.totalDebits || 0, "USD")}</div>
-          </div>
-          <div className="p-3 rounded border bg-white">
-            <div className="text-xs text-gray-500">Net</div>
-            <div className="text-sm font-semibold">{formatCurrency((summary?.netAmount ?? 0), "USD")}</div>
-          </div>
-          <div className="p-3 rounded border bg-white">
-            <div className="text-xs text-gray-500">Count</div>
-            <div className="text-sm font-semibold">{summary?.count ?? 0}</div>
           </div>
         </div>
 
@@ -157,7 +130,7 @@ export default function AllTransactions() {
             <div className="mt-3">
               <Pagination
                 currentPage={pagination.currentPage}
-                totalPages={Math.ceil((page.totalCount || 0) / pagination.pageSize)}
+                totalPages={pagination.currentPage + (page.isDone ? 0 : 1)}
                 onPageChange={pagination.goToPage}
                 isLoading={!page}
               />

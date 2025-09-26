@@ -296,11 +296,11 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                   )}
                 </tbody>
               </table>
-              {dailyPage && dailyTransactions.length > 0 && !Array.isArray(dailyPage) && (
+          {dailyPage && dailyTransactions.length > 0 && !Array.isArray(dailyPage) && (
                 <div className="mt-3">
                   <Pagination
                     currentPage={dailyPagination.currentPage}
-                    totalPages={Math.ceil((dailyPage.totalCount || 0) / dailyPagination.pageSize)}
+                totalPages={dailyPagination.currentPage + (dailyPage.isDone ? 0 : 1)}
                     onPageChange={dailyPagination.goToPage}
                     isLoading={!dailyPage}
                   />
