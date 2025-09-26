@@ -652,7 +652,7 @@ export const getOrdersByStatus = query({
         orders.sort((a, b) => {
           const dateA = a.factoryDepartureDate || a.orderCreationDate || a.createdAt;
           const dateB = b.factoryDepartureDate || b.orderCreationDate || b.createdAt;
-          return dateA - dateB;
+          return dateB - dateA; // Reverse order to show latest first
         }).slice(0, limit)
       ),
     ]);
