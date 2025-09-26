@@ -381,4 +381,38 @@ export default defineSchema({
     .index("by_invoice", ["invoiceId"])
     .index("by_status", ["status"])
     .index("by_date", ["transferDate"]),
+
+  // Production Batch Data table
+  productionBatches: defineTable({
+    batchNumber: v.number(), // Continuous batch number across all reports (1, 2, 3... 3000+)
+    serialNumber: v.string(), // SR number from the report (e.g., "SR #1", "SR #2")
+    // Quality parameters
+    viscosity: v.optional(v.number()),
+    bloom: v.optional(v.number()),
+    percentage: v.optional(v.number()),
+    ph: v.optional(v.number()),
+    conductivity: v.optional(v.number()),
+    moisture: v.optional(v.number()),
+    h2o2: v.optional(v.number()), // H2O2 content
+    so2: v.optional(v.number()), // SO2 content
+    color: v.optional(v.string()),
+    clarity: v.optional(v.string()),
+    odour: v.optional(v.string()),
+    // Metadata
+    sourceReport: v.optional(v.string()), // Original PDF filename
+    reportDate: v.optional(v.number()), // Date when the report was generated
+    isUsed: v.optional(v.boolean()), // For future batch selection logic - tracks if batch has been used
+    usedInOrder: v.optional(v.string()), // Order number where this batch was used
+    usedDate: v.optional(v.number()), // When this batch was used
+    notes: v.optional(v.string()), // Additional notes
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_batch_number", ["batchNumber"])
+    .index("by_serial_number", ["serialNumber"])
+    .index("by_source_report", ["sourceReport"])
+    .index("by_is_used", ["isUsed"])
+    .index("by_used_in_order", ["usedInOrder"])
+    .index("by_viscosity_range", ["viscosity"])
+    .index("by_bloom_range", ["bloom"]),
 });
