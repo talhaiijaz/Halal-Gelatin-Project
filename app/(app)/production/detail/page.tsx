@@ -36,15 +36,23 @@ export default function ProductionDetailPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSource, setFilterSource] = useState("all");
   const [filterUsed, setFilterUsed] = useState("all");
+  const [selectedBatches, setSelectedBatches] = useState<Set<string>>(new Set());
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Fetch all batches
   const batches = useQuery(api.productionBatches.getAllBatches, {
     paginationOpts: { numItems: 1000 } // Get all batches for now
   });
 
+  // Fetch current year info
+  const yearInfo = useQuery(api.productionBatches.getCurrentYearInfo);
+
   // Mutations
   const updateBatch = useMutation(api.productionBatches.updateBatch);
   const deleteBatch = useMutation(api.productionBatches.deleteBatch);
+  const deleteMultipleBatches = useMutation(api.productionBatches.deleteMultipleBatches);
+  const resetBatchNumbersForNewYear = useMutation(api.productionBatches.resetBatchNumbersForNewYear);
 
   // Get unique source reports for filter
   const sourceReports = batches?.page ? 
@@ -106,6 +114,46 @@ export default function ProductionDetailPage() {
     }
   };
 
+  const handleSelectBatch = (batchId: string) => {
+    const newSelected = new Set(selectedBatches);
+    if (newSelected.has(batchId)) {
+      newSelected.delete(batchId);
+    } else {
+      newSelected.add(batchId);
+    }
+    setSelectedBatches(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedBatches.size === filteredBatches.length) {
+      setSelectedBatches(new Set());
+    } else {
+      setSelectedBatches(new Set(filteredBatches.map(batch => batch._id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedBatches.size === 0) return;
+
+    try {
+      const batchIds = Array.from(selectedBatches) as Id<"productionBatches">[];
+      await deleteMultipleBatches({ batchIds });
+      setSelectedBatches(new Set());
+      setShowDeleteModal(false);
+    } catch (error) {
+      console.error("Error deleting batches:", error);
+    }
+  };
+
+  const handleResetForNewYear = async (newYear: number, notes?: string) => {
+    try {
+      await resetBatchNumbersForNewYear({ newYear, notes });
+      setShowResetModal(false);
+    } catch (error) {
+      console.error("Error resetting batch numbers:", error);
+    }
+  };
+
   const formatDate = (timestamp?: number) => {
     if (!timestamp) return "N/A";
     return new Date(timestamp).toLocaleDateString();
@@ -137,7 +185,7 @@ export default function ProductionDetailPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -197,6 +245,48 @@ export default function ProductionDetailPage() {
             </div>
           </div>
         </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Current Year</p>
+              <p className="text-2xl font-bold text-gray-900">{yearInfo?.currentYear || new Date().getFullYear()}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex gap-3">
+          {selectedBatches.size > 0 && (
+            <>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                Delete Selected ({selectedBatches.size})
+              </button>
+              <button
+                onClick={() => setSelectedBatches(new Set())}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Clear Selection
+              </button>
+            </>
+          )}
+        </div>
+        <button
+          onClick={() => setShowResetModal(true)}
+          className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+        >
+          Reset for New Year
+        </button>
       </div>
 
       {/* Filters */}
@@ -246,6 +336,14 @@ export default function ProductionDetailPage() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <input
+                    type="checkbox"
+                    checked={selectedBatches.size === filteredBatches.length && filteredBatches.length > 0}
+                    onChange={handleSelectAll}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Batch #
                 </th>
@@ -299,6 +397,14 @@ export default function ProductionDetailPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredBatches.map((batch) => (
                 <tr key={batch._id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={selectedBatches.has(batch._id)}
+                      onChange={() => handleSelectBatch(batch._id)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {batch.batchNumber}
                   </td>
@@ -397,6 +503,69 @@ export default function ProductionDetailPage() {
             setShowEditModal(false);
             setEditingBatch(null);
           }}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Delete Selected Batches
+                </h3>
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-600 mb-4">
+                  Are you sure you want to delete {selectedBatches.size} selected batch(es)? This action cannot be undone.
+                </p>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-900 mb-2">Warning:</h4>
+                  <ul className="text-sm text-red-800 space-y-1">
+                    <li>• This will permanently delete the selected batches</li>
+                    <li>• Batch numbers will not be reused</li>
+                    <li>• This action cannot be undone</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteSelected}
+                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Delete {selectedBatches.size} Batch(es)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset for New Year Modal */}
+      {showResetModal && (
+        <ResetForNewYearModal
+          currentYear={yearInfo?.currentYear || new Date().getFullYear()}
+          totalBatches={batches.page?.length || 0}
+          onReset={handleResetForNewYear}
+          onClose={() => setShowResetModal(false)}
         />
       )}
     </div>
@@ -600,6 +769,118 @@ function EditBatchModal({
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Reset for New Year Modal Component
+function ResetForNewYearModal({ 
+  currentYear, 
+  totalBatches, 
+  onReset, 
+  onClose 
+}: { 
+  currentYear: number; 
+  totalBatches: number; 
+  onReset: (newYear: number, notes?: string) => void; 
+  onClose: () => void; 
+}) {
+  const [newYear, setNewYear] = useState(currentYear + 1);
+  const [notes, setNotes] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onReset(newYear, notes || undefined);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white">
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">
+              Reset Batch Numbers for New Year
+            </h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                This will mark all current year batches as inactive and allow batch numbers to start from 1 for the new year.
+              </p>
+              
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+                <h4 className="font-medium text-orange-900 mb-2">What will happen:</h4>
+                <ul className="text-sm text-orange-800 space-y-1">
+                  <li>• All {totalBatches} batches from {currentYear} will be marked as inactive</li>
+                  <li>• Batch numbers will start from 1 for {newYear}</li>
+                  <li>• Historical data will be preserved but not shown in active view</li>
+                  <li>• A reset record will be created for tracking</li>
+                </ul>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Current Year</label>
+                  <input
+                    type="number"
+                    value={currentYear}
+                    disabled
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">New Year</label>
+                  <input
+                    type="number"
+                    value={newYear}
+                    onChange={(e) => setNewYear(parseInt(e.target.value))}
+                    min={currentYear + 1}
+                    max={currentYear + 10}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Add any notes about this reset..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                Reset for {newYear}
               </button>
             </div>
           </form>

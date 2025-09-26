@@ -2,16 +2,18 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Get all production batches with pagination
+// Get all production batches with pagination (only active batches)
 export const getAllBatches = query({
   args: {
     paginationOpts: v.optional(v.object({
       numItems: v.number(),
       cursor: v.optional(v.union(v.string(), v.null())),
     })),
+    year: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const paginationOpts = args.paginationOpts || { numItems: 50 };
+    const currentYear = args.year || new Date().getFullYear();
     
     // Ensure cursor is either string or null, not undefined
     const validPaginationOpts = {
@@ -21,6 +23,9 @@ export const getAllBatches = query({
     
     const batches = await ctx.db
       .query("productionBatches")
+      .withIndex("by_year_and_active", (q) => 
+        q.eq("year", currentYear).eq("isActive", true)
+      )
       .order("desc")
       .paginate(validPaginationOpts);
 
@@ -41,12 +46,17 @@ export const getBatchByNumber = query({
   },
 });
 
-// Get next available batch number
+// Get next available batch number for current year
 export const getNextBatchNumber = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { year: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const currentYear = args.year || new Date().getFullYear();
+    
     const lastBatch = await ctx.db
       .query("productionBatches")
+      .withIndex("by_year_and_active", (q) => 
+        q.eq("year", currentYear).eq("isActive", true)
+      )
       .order("desc")
       .first();
 
@@ -146,10 +156,13 @@ export const createBatch = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
+    const currentYear = new Date().getFullYear();
     
     const batchId = await ctx.db.insert("productionBatches", {
       ...args,
       isUsed: false,
+      year: currentYear,
+      isActive: true,
       createdAt: now,
       updatedAt: now,
     });
@@ -166,9 +179,14 @@ export const createBatchesFromExtractedData = mutation({
     reportDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Get the next batch number to start from
+    const currentYear = new Date().getFullYear();
+    
+    // Get the next batch number to start from for current year
     const lastBatch = await ctx.db
       .query("productionBatches")
+      .withIndex("by_year_and_active", (q) => 
+        q.eq("year", currentYear).eq("isActive", true)
+      )
       .order("desc")
       .first();
     
@@ -205,6 +223,8 @@ export const createBatchesFromExtractedData = mutation({
           sourceReport: args.sourceReport,
           reportDate: args.reportDate,
           isUsed: false,
+          year: currentYear,
+          isActive: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
@@ -217,6 +237,7 @@ export const createBatchesFromExtractedData = mutation({
       createdCount: createdBatches.length,
       batchIds: createdBatches,
       nextBatchNumber: nextBatchNumber,
+      year: currentYear,
     };
   },
 });
@@ -291,5 +312,123 @@ export const deleteBatchesBySourceReport = mutation({
     }
 
     return batches.length;
+  },
+});
+
+// Delete multiple batches by IDs
+export const deleteMultipleBatches = mutation({
+  args: { batchIds: v.array(v.id("productionBatches")) },
+  handler: async (ctx, args) => {
+    let deletedCount = 0;
+    
+    for (const batchId of args.batchIds) {
+      try {
+        await ctx.db.delete(batchId);
+        deletedCount++;
+      } catch (error) {
+        console.error(`Failed to delete batch ${batchId}:`, error);
+      }
+    }
+
+    return deletedCount;
+  },
+});
+
+// Get batch reset records
+export const getBatchResetRecords = query({
+  args: {},
+  handler: async (ctx) => {
+    const records = await ctx.db
+      .query("batchResetRecords")
+      .order("desc")
+      .collect();
+
+    return records;
+  },
+});
+
+// Reset batch numbers for new year
+export const resetBatchNumbersForNewYear = mutation({
+  args: { 
+    newYear: v.number(),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const currentYear = new Date().getFullYear();
+    
+    // Get the highest batch number from current year
+    const lastBatch = await ctx.db
+      .query("productionBatches")
+      .withIndex("by_year_and_active", (q) => 
+        q.eq("year", currentYear).eq("isActive", true)
+      )
+      .order("desc")
+      .first();
+
+    const previousYearMaxBatch = lastBatch ? lastBatch.batchNumber : 0;
+
+    // Mark all current year batches as inactive
+    const currentYearBatches = await ctx.db
+      .query("productionBatches")
+      .withIndex("by_year_and_active", (q) => 
+        q.eq("year", currentYear).eq("isActive", true)
+      )
+      .collect();
+
+    for (const batch of currentYearBatches) {
+      await ctx.db.patch(batch._id, {
+        isActive: false,
+        updatedAt: Date.now(),
+      });
+    }
+
+    // Create reset record
+    await ctx.db.insert("batchResetRecords", {
+      year: args.newYear,
+      resetDate: Date.now(),
+      previousYearMaxBatch,
+      newYearStartBatch: 1,
+      notes: args.notes,
+      createdAt: Date.now(),
+    });
+
+    return {
+      previousYearMaxBatch,
+      newYearStartBatch: 1,
+      batchesMarkedInactive: currentYearBatches.length,
+    };
+  },
+});
+
+// Get current year info
+export const getCurrentYearInfo = query({
+  args: {},
+  handler: async (ctx) => {
+    const currentYear = new Date().getFullYear();
+    
+    const activeBatches = await ctx.db
+      .query("productionBatches")
+      .withIndex("by_year_and_active", (q) => 
+        q.eq("year", currentYear).eq("isActive", true)
+      )
+      .collect();
+
+    const lastBatch = activeBatches.length > 0 
+      ? activeBatches.reduce((max, batch) => batch.batchNumber > max.batchNumber ? batch : max)
+      : null;
+
+    const resetRecord = await ctx.db
+      .query("batchResetRecords")
+      .withIndex("by_year", (q) => q.eq("year", currentYear))
+      .first();
+
+    return {
+      currentYear,
+      totalActiveBatches: activeBatches.length,
+      lastBatchNumber: lastBatch?.batchNumber || 0,
+      nextBatchNumber: lastBatch ? lastBatch.batchNumber + 1 : 1,
+      wasReset: !!resetRecord,
+      resetDate: resetRecord?.resetDate,
+    };
   },
 });

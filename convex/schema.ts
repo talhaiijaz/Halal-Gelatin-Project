@@ -384,7 +384,7 @@ export default defineSchema({
 
   // Production Batch Data table
   productionBatches: defineTable({
-    batchNumber: v.number(), // Continuous batch number across all reports (1, 2, 3... 3000+)
+    batchNumber: v.number(), // Continuous batch number across all reports (1, 2, 3... 3000+) - UNIQUE
     serialNumber: v.string(), // SR number from the report (e.g., "SR #1", "SR #2")
     // Quality parameters
     viscosity: v.optional(v.number()),
@@ -405,6 +405,9 @@ export default defineSchema({
     usedInOrder: v.optional(v.string()), // Order number where this batch was used
     usedDate: v.optional(v.number()), // When this batch was used
     notes: v.optional(v.string()), // Additional notes
+    // Year tracking for reset functionality
+    year: v.optional(v.number()), // Year this batch belongs to (e.g., 2024, 2025)
+    isActive: v.optional(v.boolean()), // Whether this batch is active (not reset)
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -414,5 +417,20 @@ export default defineSchema({
     .index("by_is_used", ["isUsed"])
     .index("by_used_in_order", ["usedInOrder"])
     .index("by_viscosity_range", ["viscosity"])
-    .index("by_bloom_range", ["bloom"]),
+    .index("by_bloom_range", ["bloom"])
+    .index("by_year", ["year"])
+    .index("by_year_and_active", ["year", "isActive"]),
+
+  // Batch Reset Records table - tracks when batch numbers were reset
+  batchResetRecords: defineTable({
+    year: v.number(), // Year the reset was for
+    resetDate: v.number(), // When the reset was performed
+    resetBy: v.optional(v.id("users")), // User who performed the reset
+    previousYearMaxBatch: v.number(), // Highest batch number from previous year
+    newYearStartBatch: v.number(), // Starting batch number for new year (usually 1)
+    notes: v.optional(v.string()), // Notes about the reset
+    createdAt: v.number(),
+  })
+    .index("by_year", ["year"])
+    .index("by_reset_date", ["resetDate"]),
 });
