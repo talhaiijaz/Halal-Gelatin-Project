@@ -128,10 +128,10 @@ ${extractedData.text}`;
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <FileText className="h-8 w-8 text-orange-600" />
-            <h1 className="text-3xl font-bold text-gray-900">PDF Information Extraction</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Production Reader</h1>
           </div>
           <p className="text-gray-600">
-            Upload a PDF file to extract and analyze its content using AI
+            Upload production analysis reports to extract batch data and quality metrics
           </p>
         </div>
 
@@ -140,7 +140,7 @@ ${extractedData.text}`;
           <div className="space-y-6">
             {/* File Upload */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Upload PDF</h3>
+              <h3 className="font-semibold text-gray-900 mb-4">Upload Production Report</h3>
               
               <div className="space-y-4">
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-orange-400 transition-colors">
@@ -160,7 +160,7 @@ ${extractedData.text}`;
                     <p className="text-sm text-gray-600 mb-2">
                       Click to upload or drag and drop
                     </p>
-                    <p className="text-xs text-gray-500">PDF files only</p>
+                    <p className="text-xs text-gray-500">Production report PDFs only</p>
                   </label>
                 </div>
 

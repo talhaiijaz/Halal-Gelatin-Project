@@ -17,6 +17,7 @@ import {
   Truck,
   HelpCircle,
   FileText,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -53,9 +54,13 @@ const navigation: NavItem[] = [
     icon: Truck,
   },
   {
-    name: "PDF Extraction",
-    href: "/pdf-extraction",
-    icon: FileText,
+    name: "Production",
+    href: "#",
+    icon: BarChart3,
+    children: [
+      { name: "Overview", href: "/production" },
+      { name: "Production Reader", href: "/production/reader" },
+    ],
   },
 ];
 
