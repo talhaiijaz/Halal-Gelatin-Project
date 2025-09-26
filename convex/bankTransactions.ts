@@ -752,3 +752,151 @@ export const getTransactionStats = query({
     };
   },
 });
+
+// List transactions for a single day (time-bounded), paginated and ordered by transactionDate desc
+export const listDailyTransactions = query({
+  args: {
+    bankAccountId: v.id("bankAccounts"),
+    startMs: v.number(),
+    endMs: v.number(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    // Use compound index for efficient range scan
+    const page = await ctx.db
+      .query("bankTransactions")
+      .withIndex("by_bank_and_date", (q) =>
+        q
+          .eq("bankAccountId", args.bankAccountId)
+          .gte("transactionDate", args.startMs)
+          .lte("transactionDate", args.endMs)
+      )
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    return page;
+  },
+});
+
+// Aggregate daily totals (credits, debits, net, count) for a bank account within a day window
+export const getDailySummary = query({
+  args: {
+    bankAccountId: v.id("bankAccounts"),
+    startMs: v.number(),
+    endMs: v.number(),
+  },
+  returns: v.object({
+    totalCredits: v.number(),
+    totalDebits: v.number(),
+    netAmount: v.number(),
+    count: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    let totalCredits = 0;
+    let totalDebits = 0;
+    let count = 0;
+
+    const query = ctx.db
+      .query("bankTransactions")
+      .withIndex("by_bank_and_date", (q) =>
+        q
+          .eq("bankAccountId", args.bankAccountId)
+          .gte("transactionDate", args.startMs)
+          .lte("transactionDate", args.endMs)
+      )
+      .order("desc");
+
+    for await (const tx of query) {
+      if (tx.status === "cancelled" || tx.isReversed) continue;
+      count += 1;
+      if (tx.amount >= 0) totalCredits += tx.amount;
+      else totalDebits += Math.abs(tx.amount);
+    }
+
+    return {
+      totalCredits,
+      totalDebits,
+      netAmount: totalCredits - totalDebits,
+      count,
+    };
+  },
+});
+
+// List daily transactions across all bank accounts (optional bank filter), paginated
+export const listAllDailyTransactions = query({
+  args: {
+    startMs: v.number(),
+    endMs: v.number(),
+    bankAccountId: v.optional(v.id("bankAccounts")),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    if (args.bankAccountId) {
+      return await ctx.db
+        .query("bankTransactions")
+        .withIndex("by_bank_and_date", (q) =>
+          q
+            .eq("bankAccountId", args.bankAccountId!)
+            .gte("transactionDate", args.startMs)
+            .lte("transactionDate", args.endMs)
+        )
+        .order("desc")
+        .paginate(args.paginationOpts);
+    }
+
+    // All banks
+    return await ctx.db
+      .query("bankTransactions")
+      .withIndex("by_date", (q) =>
+        q.gte("transactionDate", args.startMs).lte("transactionDate", args.endMs)
+      )
+      .order("desc")
+      .paginate(args.paginationOpts);
+  },
+});
+
+// Aggregate daily totals across all bank accounts (optional bank filter)
+export const getAllDailySummary = query({
+  args: {
+    startMs: v.number(),
+    endMs: v.number(),
+    bankAccountId: v.optional(v.id("bankAccounts")),
+  },
+  returns: v.object({
+    totalCredits: v.number(),
+    totalDebits: v.number(),
+    netAmount: v.number(),
+    count: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    let totalCredits = 0;
+    let totalDebits = 0;
+    let count = 0;
+
+    const base = ctx.db.query("bankTransactions");
+    const query = args.bankAccountId
+      ? base.withIndex("by_bank_and_date", (q) =>
+          q
+            .eq("bankAccountId", args.bankAccountId!)
+            .gte("transactionDate", args.startMs)
+            .lte("transactionDate", args.endMs)
+        )
+      : base.withIndex("by_date", (q) =>
+          q.gte("transactionDate", args.startMs).lte("transactionDate", args.endMs)
+        );
+
+    for await (const tx of query) {
+      if (tx.status === "cancelled" || tx.isReversed) continue;
+      count += 1;
+      if (tx.amount >= 0) totalCredits += tx.amount;
+      else totalDebits += Math.abs(tx.amount);
+    }
+
+    return {
+      totalCredits,
+      totalDebits,
+      netAmount: totalCredits - totalDebits,
+      count,
+    };
+  },
+});

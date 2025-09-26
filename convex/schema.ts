@@ -289,7 +289,8 @@ export default defineSchema({
     .index("by_transaction_type", ["transactionType"])
     .index("by_date", ["transactionDate"])
     .index("by_status", ["status"])
-    .index("by_payment", ["paymentId"]),
+    .index("by_payment", ["paymentId"])
+    .index("by_bank_and_date", ["bankAccountId", "transactionDate"]),
 
   // Audit Logs table
   logs: defineTable({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -23,6 +23,8 @@ import BankTransactionModal from "./BankTransactionModal";
 import BankTransactionDetailModal from "@/app/components/finance/BankTransactionDetailModal";
 import { formatCurrency } from "@/app/utils/currencyFormat";
 import { usePagination } from "@/app/hooks/usePagination";
+import DatePickerModal from "@/app/components/DatePickerModal";
+import { timestampToDateString } from "@/app/utils/dateUtils";
 import Pagination from "@/app/components/ui/Pagination";
 
 interface BankingDashboardProps {
@@ -38,8 +40,13 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
   const [isTxDetailOpen, setIsTxDetailOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Daily view state
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [selectedDateMs, setSelectedDateMs] = useState<number | null>(null);
+
   // Pagination hook
   const transactionsPagination = usePagination({ pageSize: 10 });
+  const dailyPagination = usePagination({ pageSize: 25 });
 
   const bankAccount = useQuery(api.bankTransactions.getAccountWithTransactions, 
     bankAccountId ? { 
@@ -50,6 +57,34 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
   );
   const transactionStats = useQuery(api.bankTransactions.getTransactionStats,
     bankAccountId ? { bankAccountId } : "skip"
+  );
+
+  // Compute start/end of day for selectedDateMs (local timezone per utils already used elsewhere)
+  const { startMs, endMs } = useMemo(() => {
+    if (!selectedDateMs) return { startMs: null as any, endMs: null as any };
+    const d = new Date(selectedDateMs);
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+    const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999).getTime();
+    return { startMs: start, endMs: end };
+  }, [selectedDateMs]);
+
+  const dailyPage = useQuery(
+    api.bankTransactions.listDailyTransactions,
+    bankAccountId && selectedDateMs
+      ? {
+          bankAccountId,
+          startMs,
+          endMs,
+          paginationOpts: dailyPagination.paginationOpts,
+        }
+      : "skip"
+  );
+
+  const dailySummary = useQuery(
+    api.bankTransactions.getDailySummary,
+    bankAccountId && selectedDateMs
+      ? { bankAccountId, startMs, endMs }
+      : "skip"
   );
 
   if (!bankAccountId) {
@@ -67,6 +102,11 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
       </div>
     );
   }
+
+  // Daily Transactions Section
+  const dailyTransactions = Array.isArray(dailyPage)
+    ? dailyPage
+    : dailyPage?.page || [];
 
   if (!bankAccount) {
     return (
@@ -170,6 +210,107 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
 
   return (
     <div className="space-y-6">
+      {/* Daily Transactions View */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-700 font-medium">Daily Transactions</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={selectedDateMs ? timestampToDateString(selectedDateMs) : ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) {
+                  setSelectedDateMs(null);
+                  return;
+                }
+                const [y, m, d] = val.split("-").map(Number);
+                const ts = new Date(y, m - 1, d, 12, 0, 0).getTime();
+                setSelectedDateMs(ts);
+                dailyPagination.goToPage(1);
+              }}
+              className="h-9 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        {selectedDateMs && (
+          <>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded border bg-white">
+                <div className="text-xs text-gray-500">Credits</div>
+                <div className="text-sm font-semibold text-green-700">{formatCurrency(dailySummary?.totalCredits || 0, (bankAccount as any)?.currency)}</div>
+              </div>
+              <div className="p-3 rounded border bg-white">
+                <div className="text-xs text-gray-500">Debits</div>
+                <div className="text-sm font-semibold text-red-700">{formatCurrency(dailySummary?.totalDebits || 0, (bankAccount as any)?.currency)}</div>
+              </div>
+              <div className="p-3 rounded border bg-white">
+                <div className="text-xs text-gray-500">Net</div>
+                <div className="text-sm font-semibold">{formatCurrency((dailySummary?.netAmount ?? 0), (bankAccount as any)?.currency)}</div>
+              </div>
+              <div className="p-3 rounded border bg-white">
+                <div className="text-xs text-gray-500">Count</div>
+                <div className="text-sm font-semibold">{dailySummary?.count ?? 0}</div>
+              </div>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full table-fixed divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">Type</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[40%]">Description</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">Time</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {!dailyPage ? (
+                    [...Array(5)].map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-64 bg-gray-200 rounded animate-pulse" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse" /></td>
+                        <td className="px-4 py-3 text-right"><div className="h-4 w-16 bg-gray-200 rounded animate-pulse ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : dailyTransactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">No transactions on this day</td>
+                    </tr>
+                  ) : (
+                    dailyTransactions.map((tx: any) => (
+                      <tr key={tx._id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedTxId(tx._id); setIsTxDetailOpen(true); }}>
+                        <td className="px-4 py-3 text-sm text-gray-900">{getTransactionTypeLabel(tx.transactionType)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700 truncate" title={tx.description}>{tx.description}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{new Date(tx.transactionDate).toLocaleTimeString()}</td>
+                        <td className={`px-4 py-3 text-sm font-medium text-right ${tx.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}> 
+                          {formatCurrency(tx.amount, tx.currency)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              {dailyPage && dailyTransactions.length > 0 && !Array.isArray(dailyPage) && (
+                <div className="mt-3">
+                  <Pagination
+                    currentPage={dailyPagination.currentPage}
+                    totalPages={Math.ceil((dailyPage.totalCount || 0) / dailyPagination.pageSize)}
+                    onPageChange={dailyPagination.goToPage}
+                    isLoading={!dailyPage}
+                  />
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Account Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="card p-4">

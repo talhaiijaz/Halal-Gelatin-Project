@@ -13,6 +13,7 @@ import BankAccountModal from "@/app/components/finance/BankAccountModal";
 import DeleteBankConfirmModal from "@/app/components/finance/DeleteBankConfirmModal";
 import BankAccountDetailModal from "@/app/components/finance/BankAccountDetailModal";
 import BankingDashboard from "@/app/components/finance/BankingDashboard";
+import AllTransactions from "@/app/components/finance/AllTransactions";
 import { 
   TrendingUp,
   DollarSign,
@@ -75,6 +76,7 @@ export default function FinancePage() {
     { id: "invoices", label: "Invoices", icon: <FileText className="h-4 w-4" /> },
     { id: "payments", label: "Payments", icon: <CreditCard className="h-4 w-4" /> },
     { id: "banks", label: "Banks", icon: <Building2 className="h-4 w-4" /> },
+    { id: "all_transactions", label: "All Transactions", icon: <Clock className="h-4 w-4" /> },
   ];
 
   const { activeTab, setActiveTab } = useTabNavigation(tabs, "dashboard");
@@ -1274,6 +1276,11 @@ export default function FinancePage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* All Transactions Tab */}
+      {activeTab === "all_transactions" && (
+        <AllTransactions />
       )}
 
       {/* Banks Tab */}
