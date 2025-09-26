@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UserButton } from "@clerk/nextjs";
 import {
   Home,
@@ -70,6 +70,20 @@ export default function Sidebar() {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const pathname = usePathname();
 
+  // Auto-expand parent items when on child pages
+  useEffect(() => {
+    const shouldExpand: string[] = [];
+    navigation.forEach((item) => {
+      if (item.children) {
+        const hasActiveChild = item.children.some((child) => isActive(child.href));
+        if (hasActiveChild) {
+          shouldExpand.push(item.name);
+        }
+      }
+    });
+    setExpandedItems(shouldExpand);
+  }, [pathname]);
+
   const toggleExpanded = (itemName: string) => {
     setExpandedItems((prev) =>
       prev.includes(itemName)
@@ -81,7 +95,12 @@ export default function Sidebar() {
   const isActive = (href: string) => {
     if (href === "#") return false;
     if (href === "/dashboard") return pathname === "/" || pathname === "/dashboard";
-    return pathname.startsWith(href);
+    
+    // For exact matches, use exact comparison
+    if (href === "/production") return pathname === "/production";
+    
+    // For other paths, use startsWith but ensure it's not a partial match
+    return pathname === href || (pathname.startsWith(href) && pathname.charAt(href.length) === "/");
   };
 
   const isParentActive = (item: NavItem) => {

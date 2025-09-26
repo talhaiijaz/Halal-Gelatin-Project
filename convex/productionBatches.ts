@@ -401,6 +401,50 @@ export const deleteMultipleBatches = mutation({
   },
 });
 
+// Get current year info
+export const getCurrentYearInfo = query({
+  args: {},
+  handler: async (ctx) => {
+    const currentYear = new Date().getFullYear();
+    
+    // Get the latest reset record to determine the current active year
+    const latestReset = await ctx.db
+      .query("batchResetRecords")
+      .order("desc")
+      .first();
+    
+    const activeYear = latestReset ? latestReset.year : currentYear;
+    
+    // Count batches for the active year
+    const batchCount = await ctx.db
+      .query("productionBatches")
+      .withIndex("by_year_and_active", (q) => 
+        q.eq("year", activeYear).eq("isActive", true)
+      )
+      .collect();
+    
+    return {
+      currentYear: activeYear,
+      batchCount: batchCount.length,
+      lastResetDate: latestReset?.resetDate,
+      lastResetNotes: latestReset?.notes
+    };
+  },
+});
+
+// Get available years (years that have batch data)
+export const getAvailableYears = query({
+  args: {},
+  handler: async (ctx) => {
+    const batches = await ctx.db
+      .query("productionBatches")
+      .collect();
+    
+    const years = Array.from(new Set(batches.map(batch => batch.year).filter(Boolean)));
+    return years.sort((a, b) => (b || 0) - (a || 0)); // Sort descending (newest first)
+  },
+});
+
 // Get batch reset records
 export const getBatchResetRecords = query({
   args: {},
@@ -467,36 +511,4 @@ export const resetBatchNumbersForNewYear = mutation({
   },
 });
 
-// Get current year info
-export const getCurrentYearInfo = query({
-  args: {},
-  handler: async (ctx) => {
-    const currentYear = new Date().getFullYear();
-    
-    const activeBatches = await ctx.db
-      .query("productionBatches")
-      .withIndex("by_year_and_active", (q) => 
-        q.eq("year", currentYear).eq("isActive", true)
-      )
-      .collect();
-
-    const lastBatch = activeBatches.length > 0 
-      ? activeBatches.reduce((max, batch) => batch.batchNumber > max.batchNumber ? batch : max)
-      : null;
-
-    const resetRecord = await ctx.db
-      .query("batchResetRecords")
-      .withIndex("by_year", (q) => q.eq("year", currentYear))
-      .first();
-
-    return {
-      currentYear,
-      totalActiveBatches: activeBatches.length,
-      lastBatchNumber: lastBatch?.batchNumber || 0,
-      nextBatchNumber: lastBatch ? lastBatch.batchNumber + 1 : 1,
-      wasReset: !!resetRecord,
-      resetDate: resetRecord?.resetDate,
-    };
-  },
-});
 
