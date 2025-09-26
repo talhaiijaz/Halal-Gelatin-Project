@@ -16,6 +16,8 @@ import {
   Activity,
   Truck,
   HelpCircle,
+  FileText,
+  BarChart3,
 } from "lucide-react";
 
 interface NavItem {
@@ -50,6 +52,16 @@ const navigation: NavItem[] = [
     name: "Shipments",
     href: "/shipments",
     icon: Truck,
+  },
+  {
+    name: "Production",
+    href: "#",
+    icon: BarChart3,
+    children: [
+      { name: "Overview", href: "/production" },
+      { name: "Production Reader", href: "/production/reader" },
+      { name: "Production Detail", href: "/production/detail" },
+    ],
   },
 ];
 

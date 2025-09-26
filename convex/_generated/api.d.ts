@@ -29,6 +29,7 @@ import type * as invoices from "../invoices.js";
 import type * as migrations from "../migrations.js";
 import type * as orders from "../orders.js";
 import type * as payments from "../payments.js";
+import type * as productionBatches from "../productionBatches.js";
 import type * as settings from "../settings.js";
 import type * as users from "../users.js";
 
@@ -57,6 +58,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   orders: typeof orders;
   payments: typeof payments;
+  productionBatches: typeof productionBatches;
   settings: typeof settings;
   users: typeof users;
 }>;
