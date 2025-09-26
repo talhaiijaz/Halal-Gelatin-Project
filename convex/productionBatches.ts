@@ -196,30 +196,66 @@ export const createBatchesFromExtractedData = mutation({
     const lines = args.extractedData.split('\n').filter(line => line.trim());
     const createdBatches = [];
 
+    console.log(`Processing ${lines.length} lines from extracted data`);
+
     for (const line of lines) {
       // Skip header lines and empty lines
-      if (line.includes('SR') || line.includes('Serial') || line.includes('Batch') || line.trim() === '') {
+      if (line.includes('SR') || line.includes('Serial') || line.includes('Batch') || line.includes('Viscocity') || line.includes('Bloom') || line.includes('PH') || line.includes('Conductivity') || line.includes('Moisture') || line.includes('H2O2') || line.includes('SO2') || line.includes('Color') || line.includes('Clarity') || line.includes('Odour') || line.trim() === '') {
         continue;
       }
 
-      // Parse the line data (this is a simplified parser - you might need to adjust based on actual data format)
-      const parts = line.split(/\s+/).filter(part => part.trim());
+      // Parse the line data using pipe delimiter (|)
+      const parts = line.split('|').map(part => part.trim());
       
-      if (parts.length >= 3) { // Minimum required fields
-        const batchId = await ctx.db.insert("productionBatches", {
-          batchNumber: nextBatchNumber++,
-          serialNumber: parts[0] || `SR #${nextBatchNumber}`,
-          viscosity: parseFloat(parts[1]) || undefined,
-          bloom: parseFloat(parts[2]) || undefined,
-          percentage: parseFloat(parts[3]) || undefined,
-          ph: parseFloat(parts[4]) || undefined,
-          conductivity: parseFloat(parts[5]) || undefined,
-          moisture: parseFloat(parts[6]) || undefined,
-          h2o2: parseFloat(parts[7]) || undefined,
-          so2: parseFloat(parts[8]) || undefined,
-          color: parts[9] || undefined,
-          clarity: parts[10] || undefined,
-          odour: parts[11] || undefined,
+      console.log(`Processing line with ${parts.length} parts:`, parts);
+      
+      if (parts.length >= 13) { // Expected format: SR # | Batch | Viscocity | Bloom | % age | PH | Conductivity | Moisture | H2O2 | SO2 | Color | Clarity | Odour
+        // Helper function to parse numeric values, handling percentage signs
+        const parseNumeric = (value: string): number | undefined => {
+          if (!value || value === 'N/A' || value === '' || value === '|') return undefined;
+          const cleaned = value.replace('%', '').trim();
+          const parsed = parseFloat(cleaned);
+          return isNaN(parsed) ? undefined : parsed;
+        };
+
+        // Helper function to parse string values, handling empty or pipe values
+        const parseString = (value: string): string | undefined => {
+          if (!value || value === 'N/A' || value === '' || value === '|') return undefined;
+          return value.trim();
+        };
+
+        // Extract batch number from the data (parts[1] is the Batch column, parts[0] is SR #)
+        const extractedBatchNumber = parseNumeric(parts[1]); // Use Batch column, not SR # column
+        if (!extractedBatchNumber) {
+          console.warn(`Skipping row with invalid batch number: ${parts[1]} (SR #: ${parts[0]})`);
+          continue;
+        }
+
+        // Check if batch number already exists
+        const existingBatch = await ctx.db
+          .query("productionBatches")
+          .withIndex("by_batch_number", (q) => q.eq("batchNumber", extractedBatchNumber))
+          .filter((q) => q.eq(q.field("isActive"), true))
+          .first();
+
+        if (existingBatch) {
+          throw new Error(`Batch number ${extractedBatchNumber} already exists. Cannot create duplicate batch numbers.`);
+        }
+
+        const batchData = {
+          batchNumber: extractedBatchNumber,
+          serialNumber: `Batch ${extractedBatchNumber}`, // Keep for database schema compatibility
+          viscosity: parseNumeric(parts[2]), // Viscocity column (index 2)
+          bloom: parseNumeric(parts[3]), // Bloom column (index 3)
+          percentage: parseNumeric(parts[4]), // % age column (index 4)
+          ph: parseNumeric(parts[5]), // PH column (index 5)
+          conductivity: parseNumeric(parts[6]), // Conductivity column (index 6)
+          moisture: parseNumeric(parts[7]), // Moisture column (index 7)
+          h2o2: parseNumeric(parts[8]), // H2O2 column (index 8)
+          so2: parseNumeric(parts[9]), // SO2 column (index 9)
+          color: parseString(parts[10]), // Color column (index 10)
+          clarity: parseString(parts[11]), // Clarity column (index 11)
+          odour: parseString(parts[12]), // Odour column (index 12)
           sourceReport: args.sourceReport,
           reportDate: args.reportDate,
           isUsed: false,
@@ -227,8 +263,11 @@ export const createBatchesFromExtractedData = mutation({
           isActive: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
-        });
+        };
 
+        console.log(`Creating batch with data:`, batchData);
+
+        const batchId = await ctx.db.insert("productionBatches", batchData);
         createdBatches.push(batchId);
       }
     }
@@ -293,8 +332,20 @@ export const markBatchAsUsed = mutation({
 export const deleteBatch = mutation({
   args: { id: v.id("productionBatches") },
   handler: async (ctx, args) => {
-    await ctx.db.delete(args.id);
-    return args.id;
+    try {
+      // Check if the batch exists before deleting
+      const batch = await ctx.db.get(args.id);
+      if (!batch) {
+        throw new Error(`Batch with ID ${args.id} not found`);
+      }
+      
+      await ctx.db.delete(args.id);
+      console.log(`Successfully deleted batch ${batch.batchNumber} (ID: ${args.id})`);
+      return args.id;
+    } catch (error) {
+      console.error(`Failed to delete batch ${args.id}:`, error);
+      throw error;
+    }
   },
 });
 
@@ -320,16 +371,32 @@ export const deleteMultipleBatches = mutation({
   args: { batchIds: v.array(v.id("productionBatches")) },
   handler: async (ctx, args) => {
     let deletedCount = 0;
+    const errors: string[] = [];
     
     for (const batchId of args.batchIds) {
       try {
+        // Check if the batch exists before deleting
+        const batch = await ctx.db.get(batchId);
+        if (!batch) {
+          console.warn(`Batch with ID ${batchId} not found, skipping deletion`);
+          continue;
+        }
+        
         await ctx.db.delete(batchId);
         deletedCount++;
+        console.log(`Successfully deleted batch ${batch.batchNumber} (ID: ${batchId})`);
       } catch (error) {
-        console.error(`Failed to delete batch ${batchId}:`, error);
+        const errorMsg = `Failed to delete batch ${batchId}: ${error}`;
+        console.error(errorMsg);
+        errors.push(errorMsg);
       }
     }
 
+    if (errors.length > 0) {
+      console.warn(`Some batches failed to delete: ${errors.join(', ')}`);
+    }
+
+    console.log(`Delete operation completed: ${deletedCount}/${args.batchIds.length} batches deleted`);
     return deletedCount;
   },
 });
@@ -432,3 +499,4 @@ export const getCurrentYearInfo = query({
     };
   },
 });
+
