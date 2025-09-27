@@ -152,7 +152,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl sm:rounded-l-xl">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 sticky top-0 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="border-b border-gray-200 px-4 py-4 sm:px-6 sm:py-5 sticky top-0 bg-white" style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}>
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">
@@ -164,24 +164,24 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                   </p>
                 )}
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="flex items-center px-3 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 active:bg-blue-200 transition-colors"
+                  className="flex items-center px-3 py-2 text-sm text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 active:bg-blue-200 transition-colors"
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   Edit
                 </button>
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center px-3 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 active:bg-red-200 transition-colors"
+                  className="flex items-center px-3 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 active:bg-red-200 transition-colors"
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Delete
                 </button>
                 <button
                   onClick={onClose}
-                  className="rounded-lg p-2 hover:bg-gray-100 active:bg-gray-200"
+                  className="rounded-lg p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors"
                 >
                   <X className="h-5 w-5 text-gray-500" />
                 </button>

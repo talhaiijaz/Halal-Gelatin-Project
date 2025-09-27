@@ -89,7 +89,7 @@ export default function DatePickerModal({
     >
       <div className="bg-white rounded-lg sm:rounded-lg rounded-none shadow-xl max-w-md w-full mx-0 sm:mx-4 h-full sm:h-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 sticky top-0 bg-white" style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}>
           <div className="flex items-center space-x-2">
             <Calendar className="h-5 w-5 text-blue-600" />
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>

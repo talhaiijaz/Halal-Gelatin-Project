@@ -38,7 +38,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b px-6 py-4 flex items-center justify-between">
+          <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between" style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <Building2 className="h-5 w-5 mr-2" /> Bank Account Details
@@ -47,7 +47,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                 <p className="text-sm text-gray-600 mt-1">{bankAccount.accountName}</p>
               )}
             </div>
-            <button onClick={onClose} className="rounded-lg p-1 hover:bg-gray-100">
+            <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors">
               <X className="h-5 w-5 text-gray-500" />
             </button>
           </div>

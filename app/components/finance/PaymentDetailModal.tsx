@@ -72,7 +72,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b px-6 py-4 flex items-center justify-between">
+          <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between" style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <DollarSign className="h-5 w-5 mr-2" /> Payment Details

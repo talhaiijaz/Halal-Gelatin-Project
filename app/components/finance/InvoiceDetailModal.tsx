@@ -47,7 +47,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl sm:rounded-l-xl">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between sticky top-0 bg-white" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+          <div className="border-b border-gray-200 px-4 py-4 sm:px-6 sm:py-5 flex items-center justify-between sticky top-0 bg-white" style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <FileText className="h-5 w-5 mr-2" /> Invoice Details
@@ -56,7 +56,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                 <p className="text-sm text-gray-600 mt-1">Invoice #{invoice.invoiceNumber || invoice._id}</p>
               )}
             </div>
-            <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 active:bg-gray-200">
+            <button onClick={onClose} className="rounded-lg p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors">
               <X className="h-5 w-5 text-gray-500" />
             </button>
           </div>

@@ -1066,7 +1066,7 @@ export default function LocalClientsPage() {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setExpandedMetric(null)} />
           <div className="relative bg-white sm:rounded-2xl rounded-none shadow-2xl w-full max-w-6xl h-[100vh] sm:h-[calc(100vh-2rem)] mx-0 sm:mx-4 overflow-hidden border border-gray-200">
             {/* Header */}
-            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 sticky top-0" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 sticky top-0" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
               <div className="flex items-center justify-between">
                 <div>
                       <h2 className="text-xl font-bold text-gray-900 mb-1">

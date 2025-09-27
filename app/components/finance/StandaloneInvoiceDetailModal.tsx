@@ -204,7 +204,7 @@ export default function StandaloneInvoiceDetailModal({
       }`}>
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50" style={{ paddingTop: 'max(env(safe-area-inset-top), 24px)' }}>
             <div className="flex items-center">
               <div className="p-2 bg-primary/10 rounded-lg mr-3">
                 <FileText className="h-6 w-6 text-primary" />
