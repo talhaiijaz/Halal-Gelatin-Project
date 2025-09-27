@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
+import { useProductionYear } from '../../hooks/useProductionYear';
 import { 
   FileText, 
   BarChart3, 
@@ -11,19 +12,43 @@ import {
   TrendingUp,
   Package,
   CheckCircle,
-  Clock
+  Clock,
+  ChevronDown,
+  Plus
 } from 'lucide-react';
+import { useState } from 'react';
 
 export default function ProductionPage() {
   const router = useRouter();
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showAddYearModal, setShowAddYearModal] = useState(false);
+  const [newYear, setNewYear] = useState('');
 
-  // Fetch real production data
+  // Use the new year management system
+  const { currentYear, availableYears, setCurrentYear, addNewYear, isLoading, error } = useProductionYear();
+
+  // Fetch real production data for the current year
   const batches = useQuery(api.productionBatches.getAllBatches, {
-    paginationOpts: { numItems: 1000 }
+    paginationOpts: { numItems: 1000 },
+    year: currentYear
   });
 
   const yearInfo = useQuery(api.productionBatches.getCurrentYearInfo);
-  const availableYears = useQuery(api.productionBatches.getAvailableYears);
+
+  // Year management functions
+  const handleYearSelect = async (year: number) => {
+    await setCurrentYear(year);
+    setShowYearDropdown(false);
+  };
+
+  const handleAddNewYear = async () => {
+    const year = parseInt(newYear);
+    if (year && year > 2000 && year < 2100) {
+      await addNewYear(year);
+      setNewYear('');
+      setShowAddYearModal(false);
+    }
+  };
 
   // Calculate statistics from real data
   const totalBatches = batches?.page?.length || 0;
@@ -199,22 +224,65 @@ export default function ProductionPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Year Info */}
+            {/* Year Management */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Current Year</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Active Year</span>
-                  <span className="font-semibold text-gray-900">{yearInfo?.currentYear || new Date().getFullYear()}</span>
+              <h3 className="font-semibold text-gray-900 mb-4">Production Year</h3>
+              <div className="space-y-4">
+                {/* Year Dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowYearDropdown(!showYearDropdown)}
+                    className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <span>{currentYear}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  
+                  {showYearDropdown && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                      {availableYears.map((year) => (
+                        <button
+                          key={year}
+                          onClick={() => handleYearSelect(year)}
+                          className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                            year === currentYear ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                          }`}
+                        >
+                          {year}
+                        </button>
+                      ))}
+                      <div className="border-t border-gray-200">
+                        <button
+                          onClick={() => {
+                            setShowYearDropdown(false);
+                            setShowAddYearModal(true);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Year
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Batches</span>
-                  <span className="font-semibold text-gray-900">{yearInfo?.batchCount || 0}</span>
-                </div>
-                {availableYears && availableYears.length > 1 && (
+
+                {/* Year Stats */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Batches</span>
+                    <span className="font-semibold text-gray-900">{yearInfo?.batchCount || 0}</span>
+                  </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Available Years</span>
                     <span className="font-semibold text-gray-900">{availableYears.length}</span>
+                  </div>
+                </div>
+
+                {/* Error Display */}
+                {error && (
+                  <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
+                    {error}
                   </div>
                 )}
               </div>
@@ -254,6 +322,49 @@ export default function ProductionPage() {
           </div>
         </div>
       </div>
+
+      {/* Add New Year Modal */}
+      {showAddYearModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Year</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Year
+                </label>
+                <input
+                  type="number"
+                  value={newYear}
+                  onChange={(e) => setNewYear(e.target.value)}
+                  placeholder="e.g., 2026"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="2000"
+                  max="2100"
+                />
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleAddNewYear}
+                  disabled={!newYear || isLoading}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? 'Adding...' : 'Add Year'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddYearModal(false);
+                    setNewYear('');
+                  }}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

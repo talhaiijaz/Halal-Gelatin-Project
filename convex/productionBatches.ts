@@ -190,7 +190,9 @@ export const createBatchesFromExtractedData = mutation({
         });
       }
 
-      const currentYear = new Date().getFullYear();
+      // Get the current production year from settings
+      const yearSettings = await ctx.db.query("productionYearSettings").first();
+      const currentYear = yearSettings ? yearSettings.currentYear : new Date().getFullYear();
     
     // Get the next batch number to start from for current year
     const lastBatch = await ctx.db
@@ -439,7 +441,9 @@ export const deleteMultipleBatches = mutation({
 export const getCurrentYearInfo = query({
   args: {},
   handler: async (ctx) => {
-    const currentYear = new Date().getFullYear();
+    // Get the current production year from settings
+    const yearSettings = await ctx.db.query("productionYearSettings").first();
+    const currentYear = yearSettings ? yearSettings.currentYear : new Date().getFullYear();
     
     // Get the latest reset record to determine the current active year
     const latestReset = await ctx.db
@@ -470,6 +474,14 @@ export const getCurrentYearInfo = query({
 export const getAvailableYears = query({
   args: {},
   handler: async (ctx) => {
+    // Get available years from production year settings
+    const yearSettings = await ctx.db.query("productionYearSettings").first();
+    
+    if (yearSettings) {
+      return yearSettings.availableYears.sort((a, b) => b - a); // Sort descending (newest first)
+    }
+    
+    // Fallback: get years from existing batches
     const batches = await ctx.db
       .query("productionBatches")
       .collect();

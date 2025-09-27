@@ -394,6 +394,14 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_status", ["status"]),
 
+  // Production Year Settings table
+  productionYearSettings: defineTable({
+    currentYear: v.number(), // The currently active year for production
+    availableYears: v.array(v.number()), // All available years
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+
   // Production Batch Data table
   productionBatches: defineTable({
     batchNumber: v.number(), // Continuous batch number across all reports (1, 2, 3... 3000+) - UNIQUE

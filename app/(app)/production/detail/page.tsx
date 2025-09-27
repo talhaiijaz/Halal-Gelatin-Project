@@ -5,6 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { Search, Filter, Trash2, Loader2, AlertCircle, CheckCircle, Upload, X } from "lucide-react";
+import { useProductionYear } from "../../../hooks/useProductionYear";
 
 interface BatchData {
   _id: Id<"productionBatches">;
@@ -37,8 +38,9 @@ export default function ProductionDetailPage() {
   const [filterUsed, setFilterUsed] = useState("all");
   const [selectedBatches, setSelectedBatches] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [showResetModal, setShowResetModal] = useState(false);
+  
+  // Use the shared year management system
+  const { currentYear } = useProductionYear();
   
   // Upload functionality
   const [isUploading, setIsUploading] = useState(false);
@@ -49,15 +51,14 @@ export default function ProductionDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Fetch all batches for selected year
+  // Fetch all batches for current year
   const batches = useQuery(api.productionBatches.getAllBatches, {
     paginationOpts: { numItems: 1000 },
-    year: selectedYear
+    year: currentYear
   });
 
-  // Fetch current year info and available years
+  // Fetch current year info
   const yearInfo = useQuery(api.productionBatches.getCurrentYearInfo);
-  const availableYears = useQuery(api.productionBatches.getAvailableYears);
   
   // Fetch current processing state
   const processingState = useQuery(api.productionProcessing.getCurrentProcessingState);
@@ -65,7 +66,6 @@ export default function ProductionDetailPage() {
   // Mutations
   const deleteBatch = useMutation(api.productionBatches.deleteBatch);
   const deleteMultipleBatches = useMutation(api.productionBatches.deleteMultipleBatches);
-  const resetBatchNumbersForNewYear = useMutation(api.productionBatches.resetBatchNumbersForNewYear);
   const createBatchesFromExtractedData = useMutation(api.productionBatches.createBatchesFromExtractedData);
   const startProcessing = useMutation(api.productionProcessing.startProcessing);
   const updateProcessingState = useMutation(api.productionProcessing.updateProcessingState);
@@ -132,17 +132,6 @@ export default function ProductionDetailPage() {
     }
   };
 
-  const handleResetForNewYear = async (newYear: number, notes?: string) => {
-    try {
-      await resetBatchNumbersForNewYear({ newYear, notes });
-      setShowResetModal(false);
-      setSelectedYear(newYear);
-      console.log(`Successfully reset for new year ${newYear}`);
-    } catch (error) {
-      console.error("Error resetting for new year:", error);
-      alert("Failed to reset for new year. Please try again.");
-    }
-  };
 
   // Upload functions
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -323,24 +312,10 @@ export default function ProductionDetailPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <label className="text-sm font-medium text-gray-700">Year:</label>
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {availableYears?.map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
+                <span className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-900">
+                  {currentYear}
+                </span>
               </div>
-              <button
-                onClick={() => setShowResetModal(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                Reset for New Year
-              </button>
             </div>
           </div>
         </div>
@@ -893,15 +868,6 @@ export default function ProductionDetailPage() {
         </div>
       )}
 
-      {/* Reset for New Year Modal */}
-      {showResetModal && (
-        <ResetForNewYearModal
-          currentYear={yearInfo?.currentYear || new Date().getFullYear()}
-          totalBatches={batches.page?.length || 0}
-          onReset={handleResetForNewYear}
-          onClose={() => setShowResetModal(false)}
-        />
-      )}
 
       {/* Upload Success Notification */}
       {uploadSuccess && (
@@ -912,121 +878,6 @@ export default function ProductionDetailPage() {
           </div>
               </div>
       )}
-    </div>
-  );
-}
-
-// Reset for New Year Modal Component
-function ResetForNewYearModal({ 
-  currentYear, 
-  totalBatches, 
-  onReset, 
-  onClose 
-}: { 
-  currentYear: number; 
-  totalBatches: number; 
-  onReset: (newYear: number, notes?: string) => void; 
-  onClose: () => void; 
-}) {
-  const [newYear, setNewYear] = useState(currentYear + 1);
-  const [notes, setNotes] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onReset(newYear, notes || undefined);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">
-              Reset Batch Numbers for New Year
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-4">
-                This will reset the batch numbering system for a new year. All existing batches will be preserved, 
-                but new batches will start from batch number 1.
-              </p>
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-                <div className="flex">
-                  <div className="flex-shrink-0">
-                    <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                  <div className="ml-3">
-                    <h3 className="text-sm font-medium text-blue-800">
-                      Current Year Summary
-                    </h3>
-                    <div className="mt-2 text-sm text-blue-700">
-                      <p>Current Year: <strong>{currentYear}</strong></p>
-                      <p>Total Batches: <strong>{totalBatches}</strong></p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  New Year
-                </label>
-                  <input
-                    type="number"
-                    value={newYear}
-                    onChange={(e) => setNewYear(parseInt(e.target.value))}
-                    min={currentYear + 1}
-                    max={currentYear + 10}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes (Optional)
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Add any notes about this year reset..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              >
-                Reset for {newYear}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
     </div>
   );
 }
