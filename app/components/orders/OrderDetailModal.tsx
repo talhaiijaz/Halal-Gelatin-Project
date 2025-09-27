@@ -18,7 +18,9 @@ import {
   AlertCircle,
   Upload,
   Edit,
-  Trash2
+  Trash2,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 import DocumentUpload from "./DocumentUpload";
 import EditOrderModal from "./EditOrderModal";
@@ -56,6 +58,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   const [showInvoiceDetail, setShowInvoiceDetail] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pendingStatusUpdate, setPendingStatusUpdate] = useState<"pending" | "in_production" | "shipped" | "delivered" | "cancelled" | null>(null);
+  const [isDocumentsExpanded, setIsDocumentsExpanded] = useState(false);
 
   // Generate unique modal ID and manage modal state
   const modalId = useId();
@@ -794,38 +797,51 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
 
                 {/* Documents */}
                 <div className="card p-4">
-                  <h3 className="font-medium text-gray-900 mb-3 flex items-center">
-                    <Upload className="h-5 w-5 mr-2" />
-                    Order Documents
-                  </h3>
-                  <div className="space-y-4">
-                    <DocumentUpload
-                      orderId={orderId}
-                      documentType="packingList"
-                      currentFileId={order.packingListId}
-                      onUploadComplete={() => {
-                        // Refresh order data
-                      }}
-                    />
-                    
-                    <DocumentUpload
-                      orderId={orderId}
-                      documentType="proformaInvoice"
-                      currentFileId={order.proformaInvoiceId}
-                      onUploadComplete={() => {
-                        // Refresh order data
-                      }}
-                    />
-                    
-                    <DocumentUpload
-                      orderId={orderId}
-                      documentType="commercialInvoice"
-                      currentFileId={order.commercialInvoiceId}
-                      onUploadComplete={() => {
-                        // Refresh order data
-                      }}
-                    />
+                  <div 
+                    className="flex items-center justify-between cursor-pointer hover:bg-gray-50 -m-4 p-4 rounded-lg transition-colors"
+                    onClick={() => setIsDocumentsExpanded(!isDocumentsExpanded)}
+                  >
+                    <h3 className="font-medium text-gray-900 flex items-center">
+                      <Upload className="h-5 w-5 mr-2" />
+                      Order Documents
+                    </h3>
+                    {isDocumentsExpanded ? (
+                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-gray-500" />
+                    )}
                   </div>
+                  
+                  {isDocumentsExpanded && (
+                    <div className="mt-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                      <DocumentUpload
+                        orderId={orderId}
+                        documentType="packingList"
+                        currentFileId={order.packingListId}
+                        onUploadComplete={() => {
+                          // Refresh order data
+                        }}
+                      />
+                      
+                      <DocumentUpload
+                        orderId={orderId}
+                        documentType="proformaInvoice"
+                        currentFileId={order.proformaInvoiceId}
+                        onUploadComplete={() => {
+                          // Refresh order data
+                        }}
+                      />
+                      
+                      <DocumentUpload
+                        orderId={orderId}
+                        documentType="commercialInvoice"
+                        currentFileId={order.commercialInvoiceId}
+                        onUploadComplete={() => {
+                          // Refresh order data
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Activity Log */}
