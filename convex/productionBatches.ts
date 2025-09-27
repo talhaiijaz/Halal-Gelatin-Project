@@ -214,7 +214,7 @@ export const createBatchesFromExtractedData = mutation({
 
     for (const line of lines) {
       // Skip header lines and empty lines
-      if (line.includes('SR') || line.includes('Serial') || line.includes('Batch') || line.includes('Viscocity') || line.includes('Bloom') || line.includes('PH') || line.includes('Conductivity') || line.includes('Moisture') || line.includes('H2O2') || line.includes('SO2') || line.includes('Color') || line.includes('Clarity') || line.includes('Odour') || line.trim() === '') {
+      if (line.includes('Batch') || line.includes('Viscocity') || line.includes('Bloom') || line.includes('PH') || line.includes('Conductivity') || line.includes('Moisture') || line.includes('H2O2') || line.includes('SO2') || line.includes('Color') || line.includes('Clarity') || line.includes('Odour') || line.trim() === '') {
         continue;
       }
 
@@ -223,7 +223,7 @@ export const createBatchesFromExtractedData = mutation({
       
       console.log(`Processing line with ${parts.length} parts:`, parts);
       
-      if (parts.length >= 13) { // Expected format: SR # | Batch | Viscocity | Bloom | % age | PH | Conductivity | Moisture | H2O2 | SO2 | Color | Clarity | Odour
+      if (parts.length >= 12) { // Expected format: Batch | Viscocity | Bloom | % age | PH | Conductivity | Moisture | H2O2 | SO2 | Color | Clarity | Odour
         // Helper function to parse numeric values, handling percentage signs
         const parseNumeric = (value: string): number | undefined => {
           if (!value || value === 'N/A' || value === '' || value === '|') return undefined;
@@ -238,10 +238,10 @@ export const createBatchesFromExtractedData = mutation({
           return value.trim();
         };
 
-        // Extract batch number from the data (parts[1] is the Batch column, parts[0] is SR #)
-        const extractedBatchNumber = parseNumeric(parts[1]); // Use Batch column, not SR # column
+        // Extract batch number from the data (parts[0] is now the Batch column)
+        const extractedBatchNumber = parseNumeric(parts[0]); // Use Batch column as first column
         if (!extractedBatchNumber) {
-          console.warn(`Skipping row with invalid batch number: ${parts[1]} (SR #: ${parts[0]})`);
+          console.warn(`Skipping row with invalid batch number: ${parts[0]}`);
           continue;
         }
 
@@ -260,17 +260,17 @@ export const createBatchesFromExtractedData = mutation({
                 const batchData = {
                   batchNumber: extractedBatchNumber,
                   serialNumber: `Batch ${extractedBatchNumber}`, // Keep for database schema compatibility
-                  viscosity: parseNumeric(parts[2]), // Viscocity column (index 2)
-                  bloom: parseNumeric(parts[3]), // Bloom column (index 3)
-                  percentage: parseNumeric(parts[4]), // % age column (index 4)
-                  ph: parseNumeric(parts[5]), // PH column (index 5)
-                  conductivity: parseNumeric(parts[6]), // Conductivity column (index 6)
-                  moisture: parseNumeric(parts[7]), // Moisture column (index 7)
-                  h2o2: parseNumeric(parts[8]), // H2O2 column (index 8)
-                  so2: parseNumeric(parts[9]), // SO2 column (index 9)
-                  color: parseString(parts[10]), // Color column (index 10)
-                  clarity: parseString(parts[11]), // Clarity column (index 11)
-                  odour: parseString(parts[12]), // Odour column (index 12)
+                  viscosity: parseNumeric(parts[1]), // Viscocity column (index 1)
+                  bloom: parseNumeric(parts[2]), // Bloom column (index 2)
+                  percentage: parseNumeric(parts[3]), // % age column (index 3)
+                  ph: parseNumeric(parts[4]), // PH column (index 4)
+                  conductivity: parseNumeric(parts[5]), // Conductivity column (index 5)
+                  moisture: parseNumeric(parts[6]), // Moisture column (index 6)
+                  h2o2: parseNumeric(parts[7]), // H2O2 column (index 7)
+                  so2: parseNumeric(parts[8]), // SO2 column (index 8)
+                  color: parseString(parts[9]), // Color column (index 9)
+                  clarity: parseString(parts[10]), // Clarity column (index 10)
+                  odour: parseString(parts[11]), // Odour column (index 11)
                   sourceReport: args.sourceReport,
                   reportDate: args.reportDate,
                   isUsed: false,

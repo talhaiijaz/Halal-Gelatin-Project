@@ -8,7 +8,6 @@ import {
   FileText, 
   BarChart3, 
   Eye,
-  Upload,
   TrendingUp,
   Package,
   CheckCircle,
@@ -152,20 +151,7 @@ export default function ProductionPage() {
             {/* Production Tools */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Production Tools</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div
-                  onClick={() => router.push('/production/reader')}
-                  className="p-4 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 cursor-pointer transition-all"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <Upload className="h-5 w-5 text-orange-600" />
-                    <h3 className="font-medium text-orange-900">Production Reader</h3>
-                  </div>
-                  <p className="text-sm text-orange-700">
-                    Upload and extract data from production analysis reports
-                  </p>
-                </div>
-
+              <div className="grid grid-cols-1 gap-4">
                 <div
                   onClick={() => router.push('/production/detail')}
                   className="p-4 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 cursor-pointer transition-all"
@@ -207,16 +193,8 @@ export default function ProductionPage() {
                   <FileText className="mx-auto h-12 w-12 text-gray-400" />
                   <h3 className="mt-2 text-sm font-medium text-gray-900">No reports yet</h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    Upload your first production report to get started
+                    Production reports will appear here once data is available
                   </p>
-                  <div className="mt-6">
-                    <button
-                      onClick={() => router.push('/production/reader')}
-                      className="btn-primary"
-                    >
-                      Upload Report
-                    </button>
-                  </div>
                 </div>
               )}
             </div>
@@ -293,15 +271,8 @@ export default function ProductionPage() {
               <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
               <div className="space-y-3">
                 <button
-                  onClick={() => router.push('/production/reader')}
-                  className="w-full btn-primary text-left flex items-center gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  Upload Production Report
-                </button>
-                <button
                   onClick={() => router.push('/production/detail')}
-                  className="w-full btn-secondary text-left flex items-center gap-2"
+                  className="w-full btn-primary text-left flex items-center gap-2"
                 >
                   <Eye className="h-4 w-4" />
                   View All Batches
@@ -313,10 +284,10 @@ export default function ProductionPage() {
             <div className="bg-orange-50 rounded-lg border border-orange-200 p-6">
               <h3 className="font-semibold text-orange-900 mb-3">💡 Getting Started</h3>
               <div className="space-y-2 text-sm text-orange-800">
-                <p>• Upload PDF production reports using Production Reader</p>
                 <p>• View and manage batches in Production Detail</p>
                 <p>• Track batch availability and usage status</p>
                 <p>• Reset batch numbers for new years</p>
+                <p>• Monitor production statistics and reports</p>
               </div>
             </div>
           </div>

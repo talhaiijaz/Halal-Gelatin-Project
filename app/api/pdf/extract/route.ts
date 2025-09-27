@@ -52,12 +52,13 @@ Extract:
 - Batch numbers and identifiers for each row
 
 DO NOT include:
+- SR numbers or Serial numbers (skip the first column if it contains SR/Serial)
 - Average rows
 - Summary rows
 - Total rows
 - Any aggregated data
 
-Format as a structured table with clear column separators. Include only the individual data rows, even if some cells appear empty. Do not provide summaries or analysis - just the raw row data.`,
+Format as a structured table with clear column separators. Start with Batch number as the first column, then all the measurement data. Include only the individual data rows, even if some cells appear empty. Do not provide summaries or analysis - just the raw row data.`,
               },
               {
                 type: 'file',
