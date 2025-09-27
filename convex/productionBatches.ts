@@ -177,9 +177,20 @@ export const createBatchesFromExtractedData = mutation({
     extractedData: v.string(), // Raw extracted text from PDF
     sourceReport: v.string(),
     reportDate: v.optional(v.number()),
+    processingId: v.optional(v.id("productionProcessing")), // Optional processing state ID
   },
   handler: async (ctx, args) => {
-    const currentYear = new Date().getFullYear();
+    try {
+      // Update processing state to "processing"
+      if (args.processingId) {
+        await ctx.db.patch(args.processingId, {
+          status: "processing",
+          progress: "Extracting data from PDF...",
+          updatedAt: Date.now(),
+        });
+      }
+
+      const currentYear = new Date().getFullYear();
     
     // Get the next batch number to start from for current year
     const lastBatch = await ctx.db
@@ -197,6 +208,7 @@ export const createBatchesFromExtractedData = mutation({
     const createdBatches = [];
 
     console.log(`Processing ${lines.length} lines from extracted data`);
+    console.log('Raw extracted data:', args.extractedData);
 
     for (const line of lines) {
       // Skip header lines and empty lines
@@ -231,39 +243,40 @@ export const createBatchesFromExtractedData = mutation({
           continue;
         }
 
-        // Check if batch number already exists
-        const existingBatch = await ctx.db
-          .query("productionBatches")
-          .withIndex("by_batch_number", (q) => q.eq("batchNumber", extractedBatchNumber))
-          .filter((q) => q.eq(q.field("isActive"), true))
-          .first();
+                // Check if batch number already exists across ALL files and years
+                const existingBatch = await ctx.db
+                  .query("productionBatches")
+                  .withIndex("by_batch_number", (q) => q.eq("batchNumber", extractedBatchNumber))
+                  .filter((q) => q.eq(q.field("isActive"), true))
+                  .first();
 
-        if (existingBatch) {
-          throw new Error(`Batch number ${extractedBatchNumber} already exists. Cannot create duplicate batch numbers.`);
-        }
+                if (existingBatch) {
+                  const existingSourceReport = existingBatch.sourceReport || 'Unknown file';
+                  throw new Error(`Batch number ${extractedBatchNumber} already exists in file "${existingSourceReport}". Cannot create duplicate batch numbers across different files.`);
+                }
 
-        const batchData = {
-          batchNumber: extractedBatchNumber,
-          serialNumber: `Batch ${extractedBatchNumber}`, // Keep for database schema compatibility
-          viscosity: parseNumeric(parts[2]), // Viscocity column (index 2)
-          bloom: parseNumeric(parts[3]), // Bloom column (index 3)
-          percentage: parseNumeric(parts[4]), // % age column (index 4)
-          ph: parseNumeric(parts[5]), // PH column (index 5)
-          conductivity: parseNumeric(parts[6]), // Conductivity column (index 6)
-          moisture: parseNumeric(parts[7]), // Moisture column (index 7)
-          h2o2: parseNumeric(parts[8]), // H2O2 column (index 8)
-          so2: parseNumeric(parts[9]), // SO2 column (index 9)
-          color: parseString(parts[10]), // Color column (index 10)
-          clarity: parseString(parts[11]), // Clarity column (index 11)
-          odour: parseString(parts[12]), // Odour column (index 12)
-          sourceReport: args.sourceReport,
-          reportDate: args.reportDate,
-          isUsed: false,
-          year: currentYear,
-          isActive: true,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
+                const batchData = {
+                  batchNumber: extractedBatchNumber,
+                  serialNumber: `Batch ${extractedBatchNumber}`, // Keep for database schema compatibility
+                  viscosity: parseNumeric(parts[2]), // Viscocity column (index 2)
+                  bloom: parseNumeric(parts[3]), // Bloom column (index 3)
+                  percentage: parseNumeric(parts[4]), // % age column (index 4)
+                  ph: parseNumeric(parts[5]), // PH column (index 5)
+                  conductivity: parseNumeric(parts[6]), // Conductivity column (index 6)
+                  moisture: parseNumeric(parts[7]), // Moisture column (index 7)
+                  h2o2: parseNumeric(parts[8]), // H2O2 column (index 8)
+                  so2: parseNumeric(parts[9]), // SO2 column (index 9)
+                  color: parseString(parts[10]), // Color column (index 10)
+                  clarity: parseString(parts[11]), // Clarity column (index 11)
+                  odour: parseString(parts[12]), // Odour column (index 12)
+                  sourceReport: args.sourceReport,
+                  reportDate: args.reportDate,
+                  isUsed: false,
+                  year: currentYear,
+                  isActive: true,
+                  createdAt: Date.now(),
+                  updatedAt: Date.now(),
+                };
 
         console.log(`Creating batch with data:`, batchData);
 
@@ -272,12 +285,33 @@ export const createBatchesFromExtractedData = mutation({
       }
     }
 
-    return {
-      createdCount: createdBatches.length,
-      batchIds: createdBatches,
-      nextBatchNumber: nextBatchNumber,
-      year: currentYear,
-    };
+    // Update processing state to completed
+    if (args.processingId) {
+      await ctx.db.patch(args.processingId, {
+        status: "completed",
+        progress: `Successfully created ${createdBatches.length} batches`,
+        completedBatches: createdBatches,
+        updatedAt: Date.now(),
+      });
+    }
+
+      return {
+        createdCount: createdBatches.length,
+        batchIds: createdBatches,
+        nextBatchNumber: nextBatchNumber,
+        year: currentYear,
+      };
+    } catch (error) {
+      // Update processing state to error
+      if (args.processingId) {
+        await ctx.db.patch(args.processingId, {
+          status: "error",
+          errorMessage: error instanceof Error ? error.message : "Unknown error occurred",
+          updatedAt: Date.now(),
+        });
+      }
+      throw error;
+    }
   },
 });
 
@@ -442,6 +476,14 @@ export const getAvailableYears = query({
     
     const years = Array.from(new Set(batches.map(batch => batch.year).filter(Boolean)));
     return years.sort((a, b) => (b || 0) - (a || 0)); // Sort descending (newest first)
+  },
+});
+
+// Get file URL for viewing uploaded files
+export const getFileUrl = query({
+  args: { fileId: v.id("_storage") },
+  handler: async (ctx, args) => {
+    return await ctx.storage.getUrl(args.fileId);
   },
 });
 

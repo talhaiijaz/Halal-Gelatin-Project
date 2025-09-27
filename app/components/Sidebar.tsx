@@ -59,7 +59,6 @@ const navigation: NavItem[] = [
     icon: BarChart3,
     children: [
       { name: "Overview", href: "/production" },
-      { name: "Production Reader", href: "/production/reader" },
       { name: "Production Detail", href: "/production/detail" },
     ],
   },
@@ -100,7 +99,7 @@ export default function Sidebar() {
     if (href === "/production") return pathname === "/production";
     
     // For other paths, use startsWith but ensure it's not a partial match
-    return pathname === href || (pathname.startsWith(href) && pathname.charAt(href.length) === "/");
+    return pathname === href || (pathname?.startsWith(href) && pathname?.charAt(href.length) === "/");
   };
 
   const isParentActive = (item: NavItem) => {

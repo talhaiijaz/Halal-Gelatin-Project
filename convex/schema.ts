@@ -383,6 +383,17 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_date", ["transferDate"]),
 
+  // Production Processing State table
+  productionProcessing: defineTable({
+    status: v.union(v.literal("uploading"), v.literal("processing"), v.literal("completed"), v.literal("error")),
+    fileName: v.string(),
+    progress: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    completedBatches: v.optional(v.array(v.id("productionBatches"))),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_status", ["status"]),
+
   // Production Batch Data table
   productionBatches: defineTable({
     batchNumber: v.number(), // Continuous batch number across all reports (1, 2, 3... 3000+) - UNIQUE

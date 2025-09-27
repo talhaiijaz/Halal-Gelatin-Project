@@ -43,13 +43,13 @@ export async function POST(request: NextRequest) {
             content: [
               {
                 type: 'text',
-                text: `Extract ONLY the individual SR (Serial Number) rows from this PDF document. This appears to be a product analysis report with batch data.
+                text: `Extract ONLY the individual data rows from this PDF document. This appears to be a product analysis report with batch data.
 
 Extract:
 - All table headers (column names)
-- ONLY the individual SR rows with their data (SR #1, SR #2, SR #3, etc.)
-- All numerical values and measurements for each SR row
-- Batch numbers and identifiers for each SR row
+- ONLY the individual data rows with their measurements
+- All numerical values and measurements for each row
+- Batch numbers and identifiers for each row
 
 DO NOT include:
 - Average rows
@@ -57,7 +57,7 @@ DO NOT include:
 - Total rows
 - Any aggregated data
 
-Format as a structured table with clear column separators. Include only the individual SR data rows, even if some cells appear empty. Do not provide summaries or analysis - just the raw SR row data.`,
+Format as a structured table with clear column separators. Include only the individual data rows, even if some cells appear empty. Do not provide summaries or analysis - just the raw row data.`,
               },
               {
                 type: 'file',

@@ -39,7 +39,7 @@ import Pagination from "@/app/components/ui/Pagination";
 export default function ClientDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const clientId = params.id as Id<"clients">;
+  const clientId = params?.id as Id<"clients">;
   
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);

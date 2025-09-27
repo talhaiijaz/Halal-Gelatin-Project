@@ -30,6 +30,7 @@ import type * as migrations from "../migrations.js";
 import type * as orders from "../orders.js";
 import type * as payments from "../payments.js";
 import type * as productionBatches from "../productionBatches.js";
+import type * as productionProcessing from "../productionProcessing.js";
 import type * as settings from "../settings.js";
 import type * as users from "../users.js";
 
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   orders: typeof orders;
   payments: typeof payments;
   productionBatches: typeof productionBatches;
+  productionProcessing: typeof productionProcessing;
   settings: typeof settings;
   users: typeof users;
 }>;
