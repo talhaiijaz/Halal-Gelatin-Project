@@ -43,22 +43,29 @@ export async function POST(request: NextRequest) {
             content: [
               {
                 type: 'text',
-                text: `Extract ONLY the individual data rows from this PDF document. This appears to be a product analysis report with batch data.
+                text: `Extract ONLY the main batch data rows from this PDF document. This is a product analysis report with batch data.
 
-Extract:
-- All table headers (column names)
-- ONLY the individual data rows with their measurements
-- All numerical values and measurements for each row
-- Batch numbers and identifiers for each row
+Extract ONLY:
+- The main batch data rows (typically 18-19 rows with sequential batch numbers like 359-376)
+- All numerical values and measurements for each main batch row
+- Batch numbers and identifiers for each main batch row
 
 DO NOT include:
 - SR numbers or Serial numbers (skip the first column if it contains SR/Serial)
-- Average rows
-- Summary rows
-- Total rows
-- Any aggregated data
+- Average rows or summary rows
+- Total rows or aggregated data
+- Blending sections or lot number data (like "Lot num" sections)
+- Range categories (like "201-220", "221-240", etc.)
+- Any data that appears after the main batch sequence ends
+- Footer information or document metadata
 
-Format as a structured table with clear column separators. Start with Batch number as the first column, then all the measurement data. Include only the individual data rows, even if some cells appear empty. Do not provide summaries or analysis - just the raw row data.`,
+STOP extracting when you reach:
+- Any row labeled "Average" or "Total"
+- Any section starting with "Lot num" or similar blending data
+- Any range categories or additional data sections
+- Any footer or document information
+
+Format as a structured table with clear column separators. Start with Batch number as the first column, then all the measurement data. Include only the main batch data rows (typically 18-19 rows), even if some cells appear empty. Do not provide summaries or analysis - just the raw main batch data.`,
               },
               {
                 type: 'file',

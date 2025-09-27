@@ -213,8 +213,12 @@ export const createBatchesFromExtractedData = mutation({
     console.log('Raw extracted data:', args.extractedData);
 
     for (const line of lines) {
-      // Skip header lines and empty lines
-      if (line.includes('Batch') || line.includes('Viscocity') || line.includes('Bloom') || line.includes('PH') || line.includes('Conductivity') || line.includes('Moisture') || line.includes('H2O2') || line.includes('SO2') || line.includes('Color') || line.includes('Clarity') || line.includes('Odour') || line.trim() === '') {
+      // Skip header lines, empty lines, and unwanted sections
+      if (line.includes('Batch') || line.includes('Viscocity') || line.includes('Bloom') || line.includes('PH') || line.includes('Conductivity') || line.includes('Moisture') || line.includes('H2O2') || line.includes('SO2') || line.includes('Color') || line.includes('Clarity') || line.includes('Odour') || 
+          line.includes('Average') || line.includes('Total') || line.includes('Lot num') || line.includes('Lot Num') || 
+          line.includes('201-220') || line.includes('221-240') || line.includes('241-260') || 
+          line.includes('Checked By') || line.includes('Verified By') || line.includes('Document Number') || 
+          line.includes('Internal Use Only') || line.includes('HGPL-QA') || line.trim() === '') {
         continue;
       }
 
