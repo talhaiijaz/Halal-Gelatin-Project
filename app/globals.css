@@ -19,11 +19,24 @@
     overflow-x: hidden;
     /* Smooth scrolling */
     scroll-behavior: smooth;
+    /* Prevent orange overlay glitch */
+    background-color: #f9fafb !important;
   }
 
   /* Ensure proper scroll restoration */
   html {
     scroll-behavior: smooth;
+  }
+  
+  /* Emergency fix for stuck body position */
+  body[style*="position: fixed"] {
+    background-color: #f9fafb !important;
+  }
+  
+  /* Prevent any orange overlays from appearing */
+  body::before,
+  body::after {
+    display: none !important;
   }
 }
 

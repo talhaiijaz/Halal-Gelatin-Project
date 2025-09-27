@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useId } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -192,7 +193,7 @@ export default function StandaloneInvoiceDetailModal({
     );
   }
 
-  return (
+  const modalContent = (
     <div className={`fixed inset-0 z-[9999] overflow-hidden ${isOpen ? 'block' : 'hidden'}`}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black bg-opacity-50 transition-opacity" onClick={onClose} />
@@ -463,4 +464,7 @@ export default function StandaloneInvoiceDetailModal({
       </div>
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useId } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -31,7 +32,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
 
   const formatDate = (ts?: number) => (ts ? new Date(ts).toLocaleDateString() : "-");
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[9999] overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl">
@@ -256,4 +257,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
       />
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }

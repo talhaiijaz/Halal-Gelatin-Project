@@ -6,6 +6,9 @@ import { saveScrollPosition } from '@/app/utils/scrollRestoration';
 /**
  * Hook to prevent body scrolling when a modal is open
  * This prevents background scrolling while maintaining the scroll position
+ * 
+ * NOTE: This hook is deprecated in favor of useModalManager for modal components.
+ * Use this only for non-modal scroll locking scenarios.
  */
 export function useBodyScrollLock(isLocked: boolean) {
   const scrollPositionRef = useRef<number>(0);
@@ -48,8 +51,10 @@ export function useBodyScrollLock(isLocked: boolean) {
           document.body.style.width = originalStylesRef.current.width;
         }
         
-        // Restore the scroll position synchronously to avoid double-restores
-        window.scrollTo(0, scrollPositionRef.current);
+        // Use requestAnimationFrame to avoid conflicts with ModalManager
+        requestAnimationFrame(() => {
+          window.scrollTo(0, scrollPositionRef.current);
+        });
       };
     }
   }, [isLocked]);

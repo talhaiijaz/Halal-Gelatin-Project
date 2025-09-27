@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useId } from "react";
+import { createPortal } from "react-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -65,7 +66,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
     return type === "advance" ? "bg-orange-100 text-orange-800" : "bg-green-100 text-green-800";
   };
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[9999] overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl">
@@ -376,4 +377,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
       />
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }

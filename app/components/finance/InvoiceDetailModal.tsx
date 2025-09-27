@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useId } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -40,7 +41,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
   const advanceTotal = invoice?.advancePaid ?? payments.filter((p: any) => p.type === "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
   const invoicePaymentTotal = invoice?.invoicePaid ?? payments.filter((p: any) => p.type !== "advance").reduce((s: number, p: any) => s + (p.amount || 0), 0);
 
-  return (
+  const modalContent = (
     <div className="fixed inset-0 z-[9999] overflow-hidden">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl sm:rounded-l-xl">
@@ -423,6 +424,9 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
       />
     </div>
   );
+
+  // Use portal to render modal directly to document.body
+  return createPortal(modalContent, document.body);
 }
 
 
