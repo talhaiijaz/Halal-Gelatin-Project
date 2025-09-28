@@ -333,9 +333,10 @@ export async function POST(request: NextRequest) {
 
     // Generate PDF bytes
     const pdfBytes = await pdfDoc.save();
+    const buffer = Buffer.from(pdfBytes);
 
     // Return PDF as response
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(buffer as any, {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="blending-sheet-${blend.lotNumber}.pdf"`,
