@@ -71,6 +71,7 @@ export const optimizeBatchSelection = query({
     targetMeanBloom: v.optional(v.number()), // Preferred mean bloom
     targetBags: v.optional(v.number()), // Desired number of bags (must be multiple of 10)
     fiscalYear: v.optional(v.string()),
+    preSelectedBatchIds: v.optional(v.array(v.id("productionBatches"))),
     additionalTargets: v.optional(v.object({
       viscosity: v.optional(v.number()),
       percentage: v.optional(v.number()),
@@ -117,6 +118,18 @@ export const optimizeBatchSelection = query({
     const selected: any[] = [];
     const remaining: any[] = [...batchesWithBloom];
     let sum = 0; // sum of bloom values times bags (bags are always 10 so weight is uniform)
+
+    // Seed with user pre-selected batches (if provided)
+    if (args.preSelectedBatchIds && args.preSelectedBatchIds.length > 0) {
+      for (const id of args.preSelectedBatchIds) {
+        const idx = remaining.findIndex((b) => b._id === id);
+        if (idx !== -1) {
+          const chosen = remaining.splice(idx, 1)[0];
+          selected.push(chosen);
+          sum += (chosen.bloom || 0) * 10;
+        }
+      }
+    }
     while (selected.length < batchesNeeded && remaining.length > 0) {
       let bestIdx = 0;
       let bestScore = Number.POSITIVE_INFINITY;
@@ -231,13 +244,20 @@ export const optimizeBatchSelection = query({
     // Sort selected batches by batch number (lowest to highest) for easier reading
     const sortedSelectedBatches = selectedBatches.sort((a, b) => a.batchNumber - b.batchNumber);
 
+    let warning: string | undefined;
+    const withinRange = (avg: number) => avg >= args.targetBloomMin && avg <= args.targetBloomMax;
+    if ((args.preSelectedBatchIds?.length || 0) >= batchesNeeded && !withinRange(averageBloom)) {
+      warning = "Selected batches do not meet the target average bloom range.";
+    }
+
     return {
       selectedBatches: sortedSelectedBatches,
       totalBags,
       totalWeight,
       averageBloom,
       ct3AverageBloom: averageBloom, // Same as average for now
-      message: `Selected ${selectedBatches.length} batches (10 bags each) for ${totalBags} bags`
+      message: `Selected ${selectedBatches.length} batches (10 bags each) for ${totalBags} bags`,
+      warning,
     };
   },
 });

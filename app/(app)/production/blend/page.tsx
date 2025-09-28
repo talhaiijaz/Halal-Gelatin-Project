@@ -72,6 +72,7 @@ export default function BlendPage() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [notes, setNotes] = useState('');
+  const [preSelectedBatchIds, setPreSelectedBatchIds] = useState<Set<string>>(new Set());
 
   // Get available batches for reference
   const availableBatches = useQuery(api.blends.getAvailableBatches, {
@@ -111,6 +112,7 @@ export default function BlendPage() {
           targetBags,
           fiscalYear: currentFiscalYear,
           additionalTargets: showAdvanced ? additionalTargets : undefined,
+          preSelectedBatchIds: Array.from(preSelectedBatchIds),
         }),
       });
 
@@ -118,7 +120,11 @@ export default function BlendPage() {
       
       if (response.ok) {
         setOptimizationResult(result);
-        toast.success(result.message);
+        if (result.warning) {
+          toast.error(result.warning);
+        } else {
+          toast.success(result.message);
+        }
       } else {
         toast.error(result.error || 'Failed to optimize batch selection');
       }
@@ -515,6 +521,42 @@ export default function BlendPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Total Available</span>
                     <span className="font-semibold text-gray-900">{availableBatches.length}</span>
+                  </div>
+                  <div className="max-h-72 overflow-auto border rounded">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Select</th>
+                          <th className="px-3 py-2 text-left">Batch #</th>
+                          <th className="px-3 py-2 text-left">Bloom</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {availableBatches
+                          .filter(b => b.bloom !== undefined)
+                          .sort((a,b) => (a.batchNumber||0) - (b.batchNumber||0))
+                          .map((b:any) => (
+                          <tr key={b._id} className="hover:bg-gray-50">
+                            <td className="px-3 py-2">
+                              <input
+                                type="checkbox"
+                                checked={preSelectedBatchIds.has(b._id)}
+                                onChange={(e) => {
+                                  setPreSelectedBatchIds(prev => {
+                                    const next = new Set(prev);
+                                    if (e.target.checked) next.add(b._id);
+                                    else next.delete(b._id);
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </td>
+                            <td className="px-3 py-2">{b.batchNumber}</td>
+                            <td className="px-3 py-2">{b.bloom}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">In Target Range</span>

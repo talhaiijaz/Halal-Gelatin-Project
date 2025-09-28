@@ -13,7 +13,8 @@ export async function POST(request: NextRequest) {
       targetMeanBloom,
       targetBags,
       fiscalYear,
-      additionalTargets
+      additionalTargets,
+      preSelectedBatchIds,
     } = body;
 
     if (!targetBloomMin || !targetBloomMax) {
@@ -29,7 +30,8 @@ export async function POST(request: NextRequest) {
         targetMeanBloom: targetMeanBloom ? Number(targetMeanBloom) : undefined,
         targetBags: targetBags ? Number(targetBags) : undefined,
         fiscalYear,
-        additionalTargets
+        additionalTargets,
+        preSelectedBatchIds,
       });
 
     return NextResponse.json(result);

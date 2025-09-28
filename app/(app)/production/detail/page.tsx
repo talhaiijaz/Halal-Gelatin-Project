@@ -875,7 +875,7 @@ export default function ProductionDetailPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedBatches.map((batch) => (
-                <tr key={batch._id} className="hover:bg-gray-50">
+                <tr key={batch._id} className={`${batch.isUsed ? 'bg-green-100' : ''} hover:bg-gray-50`}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="checkbox"
