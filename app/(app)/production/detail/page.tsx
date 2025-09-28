@@ -87,6 +87,16 @@ export default function ProductionDetailPage() {
     return matchesSearch && matchesUsed;
   }) || [];
 
+  // Sort filtered batches: available first, then used, both by batch number (highest to lowest)
+  const sortedBatches = filteredBatches.sort((a, b) => {
+    // If one is used and one is not, prioritize available (unused) batches
+    if (a.isUsed && !b.isUsed) return 1;  // Used batch goes after available
+    if (!a.isUsed && b.isUsed) return -1; // Available batch goes before used
+    
+    // If both have the same usage status, sort by batch number (highest to lowest)
+    return b.batchNumber - a.batchNumber;
+  });
+
   const handleDeleteBatch = async (batchId: Id<"productionBatches">) => {
     if (confirm("Are you sure you want to delete this batch?")) {
       try {
@@ -110,10 +120,10 @@ export default function ProductionDetailPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedBatches.size === filteredBatches.length) {
+    if (selectedBatches.size === sortedBatches.length) {
       setSelectedBatches(new Set());
     } else {
-      setSelectedBatches(new Set(filteredBatches.map(batch => batch._id)));
+      setSelectedBatches(new Set(sortedBatches.map(batch => batch._id)));
     }
   };
 
@@ -131,6 +141,7 @@ export default function ProductionDetailPage() {
       alert("Failed to delete selected batches. Please try again.");
     }
   };
+
 
 
   // Upload functions
@@ -663,7 +674,7 @@ export default function ProductionDetailPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <input
                     type="checkbox"
-                    checked={selectedBatches.size === filteredBatches.length && filteredBatches.length > 0}
+                    checked={selectedBatches.size === sortedBatches.length && sortedBatches.length > 0}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -716,7 +727,7 @@ export default function ProductionDetailPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBatches.map((batch) => (
+              {sortedBatches.map((batch) => (
                 <tr key={batch._id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <input
@@ -792,7 +803,7 @@ export default function ProductionDetailPage() {
           </table>
         </div>
 
-        {filteredBatches.length === 0 && (
+        {sortedBatches.length === 0 && (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -837,7 +848,7 @@ export default function ProductionDetailPage() {
                   <p className="text-xs text-gray-500">Selected batches:</p>
                   <ul className="text-xs text-gray-600 mt-1 max-h-32 overflow-y-auto">
                     {Array.from(selectedBatches).map((batchId) => {
-                      const batch = filteredBatches.find(b => b._id === batchId);
+                      const batch = sortedBatches.find(b => b._id === batchId);
                       return (
                         <li key={batchId} className="flex justify-between">
                           <span>Batch #{batch?.batchNumber}</span>
@@ -867,6 +878,7 @@ export default function ProductionDetailPage() {
           </div>
         </div>
       )}
+
 
 
       {/* Upload Success Notification */}

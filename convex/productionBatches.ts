@@ -368,6 +368,62 @@ export const markBatchAsUsed = mutation({
   },
 });
 
+// Update batch status (used/available)
+export const updateBatchStatus = mutation({
+  args: {
+    id: v.id("productionBatches"),
+    isUsed: v.boolean(),
+    usedInOrder: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const updateData: any = {
+      isUsed: args.isUsed,
+      updatedAt: Date.now(),
+    };
+
+    if (args.isUsed) {
+      updateData.usedInOrder = args.usedInOrder || null;
+      updateData.usedDate = Date.now();
+    } else {
+      updateData.usedInOrder = null;
+      updateData.usedDate = null;
+    }
+
+    await ctx.db.patch(args.id, updateData);
+    return args.id;
+  },
+});
+
+// Update multiple batch statuses in bulk
+export const updateMultipleBatchStatuses = mutation({
+  args: {
+    batchIds: v.array(v.id("productionBatches")),
+    isUsed: v.boolean(),
+    usedInOrder: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const updateData: any = {
+      isUsed: args.isUsed,
+      updatedAt: Date.now(),
+    };
+
+    if (args.isUsed) {
+      updateData.usedInOrder = args.usedInOrder || null;
+      updateData.usedDate = Date.now();
+    } else {
+      updateData.usedInOrder = null;
+      updateData.usedDate = null;
+    }
+
+    const updatePromises = args.batchIds.map(id => 
+      ctx.db.patch(id, updateData)
+    );
+
+    await Promise.all(updatePromises);
+    return args.batchIds.length;
+  },
+});
+
 // Delete a batch
 export const deleteBatch = mutation({
   args: { id: v.id("productionBatches") },
