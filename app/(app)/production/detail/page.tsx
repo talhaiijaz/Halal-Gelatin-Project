@@ -84,6 +84,15 @@ export default function ProductionDetailPage() {
   const sourceReports = batches?.page ? 
     Array.from(new Set(batches.page.map(batch => batch.sourceReport).filter(Boolean))) : [];
 
+  // Calculate averages for available batches
+  const availableBatches = batches?.page?.filter(batch => !batch.isUsed) || [];
+  const bloomAverage = availableBatches.length > 0 
+    ? (availableBatches.reduce((sum, batch) => sum + (batch.bloom || 0), 0) / availableBatches.length).toFixed(1)
+    : "0.0";
+  const viscosityAverage = availableBatches.length > 0 
+    ? (availableBatches.reduce((sum, batch) => sum + (batch.viscosity || 0), 0) / availableBatches.length).toFixed(1)
+    : "0.0";
+
   // Filter batches based on search and filters
   const filteredBatches = batches?.page?.filter(batch => {
     const matchesSearch = searchTerm === "" || 
@@ -614,7 +623,7 @@ export default function ProductionDetailPage() {
       </div>
 
       {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-sm border">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -674,6 +683,34 @@ export default function ProductionDetailPage() {
             </div>
           </div>
         </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Bloom Average</p>
+              <p className="text-2xl font-bold text-gray-900">{bloomAverage}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-sm border">
+          <div className="flex items-center">
+            <div className="p-2 bg-teal-100 rounded-lg">
+              <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Viscosity Average</p>
+              <p className="text-2xl font-bold text-gray-900">{viscosityAverage}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Action Buttons */}
@@ -708,7 +745,7 @@ export default function ProductionDetailPage() {
               placeholder="Search by batch number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -716,7 +753,7 @@ export default function ProductionDetailPage() {
             <select
               value={filterUsed}
               onChange={(e) => setFilterUsed(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Batches</option>
               <option value="unused">Available</option>
