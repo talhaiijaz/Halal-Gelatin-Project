@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useProductionYear } from '../../../hooks/useProductionYear';
@@ -9,6 +10,7 @@ import { FileDown, Trash2, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function BlendsPage() {
+  const router = useRouter();
   const { currentFiscalYear } = useProductionYear();
   const blends = useQuery(api.blends.getAllBlends, {
     paginationOpts: { numItems: 100, cursor: null },
