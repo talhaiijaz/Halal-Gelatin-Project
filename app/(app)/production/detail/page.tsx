@@ -233,7 +233,7 @@ export default function ProductionDetailPage() {
         sourceReport: uploadedFile.name,
         reportDate: Date.now(),
         processingId,
-        fileId,
+        fileId: fileId || undefined,
       });
       console.log('Batches created successfully');
 
@@ -285,7 +285,11 @@ export default function ProductionDetailPage() {
       const fileUrl = await getFileUrl({ fileId });
       
       // Open the file in a new tab
-      window.open(fileUrl, '_blank');
+      if (fileUrl) {
+        window.open(fileUrl, '_blank');
+      } else {
+        alert('File URL not available. Please try again.');
+      }
     } catch (error) {
       console.error('Error viewing file:', error);
       alert('Failed to open file. Please try again.');
