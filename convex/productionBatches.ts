@@ -252,9 +252,12 @@ export const createBatchesFromExtractedData = mutation({
     // Parse the extracted data to create batch records
     const lines = args.extractedData.split('\n').filter(line => line.trim());
     const createdBatches = [];
+    const skippedBatches = [];
 
     console.log(`Processing ${lines.length} lines from extracted data`);
     console.log('Raw extracted data:', args.extractedData);
+    console.log('First 5 lines:', lines.slice(0, 5));
+    console.log('Last 5 lines:', lines.slice(-5));
 
     for (const line of lines) {
       // Skip header lines, empty lines, and unwanted sections
@@ -292,6 +295,8 @@ export const createBatchesFromExtractedData = mutation({
           console.warn(`Skipping row with invalid batch number: ${parts[0]}`);
           continue;
         }
+        
+        console.log(`Processing batch number: ${extractedBatchNumber}`);
 
                 // Check if batch number already exists across ALL files and years
                 const existingBatch = await ctx.db
@@ -301,8 +306,12 @@ export const createBatchesFromExtractedData = mutation({
                   .first();
 
                 if (existingBatch) {
-                  const existingSourceReport = existingBatch.sourceReport || 'Unknown file';
-                  throw new Error(`Batch number ${extractedBatchNumber} already exists in file "${existingSourceReport}". Cannot create duplicate batch numbers across different files.`);
+                  console.log(`Skipping batch ${extractedBatchNumber} - already exists in file "${existingBatch.sourceReport || 'Unknown file'}"`);
+                  skippedBatches.push({
+                    batchNumber: extractedBatchNumber,
+                    reason: `Already exists in file "${existingBatch.sourceReport || 'Unknown file'}"`
+                  });
+                  continue; // Skip this batch instead of throwing an error
                 }
 
                 const batchData = {
@@ -347,11 +356,20 @@ export const createBatchesFromExtractedData = mutation({
       });
     }
 
+      // Log summary of what was processed
+      const allProcessedBatches = [...createdBatches.map(id => `created`), ...skippedBatches.map(b => `skipped #${b.batchNumber}`)];
+      console.log(`Extraction summary: Found ${lines.length} lines, processed ${allProcessedBatches.length} batches`);
+      console.log(`Created batches: ${createdBatches.length}, Skipped batches: ${skippedBatches.length}`);
+
       return {
         createdCount: createdBatches.length,
+        skippedCount: skippedBatches.length,
         batchIds: createdBatches,
+        skippedBatches: skippedBatches,
         nextBatchNumber: nextBatchNumber,
         year: currentYear,
+        summary: `Created ${createdBatches.length} new batches, skipped ${skippedBatches.length} existing batches`,
+        extractedLinesCount: lines.length
       };
     } catch (error) {
       // Update processing state to error

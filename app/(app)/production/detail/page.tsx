@@ -47,6 +47,13 @@ export default function ProductionDetailPage() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadSummary, setUploadSummary] = useState<{
+    createdCount: number;
+    skippedCount: number;
+    summary: string;
+    skippedBatches?: Array<{batchNumber: number; reason: string}>;
+    extractedLinesCount?: number;
+  } | null>(null);
   const [showUploadSection, setShowUploadSection] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -228,7 +235,7 @@ export default function ProductionDetailPage() {
 
       // Create batches from extracted data with processing ID and file ID
       console.log('Creating batches...');
-      await createBatchesFromExtractedData({
+      const result = await createBatchesFromExtractedData({
         extractedData: data.text,
         sourceReport: uploadedFile.name,
         reportDate: Date.now(),
@@ -238,10 +245,23 @@ export default function ProductionDetailPage() {
       console.log('Batches created successfully');
 
       setUploadSuccess(true);
+      setUploadSummary({
+        createdCount: result.createdCount,
+        skippedCount: result.skippedCount,
+        summary: result.summary,
+        skippedBatches: result.skippedBatches,
+        extractedLinesCount: result.extractedLinesCount
+      });
       setUploadedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+
+      // Auto-dismiss success notification after 8 seconds
+      setTimeout(() => {
+        setUploadSuccess(false);
+        setUploadSummary(null);
+      }, 8000);
 
     } catch (err) {
       // Don't show error if the request was aborted (cancelled by user)
@@ -274,6 +294,8 @@ export default function ProductionDetailPage() {
   const handleClearUpload = () => {
     setUploadedFile(null);
     setUploadError(null);
+    setUploadSuccess(false);
+    setUploadSummary(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -935,12 +957,33 @@ export default function ProductionDetailPage() {
 
       {/* Upload Success Notification */}
       {uploadSuccess && (
-        <div className="fixed top-4 right-4 bg-green-50 border border-green-200 rounded-lg p-4 shadow-lg z-50">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <span className="text-green-800 font-medium">Production report processed successfully!</span>
+        <div className="fixed top-4 right-4 bg-green-50 border border-green-200 rounded-lg p-4 shadow-lg z-50 max-w-md">
+          <div className="flex items-start gap-2">
+            <CheckCircle className="h-5 w-5 text-green-600 mt-0.5" />
+            <div className="flex-1">
+              <span className="text-green-800 font-medium block">Production report processed successfully!</span>
+              {uploadSummary && (
+                <div className="mt-2 text-sm text-green-700">
+                  <div className="font-medium">{uploadSummary.summary}</div>
+                  {uploadSummary.extractedLinesCount && (
+                    <div className="text-xs text-green-600 mt-1">
+                      Extracted {uploadSummary.extractedLinesCount} lines from PDF
+                    </div>
+                  )}
+                  {uploadSummary.skippedCount > 0 && uploadSummary.skippedBatches && (
+                    <div className="mt-1">
+                      <div className="text-xs text-green-600">Skipped batches:</div>
+                      <div className="text-xs text-green-600">
+                        {uploadSummary.skippedBatches.slice(0, 5).map(batch => `#${batch.batchNumber}`).join(', ')}
+                        {uploadSummary.skippedBatches.length > 5 && ` and ${uploadSummary.skippedBatches.length - 5} more`}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-              </div>
+        </div>
       )}
     </div>
   );
