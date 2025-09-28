@@ -1,403 +1,104 @@
-import { query, mutation } from "./_generated/server";
+// convex/migrations.ts
+import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { getFiscalYear } from "./fiscalYearUtils";
 
-// Backfill missing fiscalYear on orders using factoryDepartureDate (or orderCreationDate, or createdAt as fallback)
-export const backfillFiscalYear = mutation({
+// Migration to update existing 2025 batches to use fiscal year format
+export const migrateToFiscalYear = mutation({
   args: {},
-  returns: v.object({ updated: v.number(), totalMissing: v.number() }),
   handler: async (ctx) => {
-    const orders = await ctx.db.query("orders").collect();
-    const missing = orders.filter(o => o.fiscalYear === undefined || o.fiscalYear === null);
-
-    let updated = 0;
-    for (const order of missing) {
-      const timestamp = (order as any).factoryDepartureDate ?? (order as any).orderCreationDate ?? order.createdAt;
-      const date = new Date(timestamp);
-      const year = date.getFullYear();
-      const month = date.getMonth(); // 0-11, July = 6
-      const fiscalYear = month >= 6 ? year : year - 1;
-      await ctx.db.patch(order._id, { fiscalYear, updatedAt: Date.now() });
-      updated++;
-    }
-
-    return { updated, totalMissing: missing.length };
-  },
-});
-
-// Debug query to check fiscal years in orders
-export const debugFiscalYears = query({
-  args: {},
-  returns: v.array(v.object({
-    _id: v.id("orders"),
-    invoiceNumber: v.optional(v.string()),
-    fiscalYear: v.optional(v.number()),
-    createdAt: v.number(),
-    orderCreationDate: v.optional(v.number()),
-    factoryDepartureDate: v.optional(v.number()),
-  })),
-  handler: async (ctx) => {
-    const orders = await ctx.db.query("orders").collect();
-    return orders.map(order => ({
-      _id: order._id,
-      invoiceNumber: order.invoiceNumber,
-      fiscalYear: order.fiscalYear,
-      createdAt: order.createdAt,
-      orderCreationDate: order.orderCreationDate,
-      factoryDepartureDate: order.factoryDepartureDate,
-    }));
-  },
-});
-
-// Seed deliveries for orders that are shipped/in_transit/delivered but lack a delivery record
-export const seedDeliveriesFromOrders = mutation({
-  args: {},
-  returns: v.object({ created: v.number(), examined: v.number() }),
-  handler: async (ctx) => {
-    const targetStatuses = new Set(["shipped", "in_transit", "delivered"]);
-    const orders = await ctx.db.query("orders").collect();
-    const candidates = orders.filter(o => targetStatuses.has(o.status as any));
-
-    let created = 0;
-    for (const order of candidates) {
-      // Skip if a delivery already exists
-      const existing = await ctx.db
-        .query("deliveries")
-        .withIndex("by_order", q => q.eq("orderId", order._id))
-        .first();
-      if (existing) continue;
-
-      const client = await ctx.db.get(order.clientId);
-      const destinationParts = [client?.city, client?.country].filter(Boolean);
-      const destination = destinationParts.join(", ") || "Unknown";
-
-      // Choose scheduled date heuristically - prioritize factory departure date
-      const scheduledDate = (order as any).estimatedArrivalDate
-        || (order as any).estimatedDepartureDate
-        || (order as any).factoryDepartureDate
-        || (order as any).orderCreationDate
-        || order.createdAt;
-
-      await ctx.db.insert("deliveries", {
-        orderId: order._id,
-        carrier: (order as any).shippingCompany || "Unknown",
-        trackingNumber: (order as any).shippingOrderNumber || undefined,
-        address: undefined,
-        scheduledDate,
-        shippedDate: order.status !== "pending" ? order.updatedAt : undefined,
-        deliveredDate: order.status === "delivered" ? Date.now() : undefined,
-        incoterms: "FOB",
-        destination,
-        status: (order.status as any) === "shipped" ? "in_transit" : (order.status as any),
-        notes: undefined,
+    console.log("Starting migration to fiscal year format...");
+    
+    // 1. Update production year settings
+    const yearSettings = await ctx.db.query("productionYearSettings").first();
+    if (yearSettings) {
+      const currentFiscalYear = getFiscalYear(yearSettings.currentYear);
+      const availableFiscalYears = yearSettings.availableYears.map(year => getFiscalYear(year));
+      
+      await ctx.db.patch(yearSettings._id, {
+        currentFiscalYear,
+        availableFiscalYears,
+        updatedAt: Date.now(),
+      });
+      
+      console.log(`Updated year settings: ${yearSettings.currentYear} -> ${currentFiscalYear}`);
+    } else {
+      // Create new settings if none exist
+      const currentYear = new Date().getFullYear();
+      const currentFiscalYear = getFiscalYear(currentYear);
+      
+      await ctx.db.insert("productionYearSettings", {
+        currentYear,
+        currentFiscalYear,
+        availableYears: [currentYear],
+        availableFiscalYears: [currentFiscalYear],
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
-      created++;
+      
+      console.log(`Created new year settings: ${currentFiscalYear}`);
     }
-
-    return { created, examined: candidates.length };
-  },
-});
-
-// Migration to update invoice statuses to the new simplified system
-export const migrateInvoiceStatuses = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const invoices = await ctx.db.query("invoices").collect();
-    let updatedCount = 0;
-
-    for (const invoice of invoices) {
-      let newStatus: "unpaid" | "partially_paid" | "paid";
-
-      // Determine new status based on payment information
-      if (invoice.totalPaid >= invoice.amount) {
-        newStatus = "paid";
-      } else if (invoice.totalPaid > 0) {
-        newStatus = "partially_paid";
-      } else {
-        newStatus = "unpaid";
-      }
-
-      // Update the invoice status
-      await ctx.db.patch(invoice._id, {
-        status: newStatus,
-        updatedAt: Date.now(),
-      });
-      updatedCount++;
-    }
-
-    return { updatedCount };
-  },
-});
-
-// Fix invoice statuses and outstanding balances
-export const fixInvoiceStatusesAndBalances = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const invoices = await ctx.db.query("invoices").collect();
-    let updatedCount = 0;
-
-    for (const invoice of invoices) {
-      // Get all payments for this invoice
-      const payments = await ctx.db
-        .query("payments")
-        .withIndex("by_invoice", q => q.eq("invoiceId", invoice._id))
-        .collect();
-      
-      // Calculate actual total paid
-      const actualTotalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
-      const actualOutstandingBalance = Math.max(0, invoice.amount - actualTotalPaid);
-      
-      // Determine correct status based on payments, not outstanding balance
-      let correctStatus: "unpaid" | "partially_paid" | "paid";
-      if (actualTotalPaid >= invoice.amount) {
-        correctStatus = "paid";
-      } else if (actualTotalPaid > 0) {
-        correctStatus = "partially_paid";
-      } else {
-        correctStatus = "unpaid";
-      }
-      
-      // Update if status, totalPaid, or outstandingBalance is incorrect
-      if (invoice.status !== correctStatus || invoice.totalPaid !== actualTotalPaid || invoice.outstandingBalance !== actualOutstandingBalance) {
-        await ctx.db.patch(invoice._id, {
-          status: correctStatus,
-          totalPaid: actualTotalPaid,
-          outstandingBalance: actualOutstandingBalance,
+    
+    // 2. Update all existing batches to include fiscal year
+    const batches = await ctx.db.query("productionBatches").collect();
+    let updatedBatches = 0;
+    
+    for (const batch of batches) {
+      if (!batch.fiscalYear && batch.year) {
+        const fiscalYear = getFiscalYear(batch.year);
+        await ctx.db.patch(batch._id, {
+          fiscalYear,
           updatedAt: Date.now(),
         });
-        updatedCount++;
+        updatedBatches++;
       }
     }
     
-    return { updatedCount, totalInvoices: invoices.length };
-  },
-});
-
-// Cleanup migration: clear conversion fields where no conversion should exist
-export const cleanupPaymentConversionFields = mutation({
-  args: {},
-  returns: v.object({ updated: v.number() }),
-  handler: async (ctx) => {
-    const payments = await ctx.db.query("payments").collect();
-    let updated = 0;
-    for (const p of payments) {
-      const bank = p.bankAccountId ? await ctx.db.get(p.bankAccountId) : null;
-      const needsConversion = bank && bank.currency !== p.currency;
-      const hasFields = (p as any).conversionRateToUSD !== undefined || (p as any).convertedAmountUSD !== undefined;
-      if (!needsConversion && hasFields) {
-        await ctx.db.patch(p._id, { conversionRateToUSD: undefined, convertedAmountUSD: undefined });
-        updated++;
-      }
-    }
-    return { updated };
-  },
-});
-
-// Initialize default application settings
-export const initializeSettings = mutation({
-  args: {},
-  returns: v.object({ created: v.number() }),
-  handler: async (ctx) => {
-    const defaults = [
-      {
-        key: "monthlyShipmentLimit",
-        value: 150000,
-        description: "Maximum allowed shipment quantity per month (in kg)",
-        category: "shipments",
-      },
-    ];
+    console.log(`Updated ${updatedBatches} batches with fiscal year information`);
     
-    let created = 0;
-    for (const setting of defaults) {
-      const existing = await ctx.db
-        .query("settings")
-        .withIndex("by_key", (q) => q.eq("key", setting.key))
-        .first();
-      
-      if (!existing) {
-        await ctx.db.insert("settings", {
-          ...setting,
-          updatedAt: Date.now(),
+    // 3. Update batch reset records
+    const resetRecords = await ctx.db.query("batchResetRecords").collect();
+    let updatedRecords = 0;
+    
+    for (const record of resetRecords) {
+      if (!record.fiscalYear && record.year) {
+        const fiscalYear = getFiscalYear(record.year);
+        await ctx.db.patch(record._id, {
+          fiscalYear,
         });
-        created++;
+        updatedRecords++;
       }
     }
     
-    return { created };
-  },
-});
-
-// Get monthly shipment limit (with default fallback)
-export const getMonthlyShipmentLimit = query({
-  args: {},
-  returns: v.number(),
-  handler: async (ctx) => {
-    const setting = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "monthlyShipmentLimit"))
-      .first();
-    
-    // Return setting value or default to 150,000 kg
-    return setting ? (setting.value as number) : 150000;
-  },
-});
-
-// Update monthly shipment limit
-export const setMonthlyShipmentLimit = mutation({
-  args: {
-    limit: v.number(),
-    updatedBy: v.optional(v.string()),
-  },
-  returns: v.object({ success: v.boolean() }),
-  handler: async (ctx, args) => {
-    if (args.limit < 0) {
-      throw new Error("Monthly shipment limit cannot be negative");
-    }
-    
-    const existing = await ctx.db
-      .query("settings")
-      .withIndex("by_key", (q) => q.eq("key", "monthlyShipmentLimit"))
-      .first();
-    
-    if (existing) {
-      // Update existing setting
-      await ctx.db.patch(existing._id, {
-        value: args.limit,
-        description: "Maximum allowed shipment quantity per month (in kg)",
-        category: "shipments",
-        updatedAt: Date.now(),
-        updatedBy: args.updatedBy,
-      });
-    } else {
-      // Create new setting
-      await ctx.db.insert("settings", {
-        key: "monthlyShipmentLimit",
-        value: args.limit,
-        description: "Maximum allowed shipment quantity per month (in kg)",
-        category: "shipments",
-        updatedAt: Date.now(),
-        updatedBy: args.updatedBy,
-      });
-    }
-    
-    return { success: true };
-  },
-});
-
-// Migration to remove balance fields from bank accounts
-export const migrateRemoveBankBalances = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const bankAccounts = await ctx.db.query("bankAccounts").collect();
-    let updatedCount = 0;
-
-    for (const account of bankAccounts) {
-      // Remove balance fields by patching with only the fields we want to keep
-      await ctx.db.patch(account._id, {
-        accountName: account.accountName,
-        bankName: account.bankName,
-        accountNumber: account.accountNumber,
-        currency: account.currency,
-        status: account.status,
-        createdAt: account.createdAt,
-      });
-      updatedCount++;
-    }
-
-    return { updatedCount };
-  },
-});
-
-// Migration to remove accountType field from bank accounts
-export const removeAccountTypeFromBankAccounts = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const bankAccounts = await ctx.db.query("bankAccounts").collect();
-    let updatedCount = 0;
-
-    for (const account of bankAccounts) {
-      // Patch each account to remove accountType field
-      await ctx.db.patch(account._id, {
-        accountName: account.accountName,
-        bankName: account.bankName,
-        accountNumber: account.accountNumber,
-        currency: account.currency,
-        status: account.status,
-        createdAt: account.createdAt,
-      });
-      updatedCount++;
-    }
-
-    return { updatedCount };
-  },
-});
-
-// Migration to delete problematic bank account
-export const deleteProblematicBankAccount = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const bankAccount = await ctx.db.get("j57cnn373qwp3m5gwnnyqmzs417nxbx4" as any);
-    if (bankAccount) {
-      await ctx.db.delete("j57cnn373qwp3m5gwnnyqmzs417nxbx4" as any);
-      return { deleted: true };
-    }
-    return { deleted: false };
-  },
-});
-
-// Migration to convert any existing numeric bloom values to strings
-export const migrateBloomValues = mutation({
-  args: {},
-  handler: async (ctx) => {
-    // Get all order items
-    const orderItems = await ctx.db.query("orderItems").collect();
-    
-    let migratedCount = 0;
-    
-    for (const item of orderItems) {
-      // If bloom is a number, convert it to string
-      if (item.bloom !== undefined && typeof item.bloom === 'number') {
-        await ctx.db.patch(item._id, {
-          bloom: (item.bloom as number).toString()
-        });
-        migratedCount++;
-      }
-    }
-    
-    console.log(`Migrated ${migratedCount} bloom values from number to string`);
-    return { migratedCount };
-  },
-});
-
-// Migration: Convert existing 'confirmed' orders to 'in_production'
-export const migrateConfirmedOrders = mutation({
-  args: {},
-  returns: v.object({
-    migratedCount: v.number(),
-    message: v.string(),
-  }),
-  handler: async (ctx) => {
-    const confirmedOrders = await ctx.db
-      .query("orders")
-      .filter((q) => q.eq(q.field("status"), "confirmed"))
-      .collect();
-    
-    let migratedCount = 0;
-    for (const order of confirmedOrders) {
-      await ctx.db.patch(order._id, {
-        status: "in_production",
-        updatedAt: Date.now(),
-      });
-      migratedCount++;
-    }
+    console.log(`Updated ${updatedRecords} reset records with fiscal year information`);
     
     return {
-      migratedCount,
-      message: `Successfully migrated ${migratedCount} orders from 'confirmed' to 'in_production' status`,
+      success: true,
+      message: `Migration completed successfully. Updated ${updatedBatches} batches and ${updatedRecords} reset records.`,
+      updatedBatches,
+      updatedRecords,
     };
   },
 });
 
-
+// Query to check migration status
+export const getMigrationStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const yearSettings = await ctx.db.query("productionYearSettings").first();
+    const batches = await ctx.db.query("productionBatches").collect();
+    const resetRecords = await ctx.db.query("batchResetRecords").collect();
+    
+    const batchesWithoutFiscalYear = batches.filter(batch => !batch.fiscalYear && batch.year).length;
+    const recordsWithoutFiscalYear = resetRecords.filter(record => !record.fiscalYear && record.year).length;
+    
+    return {
+      yearSettingsHasFiscalYear: !!yearSettings?.currentFiscalYear,
+      totalBatches: batches.length,
+      batchesWithoutFiscalYear,
+      totalResetRecords: resetRecords.length,
+      recordsWithoutFiscalYear,
+      needsMigration: batchesWithoutFiscalYear > 0 || recordsWithoutFiscalYear > 0 || !yearSettings?.currentFiscalYear,
+    };
+  },
+});

@@ -1,6 +1,7 @@
 // convex/productionBatches.ts
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { getFiscalYear, getCalendarYearFromFiscal, isValidFiscalYear } from "./fiscalYearUtils";
 
 // Get all production batches with pagination (only active batches)
 export const getAllBatches = query({
@@ -10,10 +11,10 @@ export const getAllBatches = query({
       cursor: v.optional(v.union(v.string(), v.null())),
     })),
     year: v.optional(v.number()),
+    fiscalYear: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const paginationOpts = args.paginationOpts || { numItems: 50 };
-    const currentYear = args.year || new Date().getFullYear();
     
     // Ensure cursor is either string or null, not undefined
     const validPaginationOpts = {
@@ -21,13 +22,28 @@ export const getAllBatches = query({
       cursor: paginationOpts.cursor ?? null,
     };
     
-    const batches = await ctx.db
-      .query("productionBatches")
-      .withIndex("by_year_and_active", (q) => 
-        q.eq("year", currentYear).eq("isActive", true)
-      )
-      .order("desc")
-      .paginate(validPaginationOpts);
+    let batches;
+    
+    if (args.fiscalYear) {
+      // Use fiscal year if provided
+      batches = await ctx.db
+        .query("productionBatches")
+        .withIndex("by_fiscal_year_and_active", (q) => 
+          q.eq("fiscalYear", args.fiscalYear).eq("isActive", true)
+        )
+        .order("desc")
+        .paginate(validPaginationOpts);
+    } else {
+      // Fallback to calendar year (legacy support)
+      const currentYear = args.year || new Date().getFullYear();
+      batches = await ctx.db
+        .query("productionBatches")
+        .withIndex("by_year_and_active", (q) => 
+          q.eq("year", currentYear).eq("isActive", true)
+        )
+        .order("desc")
+        .paginate(validPaginationOpts);
+    }
 
     return batches;
   },
@@ -48,17 +64,33 @@ export const getBatchByNumber = query({
 
 // Get next available batch number for current year
 export const getNextBatchNumber = query({
-  args: { year: v.optional(v.number()) },
+  args: { 
+    year: v.optional(v.number()),
+    fiscalYear: v.optional(v.string())
+  },
   handler: async (ctx, args) => {
-    const currentYear = args.year || new Date().getFullYear();
+    let lastBatch;
     
-    const lastBatch = await ctx.db
-      .query("productionBatches")
-      .withIndex("by_year_and_active", (q) => 
-        q.eq("year", currentYear).eq("isActive", true)
-      )
-      .order("desc")
-      .first();
+    if (args.fiscalYear) {
+      // Use fiscal year if provided
+      lastBatch = await ctx.db
+        .query("productionBatches")
+        .withIndex("by_fiscal_year_and_active", (q) => 
+          q.eq("fiscalYear", args.fiscalYear).eq("isActive", true)
+        )
+        .order("desc")
+        .first();
+    } else {
+      // Fallback to calendar year (legacy support)
+      const currentYear = args.year || new Date().getFullYear();
+      lastBatch = await ctx.db
+        .query("productionBatches")
+        .withIndex("by_year_and_active", (q) => 
+          q.eq("year", currentYear).eq("isActive", true)
+        )
+        .order("desc")
+        .first();
+    }
 
     return lastBatch ? lastBatch.batchNumber + 1 : 1;
   },
@@ -153,15 +185,25 @@ export const createBatch = mutation({
     sourceReport: v.optional(v.string()),
     reportDate: v.optional(v.number()),
     notes: v.optional(v.string()),
+    fiscalYear: v.optional(v.string()), // Optional fiscal year override
   },
   handler: async (ctx, args) => {
     const now = Date.now();
     const currentYear = new Date().getFullYear();
     
+    // Determine fiscal year
+    let fiscalYear = args.fiscalYear;
+    if (!fiscalYear) {
+      // Get from settings or use current fiscal year
+      const yearSettings = await ctx.db.query("productionYearSettings").first();
+      fiscalYear = yearSettings?.currentFiscalYear || getFiscalYear(currentYear);
+    }
+    
     const batchId = await ctx.db.insert("productionBatches", {
       ...args,
       isUsed: false,
       year: currentYear,
+      fiscalYear,
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -194,12 +236,13 @@ export const createBatchesFromExtractedData = mutation({
       // Get the current production year from settings
       const yearSettings = await ctx.db.query("productionYearSettings").first();
       const currentYear = yearSettings ? yearSettings.currentYear : new Date().getFullYear();
+      const currentFiscalYear = yearSettings?.currentFiscalYear || getFiscalYear(currentYear);
     
-    // Get the next batch number to start from for current year
+    // Get the next batch number to start from for current fiscal year
     const lastBatch = await ctx.db
       .query("productionBatches")
-      .withIndex("by_year_and_active", (q) => 
-        q.eq("year", currentYear).eq("isActive", true)
+      .withIndex("by_fiscal_year_and_active", (q) => 
+        q.eq("fiscalYear", currentFiscalYear).eq("isActive", true)
       )
       .order("desc")
       .first();
@@ -281,6 +324,7 @@ export const createBatchesFromExtractedData = mutation({
                   fileId: args.fileId, // Store the file ID for viewing
                   isUsed: false,
                   year: currentYear,
+                  fiscalYear: currentFiscalYear,
                   isActive: true,
                   createdAt: Date.now(),
                   updatedAt: Date.now(),
@@ -506,6 +550,7 @@ export const getCurrentYearInfo = query({
     // Get the current production year from settings
     const yearSettings = await ctx.db.query("productionYearSettings").first();
     const currentYear = yearSettings ? yearSettings.currentYear : new Date().getFullYear();
+    const currentFiscalYear = yearSettings?.currentFiscalYear || getFiscalYear(currentYear);
     
     // Get the latest reset record to determine the current active year
     const latestReset = await ctx.db
@@ -514,17 +559,19 @@ export const getCurrentYearInfo = query({
       .first();
     
     const activeYear = latestReset ? latestReset.year : currentYear;
+    const activeFiscalYear = latestReset?.fiscalYear || currentFiscalYear;
     
-    // Count batches for the active year
+    // Count batches for the active fiscal year
     const batchCount = await ctx.db
       .query("productionBatches")
-      .withIndex("by_year_and_active", (q) => 
-        q.eq("year", activeYear).eq("isActive", true)
+      .withIndex("by_fiscal_year_and_active", (q) => 
+        q.eq("fiscalYear", activeFiscalYear).eq("isActive", true)
       )
       .collect();
     
     return {
       currentYear: activeYear,
+      currentFiscalYear: activeFiscalYear,
       batchCount: batchCount.length,
       lastResetDate: latestReset?.resetDate,
       lastResetNotes: latestReset?.notes
@@ -532,7 +579,7 @@ export const getCurrentYearInfo = query({
   },
 });
 
-// Get available years (years that have batch data)
+// Get available years (years that have batch data) - legacy
 export const getAvailableYears = query({
   args: {},
   handler: async (ctx) => {
@@ -550,6 +597,27 @@ export const getAvailableYears = query({
     
     const years = Array.from(new Set(batches.map(batch => batch.year).filter(Boolean)));
     return years.sort((a, b) => (b || 0) - (a || 0)); // Sort descending (newest first)
+  },
+});
+
+// Get available fiscal years (fiscal years that have batch data)
+export const getAvailableFiscalYears = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get available fiscal years from production year settings
+    const yearSettings = await ctx.db.query("productionYearSettings").first();
+    
+    if (yearSettings && yearSettings.availableFiscalYears) {
+      return yearSettings.availableFiscalYears.sort((a, b) => b.localeCompare(a)); // Sort descending (newest first)
+    }
+    
+    // Fallback: get fiscal years from existing batches
+    const batches = await ctx.db
+      .query("productionBatches")
+      .collect();
+    
+    const fiscalYears = Array.from(new Set(batches.map(batch => batch.fiscalYear).filter(Boolean)));
+    return fiscalYears.sort((a, b) => (b || "").localeCompare(a || "")); // Sort descending (newest first)
   },
 });
 
@@ -574,7 +642,7 @@ export const getBatchResetRecords = query({
   },
 });
 
-// Reset batch numbers for new year
+// Reset batch numbers for new year (legacy)
 export const resetBatchNumbersForNewYear = mutation({
   args: { 
     newYear: v.number(),
@@ -582,23 +650,27 @@ export const resetBatchNumbersForNewYear = mutation({
   },
   handler: async (ctx, args) => {
     const currentYear = new Date().getFullYear();
+    const newFiscalYear = getFiscalYear(args.newYear);
     
-    // Get the highest batch number from current year
+    // Get the highest batch number from current fiscal year
+    const yearSettings = await ctx.db.query("productionYearSettings").first();
+    const currentFiscalYear = yearSettings?.currentFiscalYear || getFiscalYear(currentYear);
+    
     const lastBatch = await ctx.db
       .query("productionBatches")
-      .withIndex("by_year_and_active", (q) => 
-        q.eq("year", currentYear).eq("isActive", true)
+      .withIndex("by_fiscal_year_and_active", (q) => 
+        q.eq("fiscalYear", currentFiscalYear).eq("isActive", true)
       )
       .order("desc")
       .first();
 
     const previousYearMaxBatch = lastBatch ? lastBatch.batchNumber : 0;
 
-    // Mark all current year batches as inactive
+    // Mark all current fiscal year batches as inactive
     const currentYearBatches = await ctx.db
       .query("productionBatches")
-      .withIndex("by_year_and_active", (q) => 
-        q.eq("year", currentYear).eq("isActive", true)
+      .withIndex("by_fiscal_year_and_active", (q) => 
+        q.eq("fiscalYear", currentFiscalYear).eq("isActive", true)
       )
       .collect();
 
@@ -612,6 +684,7 @@ export const resetBatchNumbersForNewYear = mutation({
     // Create reset record
     await ctx.db.insert("batchResetRecords", {
       year: args.newYear,
+      fiscalYear: newFiscalYear,
       resetDate: Date.now(),
       previousYearMaxBatch,
       newYearStartBatch: 1,
@@ -623,6 +696,69 @@ export const resetBatchNumbersForNewYear = mutation({
       previousYearMaxBatch,
       newYearStartBatch: 1,
       batchesMarkedInactive: currentYearBatches.length,
+      newFiscalYear,
+    };
+  },
+});
+
+// Reset batch numbers for new fiscal year
+export const resetBatchNumbersForNewFiscalYear = mutation({
+  args: { 
+    newFiscalYear: v.string(),
+    notes: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (!isValidFiscalYear(args.newFiscalYear)) {
+      throw new Error("Invalid fiscal year format. Expected format: YYYY-YY (e.g., 2025-26)");
+    }
+    
+    const newCalendarYear = getCalendarYearFromFiscal(args.newFiscalYear);
+    
+    // Get the highest batch number from current fiscal year
+    const yearSettings = await ctx.db.query("productionYearSettings").first();
+    const currentFiscalYear = yearSettings?.currentFiscalYear || getFiscalYear(new Date().getFullYear());
+    
+    const lastBatch = await ctx.db
+      .query("productionBatches")
+      .withIndex("by_fiscal_year_and_active", (q) => 
+        q.eq("fiscalYear", currentFiscalYear).eq("isActive", true)
+      )
+      .order("desc")
+      .first();
+
+    const previousYearMaxBatch = lastBatch ? lastBatch.batchNumber : 0;
+
+    // Mark all current fiscal year batches as inactive
+    const currentYearBatches = await ctx.db
+      .query("productionBatches")
+      .withIndex("by_fiscal_year_and_active", (q) => 
+        q.eq("fiscalYear", currentFiscalYear).eq("isActive", true)
+      )
+      .collect();
+
+    for (const batch of currentYearBatches) {
+      await ctx.db.patch(batch._id, {
+        isActive: false,
+        updatedAt: Date.now(),
+      });
+    }
+
+    // Create reset record
+    await ctx.db.insert("batchResetRecords", {
+      year: newCalendarYear,
+      fiscalYear: args.newFiscalYear,
+      resetDate: Date.now(),
+      previousYearMaxBatch,
+      newYearStartBatch: 1,
+      notes: args.notes,
+      createdAt: Date.now(),
+    });
+
+    return {
+      previousYearMaxBatch,
+      newYearStartBatch: 1,
+      batchesMarkedInactive: currentYearBatches.length,
+      newFiscalYear: args.newFiscalYear,
     };
   },
 });

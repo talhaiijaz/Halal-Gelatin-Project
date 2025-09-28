@@ -40,7 +40,7 @@ export default function ProductionDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   // Use the shared year management system
-  const { currentYear } = useProductionYear();
+  const { currentYear, currentFiscalYear } = useProductionYear();
   
   // Upload functionality
   const [isUploading, setIsUploading] = useState(false);
@@ -51,10 +51,10 @@ export default function ProductionDetailPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Fetch all batches for current year
+  // Fetch all batches for current fiscal year
   const batches = useQuery(api.productionBatches.getAllBatches, {
     paginationOpts: { numItems: 1000 },
-    year: currentYear
+    fiscalYear: currentFiscalYear
   });
 
   // Fetch current year info
@@ -361,9 +361,9 @@ export default function ProductionDetailPage() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <label className="text-sm font-medium text-gray-700">Year:</label>
+                <label className="text-sm font-medium text-gray-700">Fiscal Year:</label>
                 <span className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-sm font-medium text-gray-900">
-                  {currentYear}
+                  {currentFiscalYear}
                 </span>
               </div>
             </div>

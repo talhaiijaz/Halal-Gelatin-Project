@@ -396,8 +396,10 @@ export default defineSchema({
 
   // Production Year Settings table
   productionYearSettings: defineTable({
-    currentYear: v.number(), // The currently active year for production
-    availableYears: v.array(v.number()), // All available years
+    currentYear: v.number(), // The currently active year for production (legacy)
+    currentFiscalYear: v.optional(v.string()), // The currently active fiscal year (e.g., "2025-26")
+    availableYears: v.array(v.number()), // All available years (legacy)
+    availableFiscalYears: v.optional(v.array(v.string())), // All available fiscal years (e.g., ["2025-26", "2026-27"])
     createdAt: v.number(),
     updatedAt: v.number(),
   }),
@@ -427,7 +429,8 @@ export default defineSchema({
     usedDate: v.optional(v.number()), // When this batch was used
     notes: v.optional(v.string()), // Additional notes
     // Year tracking for reset functionality
-    year: v.optional(v.number()), // Year this batch belongs to (e.g., 2024, 2025)
+    year: v.optional(v.number()), // Year this batch belongs to (e.g., 2024, 2025) - legacy
+    fiscalYear: v.optional(v.string()), // Fiscal year this batch belongs to (e.g., "2025-26", "2026-27")
     isActive: v.optional(v.boolean()), // Whether this batch is active (not reset)
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -440,11 +443,14 @@ export default defineSchema({
     .index("by_viscosity_range", ["viscosity"])
     .index("by_bloom_range", ["bloom"])
     .index("by_year", ["year"])
-    .index("by_year_and_active", ["year", "isActive"]),
+    .index("by_year_and_active", ["year", "isActive"])
+    .index("by_fiscal_year", ["fiscalYear"])
+    .index("by_fiscal_year_and_active", ["fiscalYear", "isActive"]),
 
   // Batch Reset Records table - tracks when batch numbers were reset
   batchResetRecords: defineTable({
-    year: v.number(), // Year the reset was for
+    year: v.number(), // Year the reset was for (legacy)
+    fiscalYear: v.optional(v.string()), // Fiscal year the reset was for (e.g., "2025-26")
     resetDate: v.number(), // When the reset was performed
     resetBy: v.optional(v.id("users")), // User who performed the reset
     previousYearMaxBatch: v.number(), // Highest batch number from previous year
@@ -453,5 +459,6 @@ export default defineSchema({
     createdAt: v.number(),
   })
     .index("by_year", ["year"])
+    .index("by_fiscal_year", ["fiscalYear"])
     .index("by_reset_date", ["resetDate"]),
 });

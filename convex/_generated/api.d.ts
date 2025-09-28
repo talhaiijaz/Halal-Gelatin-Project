@@ -24,6 +24,7 @@ import type * as deliveries from "../deliveries.js";
 import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
 import type * as finance from "../finance.js";
+import type * as fiscalYearUtils from "../fiscalYearUtils.js";
 import type * as interBankTransfers from "../interBankTransfers.js";
 import type * as invoices from "../invoices.js";
 import type * as migrations from "../migrations.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   feedback: typeof feedback;
   files: typeof files;
   finance: typeof finance;
+  fiscalYearUtils: typeof fiscalYearUtils;
   interBankTransfers: typeof interBankTransfers;
   invoices: typeof invoices;
   migrations: typeof migrations;

@@ -24,26 +24,39 @@ export default function ProductionPage() {
   const [newYear, setNewYear] = useState('');
 
   // Use the new year management system
-  const { currentYear, availableYears, setCurrentYear, addNewYear, isLoading, error } = useProductionYear();
+  const { 
+    currentYear, 
+    availableYears, 
+    setCurrentYear, 
+    addNewYear, 
+    currentFiscalYear, 
+    availableFiscalYears, 
+    setCurrentFiscalYear, 
+    addNewFiscalYear, 
+    isLoading, 
+    error 
+  } = useProductionYear();
 
-  // Fetch real production data for the current year
+  // Fetch real production data for the current fiscal year
   const batches = useQuery(api.productionBatches.getAllBatches, {
     paginationOpts: { numItems: 1000 },
-    year: currentYear
+    fiscalYear: currentFiscalYear
   });
 
   const yearInfo = useQuery(api.productionBatches.getCurrentYearInfo);
 
   // Year management functions
-  const handleYearSelect = async (year: number) => {
-    await setCurrentYear(year);
+  const handleYearSelect = async (fiscalYear: string) => {
+    await setCurrentFiscalYear(fiscalYear);
     setShowYearDropdown(false);
   };
 
   const handleAddNewYear = async () => {
     const year = parseInt(newYear);
     if (year && year > 2000 && year < 2100) {
-      await addNewYear(year);
+      // Convert to fiscal year format
+      const fiscalYear = `${year}-${(year + 1).toString().slice(-2)}`;
+      await addNewFiscalYear(fiscalYear);
       setNewYear('');
       setShowAddYearModal(false);
     }
@@ -206,27 +219,27 @@ export default function ProductionPage() {
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Production Year</h3>
               <div className="space-y-4">
-                {/* Year Dropdown */}
+                {/* Fiscal Year Dropdown */}
                 <div className="relative">
                   <button
                     onClick={() => setShowYearDropdown(!showYearDropdown)}
                     className="w-full flex items-center justify-between px-3 py-2 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <span>{currentYear}</span>
+                    <span>{currentFiscalYear}</span>
                     <ChevronDown className="h-4 w-4" />
                   </button>
                   
                   {showYearDropdown && (
                     <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
-                      {availableYears.map((year) => (
+                      {availableFiscalYears.map((fiscalYear) => (
                         <button
-                          key={year}
-                          onClick={() => handleYearSelect(year)}
+                          key={fiscalYear}
+                          onClick={() => handleYearSelect(fiscalYear)}
                           className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                            year === currentYear ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                            fiscalYear === currentFiscalYear ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
                           }`}
                         >
-                          {year}
+                          {fiscalYear}
                         </button>
                       ))}
                       <div className="border-t border-gray-200">
@@ -238,7 +251,7 @@ export default function ProductionPage() {
                           className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add New Year
+                          Add New Fiscal Year
                         </button>
                       </div>
                     </div>
@@ -252,8 +265,8 @@ export default function ProductionPage() {
                     <span className="font-semibold text-gray-900">{yearInfo?.batchCount || 0}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Available Years</span>
-                    <span className="font-semibold text-gray-900">{availableYears.length}</span>
+                    <span className="text-sm text-gray-600">Available Fiscal Years</span>
+                    <span className="font-semibold text-gray-900">{availableFiscalYears.length}</span>
                   </div>
                 </div>
 
@@ -298,21 +311,24 @@ export default function ProductionPage() {
       {showAddYearModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Year</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Fiscal Year</h3>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Year
+                  Starting Year
                 </label>
                 <input
                   type="number"
                   value={newYear}
                   onChange={(e) => setNewYear(e.target.value)}
-                  placeholder="e.g., 2026"
+                  placeholder="e.g., 2026 (will create 2026-27)"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   min="2000"
                   max="2100"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter the starting year (e.g., 2026 for fiscal year 2026-27)
+                </p>
               </div>
               <div className="flex space-x-3">
                 <button
@@ -320,7 +336,7 @@ export default function ProductionPage() {
                   disabled={!newYear || isLoading}
                   className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? 'Adding...' : 'Add Year'}
+                  {isLoading ? 'Adding...' : 'Add Fiscal Year'}
                 </button>
                 <button
                   onClick={() => {
