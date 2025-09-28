@@ -15,7 +15,7 @@ class ModalManager {
     top: string;
     width: string;
   } | null = null;
-  private cleanupTimer: NodeJS.Timeout | null = null;
+  private cleanupTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingLockFrame: number | null = null;
 
   static getInstance(): ModalManager {
@@ -45,7 +45,7 @@ class ModalManager {
         });
         
         // Add scroll event listener to detect interference
-        let scrollTimeout: NodeJS.Timeout;
+        let scrollTimeout: ReturnType<typeof setTimeout>;
         window.addEventListener('scroll', () => {
           // If we're in a modal and body is fixed, prevent scroll interference
           if (ModalManager.instance.isModalOpen() && document.body.style.position === 'fixed') {
