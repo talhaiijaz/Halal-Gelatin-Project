@@ -70,6 +70,8 @@ export default function ProductionDetailPage() {
   const startProcessing = useMutation(api.productionProcessing.startProcessing);
   const updateProcessingState = useMutation(api.productionProcessing.updateProcessingState);
   const clearProcessingState = useMutation(api.productionProcessing.clearProcessingState);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const getFileUrl = useMutation(api.productionBatches.getFileUrl);
 
   // Get unique source reports for filter
   const sourceReports = batches?.page ? 
@@ -161,6 +163,7 @@ export default function ProductionDetailPage() {
     setIsUploading(true);
     setUploadError(null);
     let processingId: Id<"productionProcessing"> | null = null;
+    let fileId: Id<"_storage"> | null = null;
 
     try {
       // Start processing state
@@ -174,6 +177,24 @@ export default function ProductionDetailPage() {
         status: "uploading",
         progress: "Uploading file...",
       });
+
+      // First, upload the file to storage
+      console.log('Uploading file to storage...');
+      const uploadUrl = await generateUploadUrl();
+      
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': uploadedFile.type },
+        body: uploadedFile,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file to storage');
+      }
+
+      const { storageId } = await uploadResponse.json();
+      fileId = storageId;
+      console.log('File uploaded to storage:', fileId);
 
       // Extract the data from PDF
       console.log('Extracting data from PDF...');
@@ -205,13 +226,14 @@ export default function ProductionDetailPage() {
       const data = await response.json();
       console.log('PDF extraction completed');
 
-      // Create batches from extracted data with processing ID
+      // Create batches from extracted data with processing ID and file ID
       console.log('Creating batches...');
       await createBatchesFromExtractedData({
         extractedData: data.text,
         sourceReport: uploadedFile.name,
         reportDate: Date.now(),
         processingId,
+        fileId,
       });
       console.log('Batches created successfully');
 
@@ -254,6 +276,19 @@ export default function ProductionDetailPage() {
     setUploadError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleViewFile = async (fileId: Id<"_storage">, fileName: string) => {
+    try {
+      // Use the Convex mutation to get file URL
+      const fileUrl = await getFileUrl({ fileId });
+      
+      // Open the file in a new tab
+      window.open(fileUrl, '_blank');
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      alert('Failed to open file. Please try again.');
     }
   };
 
@@ -784,8 +819,21 @@ export default function ProductionDetailPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {batch.sourceReport && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <span 
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          batch.fileId 
+                            ? 'bg-blue-100 text-blue-800 hover:bg-blue-200 cursor-pointer' 
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                        onClick={batch.fileId ? () => handleViewFile(batch.fileId!, batch.sourceReport!) : undefined}
+                        title={batch.fileId ? 'Click to view file' : 'File not available'}
+                      >
                         {batch.sourceReport}
+                        {batch.fileId && (
+                          <svg className="ml-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        )}
                       </span>
                     )}
                   </td>

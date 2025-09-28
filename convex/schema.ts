@@ -421,6 +421,7 @@ export default defineSchema({
     // Metadata
     sourceReport: v.optional(v.string()), // Original PDF filename
     reportDate: v.optional(v.number()), // Date when the report was generated
+    fileId: v.optional(v.id("_storage")), // Storage ID for the original PDF file
     isUsed: v.optional(v.boolean()), // For future batch selection logic - tracks if batch has been used
     usedInOrder: v.optional(v.string()), // Order number where this batch was used
     usedDate: v.optional(v.number()), // When this batch was used

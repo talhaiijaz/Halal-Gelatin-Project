@@ -178,6 +178,7 @@ export const createBatchesFromExtractedData = mutation({
     sourceReport: v.string(),
     reportDate: v.optional(v.number()),
     processingId: v.optional(v.id("productionProcessing")), // Optional processing state ID
+    fileId: v.optional(v.id("_storage")), // Optional file storage ID
   },
   handler: async (ctx, args) => {
     try {
@@ -277,6 +278,7 @@ export const createBatchesFromExtractedData = mutation({
                   odour: parseString(parts[11]), // Odour column (index 11)
                   sourceReport: args.sourceReport,
                   reportDate: args.reportDate,
+                  fileId: args.fileId, // Store the file ID for viewing
                   isUsed: false,
                   year: currentYear,
                   isActive: true,
@@ -552,7 +554,7 @@ export const getAvailableYears = query({
 });
 
 // Get file URL for viewing uploaded files
-export const getFileUrl = query({
+export const getFileUrl = mutation({
   args: { fileId: v.id("_storage") },
   handler: async (ctx, args) => {
     return await ctx.storage.getUrl(args.fileId);
