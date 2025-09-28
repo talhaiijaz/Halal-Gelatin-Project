@@ -394,6 +394,17 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_status", ["status"]),
 
+  // Outsource Processing State table
+  outsourceProcessing: defineTable({
+    status: v.union(v.literal("uploading"), v.literal("processing"), v.literal("completed"), v.literal("error")),
+    fileName: v.string(),
+    progress: v.optional(v.string()),
+    errorMessage: v.optional(v.string()),
+    completedBatches: v.optional(v.array(v.id("outsourceBatches"))),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_status", ["status"]),
+
   // Production Year Settings table
   productionYearSettings: defineTable({
     currentYear: v.number(), // The currently active year for production (legacy)
@@ -450,8 +461,7 @@ export default defineSchema({
   // Outsource Batch Data table - batches from other companies/factories
   outsourceBatches: defineTable({
     batchNumber: v.number(), // Continuous batch number for outsource batches (1, 2, 3...)
-    supplierName: v.string(), // Name of the supplier company/factory
-    supplierBatchId: v.optional(v.string()), // Supplier's own batch ID
+    serialNumber: v.string(), // Serial number from the report
     // Quality parameters
     viscosity: v.optional(v.number()),
     bloom: v.optional(v.number()),
@@ -479,10 +489,9 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_batch_number", ["batchNumber"])
-    .index("by_supplier_name", ["supplierName"])
-    .index("by_supplier_batch_id", ["supplierBatchId"])
-    .index("by_source_report", ["sourceReport"])
+        .index("by_batch_number", ["batchNumber"])
+        .index("by_serial_number", ["serialNumber"])
+        .index("by_source_report", ["sourceReport"])
     .index("by_is_used", ["isUsed"])
     .index("by_used_in_order", ["usedInOrder"])
     .index("by_viscosity_range", ["viscosity"])
