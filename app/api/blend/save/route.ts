@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
       targetBloomMax,
       targetMeanBloom,
       targetMesh,
+      lotNumber,
       additionalTargets,
       selectedBatches,
       notes,
@@ -25,11 +26,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-      const blendId = await convex.mutation(api.blends.createBlend, {
+    const blendId = await convex.mutation(api.blends.createBlend, {
         targetBloomMin: Number(targetBloomMin),
         targetBloomMax: Number(targetBloomMax),
         targetMeanBloom: targetMeanBloom ? Number(targetMeanBloom) : undefined,
         targetMesh: targetMesh ? Number(targetMesh) : undefined,
+      lotNumber,
         additionalTargets,
         selectedBatches,
         notes,

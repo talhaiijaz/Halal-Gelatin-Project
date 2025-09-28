@@ -743,7 +743,7 @@ export default function ProductionDetailPage() {
             <div className="bg-orange-50 p-4 rounded-lg">
               <p className="text-sm text-orange-600 font-medium">Used in Blends</p>
               <p className="text-2xl font-bold text-orange-900">
-                {batches.page?.filter(batch => batch.isUsed && batch.usedInOrder?.startsWith('BL-')).length || 0}
+                {batches.page?.filter(batch => batch.isUsed && batch.usedInOrder).length || 0}
               </p>
               <p className="text-xs text-orange-600 mt-1">batches in blends</p>
             </div>

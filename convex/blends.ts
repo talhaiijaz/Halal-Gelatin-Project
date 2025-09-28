@@ -1,15 +1,13 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
 
 // Get all blends with pagination
 export const getAllBlends = query({
   args: {
-    paginationOpts: v.object({
-      numItems: v.number(),
-      cursor: v.union(v.string(), v.null()),
-    }),
+    paginationOpts: paginationOptsValidator,
     fiscalYear: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -241,49 +239,6 @@ export const optimizeBatchSelection = query({
   },
 });
 
-// Generate next blend number
-export const getNextBlendNumber = query({
-  args: { fiscalYear: v.optional(v.string()) },
-  handler: async (ctx, args) => {
-    const currentYear = new Date().getFullYear();
-    const year = args.fiscalYear ? args.fiscalYear.split('-')[0] : currentYear.toString();
-    
-    const lastBlend = await ctx.db
-      .query("blends")
-      .withIndex("by_blend_number")
-      .filter((q) => q.eq(q.field("blendNumber"), `BL-${year}-`))
-      .order("desc")
-      .first();
-    
-    if (!lastBlend) {
-      return `BL-${year}-001`;
-    }
-    
-    const lastNumber = parseInt(lastBlend.blendNumber.split('-')[2]);
-    const nextNumber = (lastNumber + 1).toString().padStart(3, '0');
-    return `BL-${year}-${nextNumber}`;
-  },
-});
-
-// Generate next serial number
-export const getNextSerialNumber = query({
-  args: {},
-  handler: async (ctx) => {
-    const lastBlend = await ctx.db
-      .query("blends")
-      .withIndex("by_serial_number")
-      .order("desc")
-      .first();
-    
-    if (!lastBlend) {
-      return "1";
-    }
-    
-    const lastSerial = parseInt(lastBlend.serialNumber);
-    return (lastSerial + 1).toString();
-  },
-});
-
 // Generate lot number
 export const generateLotNumber = query({
   args: {},
@@ -312,6 +267,7 @@ export const createBlend = mutation({
     targetBloomMin: v.number(),
     targetBloomMax: v.number(),
     targetMeanBloom: v.optional(v.number()),
+    lotNumber: v.string(),
     targetMesh: v.optional(v.number()),
     additionalTargets: v.optional(v.object({
       viscosity: v.optional(v.number()),
@@ -346,12 +302,15 @@ export const createBlend = mutation({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    
-    // Get next blend number and serial number
-    const blendNumber = await ctx.runQuery(api.blends.getNextBlendNumber, { fiscalYear: args.fiscalYear });
-    const serialNumber = await ctx.runQuery(api.blends.getNextSerialNumber, {});
-    const lotNumber = await ctx.runQuery(api.blends.generateLotNumber, {});
-    
+    // Enforce unique lot number
+    const existingLot = await ctx.db
+      .query("blends")
+      .withIndex("by_lot_number", (q) => q.eq("lotNumber", args.lotNumber))
+      .first();
+    if (existingLot) {
+      throw new Error("Lot number already exists. Please choose a unique lot number.");
+    }
+
     // Calculate totals
     const totalBags = args.selectedBatches.reduce((sum, batch) => sum + batch.bags, 0);
     const totalBloom = args.selectedBatches.reduce((sum, batch) => sum + ((batch.bloom || 0) * batch.bags), 0);
@@ -360,8 +319,7 @@ export const createBlend = mutation({
     
     // Create the blend
     const blendId = await ctx.db.insert("blends", {
-      blendNumber,
-      serialNumber,
+      lotNumber: args.lotNumber,
       date: now,
       targetBloomMin: args.targetBloomMin,
       targetBloomMax: args.targetBloomMax,
@@ -382,7 +340,6 @@ export const createBlend = mutation({
       totalWeight,
       averageBloom,
       ct3AverageBloom: averageBloom,
-      lotNumber,
       status: "completed",
       notes: args.notes,
       fiscalYear: args.fiscalYear,
@@ -395,7 +352,7 @@ export const createBlend = mutation({
       await ctx.db.patch(selectedBatch.batchId, {
         isUsed: true,
         usedDate: now,
-        usedInOrder: blendNumber,
+        usedInOrder: args.lotNumber,
         updatedAt: now,
       });
     }

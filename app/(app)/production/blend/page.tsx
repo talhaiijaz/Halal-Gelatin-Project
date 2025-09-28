@@ -6,7 +6,6 @@ import { api } from '../../../../convex/_generated/api';
 import { useProductionYear } from '../../../hooks/useProductionYear';
 import { 
   Calculator, 
-  Download, 
   Save, 
   RefreshCw, 
   Target,
@@ -54,6 +53,7 @@ export default function BlendPage() {
   const [targetMeanBloom, setTargetMeanBloom] = useState<number | undefined>(undefined);
   const [targetMesh, setTargetMesh] = useState<number>(20);
   const [targetBags, setTargetBags] = useState<number>(100);
+  const [lotNumber, setLotNumber] = useState<string>("");
   
   // Additional targets (optional)
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -82,6 +82,11 @@ export default function BlendPage() {
 
   // Optimize batch selection
   const handleOptimize = async () => {
+    if (!lotNumber.trim()) {
+      toast.error('Please enter a Lot Number');
+      return;
+    }
+
     if (!targetBloomMin || !targetBloomMax) {
       toast.error('Please enter target bloom range');
       return;
@@ -127,6 +132,11 @@ export default function BlendPage() {
 
   // Save blend
   const handleSave = async () => {
+    if (!lotNumber.trim()) {
+      toast.error('Please enter a Lot Number');
+      return;
+    }
+
     if (!optimizationResult || optimizationResult.selectedBatches.length === 0) {
       toast.error('Please optimize batch selection first');
       return;
@@ -144,6 +154,7 @@ export default function BlendPage() {
           targetBloomMax,
           targetMeanBloom,
           targetMesh,
+          lotNumber,
           additionalTargets: showAdvanced ? additionalTargets : undefined,
           selectedBatches: optimizationResult.selectedBatches,
           notes,
@@ -170,68 +181,7 @@ export default function BlendPage() {
     }
   };
 
-  // Download PDF
-  const handleDownloadPDF = async () => {
-    if (!optimizationResult) {
-      toast.error('Please optimize batch selection first');
-      return;
-    }
-
-    try {
-      // First save the blend if not already saved
-      const saveResponse = await fetch('/api/blend/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          targetBloomMin,
-          targetBloomMax,
-          targetMeanBloom,
-          targetMesh,
-          additionalTargets: showAdvanced ? additionalTargets : undefined,
-          selectedBatches: optimizationResult.selectedBatches,
-          notes,
-          fiscalYear: currentFiscalYear,
-        }),
-      });
-
-      const saveResult = await saveResponse.json();
-      
-      if (saveResponse.ok) {
-        // Now generate PDF
-        const pdfResponse = await fetch('/api/blend/pdf', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            blendId: saveResult.blendId,
-          }),
-        });
-
-        if (pdfResponse.ok) {
-          const blob = await pdfResponse.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `blending-sheet-${Date.now()}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-          toast.success('PDF downloaded successfully!');
-        } else {
-          toast.error('Failed to generate PDF');
-        }
-      } else {
-        toast.error(saveResult.error || 'Failed to save blend');
-      }
-    } catch (error) {
-      console.error('Download error:', error);
-      toast.error('Failed to download PDF');
-    }
-  };
+  // Download PDF removed: downloads are available from the Blends page only.
 
   // Adjust bag quantities
   const adjustBags = () => {
@@ -333,6 +283,19 @@ export default function BlendPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Lot Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={lotNumber}
+                      onChange={(e) => setLotNumber(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="e.g., HG-720-MFI-912-3"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">Required and must be unique</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
                       Mesh Size
                     </label>
                     <input
@@ -432,7 +395,7 @@ export default function BlendPage() {
               <div className="mt-6">
                 <button
                   onClick={handleOptimize}
-                  disabled={isOptimizing}
+                  disabled={isOptimizing || !lotNumber.trim()}
                   className="btn-primary flex items-center gap-2"
                 >
                   {isOptimizing ? (
@@ -519,11 +482,11 @@ export default function BlendPage() {
                   />
                 </div>
 
-                {/* Action Buttons */}
-                <div className="mt-6 flex gap-3">
+                {/* Action Button */}
+                <div className="mt-6">
                   <button
                     onClick={handleSave}
-                    disabled={isSaving}
+                    disabled={isSaving || !lotNumber.trim()}
                     className="btn-primary flex items-center gap-2"
                   >
                     {isSaving ? (
@@ -532,14 +495,6 @@ export default function BlendPage() {
                       <Save className="h-4 w-4" />
                     )}
                     {isSaving ? 'Saving...' : 'Save Blend'}
-                  </button>
-                  
-                  <button
-                    onClick={handleDownloadPDF}
-                    className="btn-secondary flex items-center gap-2"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download PDF
                   </button>
                 </div>
               </div>
@@ -594,7 +549,7 @@ export default function BlendPage() {
                 <p>• Set target bags (default: 100, must be multiple of 10)</p>
                 <p>• System automatically selects optimal batches (10 bags each)</p>
                 <p>• Mesh size is for PDF documentation only</p>
-                <p>• Download the PDF for your records</p>
+                <p>• PDFs can be downloaded from the Blends page</p>
                 <p>• Used batches will be marked in Production Detail</p>
               </div>
             </div>

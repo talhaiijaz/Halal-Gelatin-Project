@@ -95,20 +95,9 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    // Serial number and date
-    const serialText = `Sr. No. ${blend.serialNumber}`;
+    // Date only (serial number removed)
     const dateText = `Date: ${new Date(blend.date).toLocaleDateString('en-GB')}`;
-    
-    const serialWidth = font.widthOfTextAtSize(serialText, 12);
     const dateWidth = font.widthOfTextAtSize(dateText, 12);
-
-    page.drawText(serialText, {
-      x: width - 50 - serialWidth,
-      y: contentStartY + 20,
-      size: 12,
-      font: font,
-      color: black,
-    });
 
     page.drawText(dateText, {
       x: width - 50 - dateWidth,
@@ -138,8 +127,10 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    if (blend.targetMeanBloom) {
-      page.drawText(`Target Mean: ${blend.targetMeanBloom}`, {
+    // Target mean bloom is intentionally omitted from the PDF.
+
+    if (blend.targetMesh) {
+      page.drawText(`Mesh: ${blend.targetMesh}`, {
         x: 50,
         y: contentStartY - 50,
         size: 12,
@@ -148,18 +139,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (blend.targetMesh) {
-      page.drawText(`Mesh: ${blend.targetMesh}`, {
-        x: 50,
-        y: contentStartY - (blend.targetMeanBloom ? 70 : 50),
-        size: 12,
-        font: font,
-        color: black,
-      });
-    }
-
     // Table header
-    const tableY = contentStartY - (blend.targetMeanBloom ? 100 : 80);
+    const tableY = contentStartY - 80;
     const colWidths = [60, 100, 80, 80];
     const colX = [50, 110, 210, 290];
 
@@ -280,12 +261,61 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    // Removed CT3 Average Bloom and moved Lot # to header
+    // Notes section
+    let notesY = summaryY - 40;
+    if (blend.notes && blend.notes.trim()) {
+      page.drawText('Notes:', {
+        x: 50,
+        y: notesY,
+        size: 12,
+        font: boldFont,
+        color: black,
+      });
+      
+      // Split notes into multiple lines if too long
+      const maxWidth = 500;
+      const words = blend.notes.split(' ');
+      let currentLine = '';
+      let lineY = notesY - 20;
+      
+      for (const word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const testWidth = font.widthOfTextAtSize(testLine, 10);
+        
+        if (testWidth > maxWidth && currentLine) {
+          page.drawText(currentLine, {
+            x: 50,
+            y: lineY,
+            size: 10,
+            font: font,
+            color: black,
+          });
+          currentLine = word;
+          lineY -= 15;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      
+      // Draw the last line
+      if (currentLine) {
+        page.drawText(currentLine, {
+          x: 50,
+          y: lineY,
+          size: 10,
+          font: font,
+          color: black,
+        });
+        lineY -= 15;
+      }
+      
+      notesY = lineY - 20;
+    }
 
     // Review section
     page.drawText('Reviewed By:', {
       x: 50,
-      y: summaryY - 100,
+      y: notesY,
       size: 12,
       font: font,
       color: black,
@@ -294,7 +324,7 @@ export async function POST(request: NextRequest) {
     if (blend.reviewedBy) {
       page.drawText(blend.reviewedBy, {
         x: 150,
-        y: summaryY - 100,
+        y: notesY,
         size: 12,
         font: font,
         color: black,
@@ -308,7 +338,7 @@ export async function POST(request: NextRequest) {
     return new NextResponse(pdfBytes, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="blending-sheet-${blend.blendNumber}.pdf"`,
+        'Content-Disposition': `attachment; filename="blending-sheet-${blend.lotNumber}.pdf"`,
       },
     });
 

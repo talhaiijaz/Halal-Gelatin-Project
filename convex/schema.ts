@@ -464,8 +464,10 @@ export default defineSchema({
 
   // Blends table - stores blend records
   blends: defineTable({
-    blendNumber: v.string(), // Unique blend identifier (e.g., "BL-2024-001")
-    serialNumber: v.string(), // Serial number for the blend sheet (e.g., "Sr. No. 491")
+    lotNumber: v.string(), // Primary unique identifier (e.g., "HG-720-MFI-912-3")
+    // Legacy fields kept optional for backward compatibility during migration
+    blendNumber: v.optional(v.string()),
+    serialNumber: v.optional(v.string()),
     date: v.number(), // Date when blend was created
     // Target specifications
     targetBloomMin: v.optional(v.number()), // Target bloom minimum
@@ -505,7 +507,6 @@ export default defineSchema({
     totalWeight: v.number(), // Total weight in kg
     averageBloom: v.number(),
     ct3AverageBloom: v.optional(v.number()), // CT3 average bloom calculation
-    lotNumber: v.string(), // Generated lot number (e.g., "HG-720-MFI-912-3")
     // Status and metadata
     status: v.union(v.literal("draft"), v.literal("completed"), v.literal("approved")),
     reviewedBy: v.optional(v.string()), // Name of reviewer
@@ -515,10 +516,8 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   })
-    .index("by_blend_number", ["blendNumber"])
-    .index("by_serial_number", ["serialNumber"])
+    .index("by_lot_number", ["lotNumber"])
     .index("by_date", ["date"])
     .index("by_status", ["status"])
-    .index("by_fiscal_year", ["fiscalYear"])
-    .index("by_lot_number", ["lotNumber"]),
+    .index("by_fiscal_year", ["fiscalYear"]),
 });
