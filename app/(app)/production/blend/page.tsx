@@ -56,6 +56,7 @@ export default function BlendPage() {
   const [targetMeanBloom, setTargetMeanBloom] = useState<number | undefined>(undefined);
   const [targetMesh, setTargetMesh] = useState<number>(20);
   const [targetBags, setTargetBags] = useState<number>(100);
+  const [includeOutsourceBatches, setIncludeOutsourceBatches] = useState<boolean>(false);
   const [lotNumber, setLotNumber] = useState<string>("");
   
   // Additional targets (optional)
@@ -82,6 +83,11 @@ export default function BlendPage() {
     fiscalYear: currentFiscalYear,
     targetBloomMin,
     targetBloomMax,
+  });
+
+  // Get available outsource batches for reference
+  const availableOutsourceBatches = useQuery(api.outsourceBatches.getAvailableOutsourceBatches, {
+    fiscalYear: currentFiscalYear,
   });
 
   // Optimize batch selection
@@ -113,6 +119,7 @@ export default function BlendPage() {
           targetBloomMax,
           targetMeanBloom,
           targetBags,
+          includeOutsourceBatches,
           fiscalYear: currentFiscalYear,
           additionalTargets: showAdvanced ? additionalTargets : undefined,
           preSelectedBatchIds: Array.from(preSelectedBatchIds),
@@ -278,6 +285,35 @@ export default function BlendPage() {
                       max={200}
                     />
                     <p className="text-xs text-gray-500 mt-2">Must be multiple of 10 (10 bags per batch)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Include Outsource Batches
+                    </label>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="includeOutsource"
+                          checked={includeOutsourceBatches === true}
+                          onChange={() => setIncludeOutsourceBatches(true)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Yes</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          name="includeOutsource"
+                          checked={includeOutsourceBatches === false}
+                          onChange={() => setIncludeOutsourceBatches(false)}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">No</span>
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">Include outsource batches in optimization (production batches only if No)</p>
                   </div>
                 </div>
               </div>
@@ -551,8 +587,18 @@ export default function BlendPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Total Available</span>
-                    <span className="font-semibold text-gray-900">{availableBatches.length}</span>
+                    <span className="font-semibold text-gray-900">
+                      {includeOutsourceBatches && availableOutsourceBatches 
+                        ? availableBatches.length + availableOutsourceBatches.length
+                        : availableBatches.length}
+                    </span>
                   </div>
+                  {includeOutsourceBatches && availableOutsourceBatches && (
+                    <div className="flex justify-between items-center text-xs text-gray-500">
+                      <span>Production: {availableBatches.length}</span>
+                      <span>Outsource: {availableOutsourceBatches.length}</span>
+                    </div>
+                  )}
                   <div className="max-h-72 overflow-auto border rounded">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-50">
@@ -563,38 +609,54 @@ export default function BlendPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {availableBatches
-                          .filter(b => b.bloom !== undefined)
-                          .sort((a,b) => (a.batchNumber||0) - (b.batchNumber||0))
-                          .map((b:any) => (
-                          <tr key={b._id} className="hover:bg-gray-50">
-                            <td className="px-3 py-2">
-                              <input
-                                type="checkbox"
-                                checked={preSelectedBatchIds.has(b._id)}
-                                onChange={(e) => {
-                                  setPreSelectedBatchIds(prev => {
-                                    const next = new Set(prev);
-                                    if (e.target.checked) next.add(b._id);
-                                    else next.delete(b._id);
-                                    return next;
-                                  });
-                                }}
-                              />
-                            </td>
-                            <td className="px-3 py-2">{b.batchNumber}</td>
-                            <td className="px-3 py-2">{b.bloom}</td>
-                          </tr>
-                        ))}
+                        {(() => {
+                          const allBatches = includeOutsourceBatches && availableOutsourceBatches
+                            ? [...availableBatches, ...availableOutsourceBatches]
+                            : availableBatches;
+                          
+                          return allBatches
+                            .filter(b => b.bloom !== undefined)
+                            .sort((a,b) => (a.batchNumber||0) - (b.batchNumber||0))
+                            .map((b:any) => (
+                            <tr key={b._id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={preSelectedBatchIds.has(b._id)}
+                                  onChange={(e) => {
+                                    setPreSelectedBatchIds(prev => {
+                                      const next = new Set(prev);
+                                      if (e.target.checked) next.add(b._id);
+                                      else next.delete(b._id);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                {b.batchNumber}
+                                {includeOutsourceBatches && availableOutsourceBatches && 
+                                 availableOutsourceBatches.some((ob: any) => ob._id === b._id) && 
+                                 <span className="text-xs text-blue-600 ml-1">(O)</span>}
+                              </td>
+                              <td className="px-3 py-2">{b.bloom}</td>
+                            </tr>
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">In Range Batches</span>
                     <span className="font-semibold text-gray-900">
-                      {availableBatches.filter(batch => 
-                        batch.bloom && batch.bloom >= targetBloomMin && batch.bloom <= targetBloomMax
-                      ).length}
+                      {(() => {
+                        const allBatches = includeOutsourceBatches && availableOutsourceBatches
+                          ? [...availableBatches, ...availableOutsourceBatches]
+                          : availableBatches;
+                        return allBatches.filter(batch => 
+                          batch.bloom && batch.bloom >= targetBloomMin && batch.bloom <= targetBloomMax
+                        ).length;
+                      })()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
