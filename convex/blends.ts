@@ -114,10 +114,22 @@ export const optimizeBatchSelection = query({
     
     const batchesWithBloom = availableBatches.filter((b: any) => b.bloom !== undefined);
     
-    // Greedy selection towards target bloom average
+    // Hierarchical optimization: Bloom first, then other targets
     const selected: any[] = [];
     const remaining: any[] = [...batchesWithBloom];
     let sum = 0; // sum of bloom values times bags (bags are always 10 so weight is uniform)
+    
+    // Define hierarchy of additional targets (in order of importance)
+    const targetHierarchy = ['viscosity', 'percentage', 'ph', 'conductivity', 'moisture', 'h2o2', 'so2'];
+    const attrSums: Record<string, number> = {
+      viscosity: 0,
+      percentage: 0,
+      ph: 0,
+      conductivity: 0,
+      moisture: 0,
+      h2o2: 0,
+      so2: 0,
+    };
 
     // Seed with user pre-selected batches (if provided)
     if (args.preSelectedBatchIds && args.preSelectedBatchIds.length > 0) {
@@ -127,24 +139,83 @@ export const optimizeBatchSelection = query({
           const chosen = remaining.splice(idx, 1)[0];
           selected.push(chosen);
           sum += (chosen.bloom || 0) * 10;
+          attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
+          attrSums.percentage += (chosen.percentage ?? 0) * 10;
+          attrSums.ph += (chosen.ph ?? 0) * 10;
+          attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
+          attrSums.moisture += (chosen.moisture ?? 0) * 10;
+          attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
+          attrSums.so2 += (chosen.so2 ?? 0) * 10;
         }
       }
     }
     while (selected.length < batchesNeeded && remaining.length > 0) {
       let bestIdx = 0;
       let bestScore = Number.POSITIVE_INFINITY;
+      
       for (let i = 0; i < remaining.length; i++) {
         const candidate = remaining[i];
-        const nextAvg = (sum + (candidate.bloom || 0) * 10) / ((selected.length + 1) * 10);
-        const score = Math.abs(targetBloom - nextAvg);
+        const nextCountBatches = selected.length + 1;
+        const nextBags = nextCountBatches * 10;
+        const nextAvg = (sum + (candidate.bloom || 0) * 10) / nextBags;
+        
+        // Primary score: Bloom range compliance (MUST be met)
+        const withinBloomRange = nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax;
+        let score = Math.abs(targetBloom - nextAvg);
+        
+        // If bloom is outside range, heavily penalize this candidate
+        if (!withinBloomRange) {
+          score += 1000; // Heavy penalty for violating bloom range
+        }
+        
+        // Secondary optimization: Additional targets (only if bloom range is satisfied)
+        if (args.additionalTargets && withinBloomRange) {
+          const withAttr = {
+            viscosity: (attrSums.viscosity + (candidate.viscosity ?? 0) * 10) / nextBags,
+            percentage: (attrSums.percentage + (candidate.percentage ?? 0) * 10) / nextBags,
+            ph: (attrSums.ph + (candidate.ph ?? 0) * 10) / nextBags,
+            conductivity: (attrSums.conductivity + (candidate.conductivity ?? 0) * 10) / nextBags,
+            moisture: (attrSums.moisture + (candidate.moisture ?? 0) * 10) / nextBags,
+            h2o2: (attrSums.h2o2 + (candidate.h2o2 ?? 0) * 10) / nextBags,
+            so2: (attrSums.so2 + (candidate.so2 ?? 0) * 10) / nextBags,
+          };
+          
+          const targets = args.additionalTargets as any;
+          let additionalScore = 0;
+          
+          // Apply hierarchical weighting (higher priority = lower weight multiplier)
+          for (let h = 0; h < targetHierarchy.length; h++) {
+            const key = targetHierarchy[h];
+            if (targets[key] !== undefined) {
+              const tgt = targets[key];
+              const val = (withAttr as any)[key];
+              const denom = Math.max(Math.abs(tgt), 1);
+              const deviation = Math.abs((val - tgt) / denom);
+              // Weight decreases with hierarchy position (viscosity = 1.0, ph = 0.8, etc.)
+              const weight = 1.0 - (h * 0.1);
+              additionalScore += deviation * weight;
+            }
+          }
+          
+          score += additionalScore * 0.1; // Small weight for additional targets
+        }
+        
         if (score < bestScore) {
           bestScore = score;
           bestIdx = i;
         }
       }
+      
       const chosen = remaining.splice(bestIdx, 1)[0];
       selected.push(chosen);
       sum += (chosen.bloom || 0) * 10;
+      attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
+      attrSums.percentage += (chosen.percentage ?? 0) * 10;
+      attrSums.ph += (chosen.ph ?? 0) * 10;
+      attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
+      attrSums.moisture += (chosen.moisture ?? 0) * 10;
+      attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
+      attrSums.so2 += (chosen.so2 ?? 0) * 10;
     }
 
     // Select optimal batches
@@ -244,11 +315,51 @@ export const optimizeBatchSelection = query({
     // Sort selected batches by batch number (lowest to highest) for easier reading
     const sortedSelectedBatches = selectedBatches.sort((a, b) => a.batchNumber - b.batchNumber);
 
-    let warning: string | undefined;
+    // Generate optimization status messages
     const withinRange = (avg: number) => avg >= args.targetBloomMin && avg <= args.targetBloomMax;
-    if ((args.preSelectedBatchIds?.length || 0) >= batchesNeeded && !withinRange(averageBloom)) {
-      warning = "Selected batches do not meet the target average bloom range.";
+    const warnings: string[] = [];
+    const status: string[] = [];
+    
+    // Check bloom range compliance
+    if (!withinRange(averageBloom)) {
+      warnings.push(`⚠️ Bloom average (${averageBloom}) is outside target range (${args.targetBloomMin}-${args.targetBloomMax})`);
+    } else {
+      status.push(`✅ Bloom average (${averageBloom}) meets target range (${args.targetBloomMin}-${args.targetBloomMax})`);
     }
+    
+    // Check additional targets with hierarchy awareness
+    if (args.additionalTargets) {
+      const countBags = selectedBatches.length * 10 || 1;
+      const achieved = {
+        viscosity: selectedBatches.reduce((s, b) => s + (b.viscosity ?? 0) * b.bags, 0) / countBags,
+        percentage: selectedBatches.reduce((s, b) => s + (b.percentage ?? 0) * b.bags, 0) / countBags,
+        ph: selectedBatches.reduce((s, b) => s + (b.ph ?? 0) * b.bags, 0) / countBags,
+        conductivity: selectedBatches.reduce((s, b) => s + (b.conductivity ?? 0) * b.bags, 0) / countBags,
+        moisture: selectedBatches.reduce((s, b) => s + (b.moisture ?? 0) * b.bags, 0) / countBags,
+        h2o2: selectedBatches.reduce((s, b) => s + (b.h2o2 ?? 0) * b.bags, 0) / countBags,
+        so2: selectedBatches.reduce((s, b) => s + (b.so2 ?? 0) * b.bags, 0) / countBags,
+      } as any;
+      
+      const targets = args.additionalTargets as any;
+      for (const key of targetHierarchy) {
+        if (targets[key] !== undefined) {
+          const tgt = targets[key];
+          const val = achieved[key] ?? 0;
+          const denom = Math.max(Math.abs(tgt), 1);
+          const ratio = Math.abs(val - tgt) / denom;
+          const tolerance = 0.05; // 5% tolerance
+          
+          if (ratio <= tolerance) {
+            status.push(`✅ ${key}: ${val.toFixed(2)} (target: ${tgt})`);
+          } else {
+            warnings.push(`⚠️ ${key}: ${val.toFixed(2)} (target: ${tgt}) - outside tolerance`);
+          }
+        }
+      }
+    }
+    
+    const warning = warnings.length > 0 ? warnings.join('; ') : undefined;
+    const optimizationStatus = status.length > 0 ? status.join('; ') : undefined;
 
     return {
       selectedBatches: sortedSelectedBatches,
@@ -258,6 +369,7 @@ export const optimizeBatchSelection = query({
       ct3AverageBloom: averageBloom, // Same as average for now
       message: `Selected ${selectedBatches.length} batches (10 bags each) for ${totalBags} bags`,
       warning,
+      optimizationStatus,
     };
   },
 });

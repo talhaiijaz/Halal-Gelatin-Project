@@ -120,11 +120,7 @@ export default function BlendPage() {
       
       if (response.ok) {
         setOptimizationResult(result);
-        if (result.warning) {
-          toast.error(result.warning);
-        } else {
-          toast.success(result.message);
-        }
+        toast.success(result.message);
       } else {
         toast.error(result.error || 'Failed to optimize batch selection');
       }
@@ -422,6 +418,34 @@ export default function BlendPage() {
                   Selected Batches
                 </h2>
 
+                {/* Optimization Status */}
+                {(optimizationResult.warning || optimizationResult.optimizationStatus) && (
+                  <div className="mb-6 space-y-3">
+                    {optimizationResult.warning && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                          <div>
+                            <h4 className="text-sm font-medium text-red-800">Optimization Warnings</h4>
+                            <p className="text-sm text-red-700 mt-1">{optimizationResult.warning}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {optimizationResult.optimizationStatus && (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-start">
+                          <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" />
+                          <div>
+                            <h4 className="text-sm font-medium text-green-800">Optimization Status</h4>
+                            <p className="text-sm text-green-700 mt-1">{optimizationResult.optimizationStatus}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Summary Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="bg-blue-50 p-4 rounded-lg">
@@ -559,7 +583,7 @@ export default function BlendPage() {
                     </table>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">In Target Range</span>
+                    <span className="text-sm text-gray-600">In Range Batches</span>
                     <span className="font-semibold text-gray-900">
                       {availableBatches.filter(batch => 
                         batch.bloom && batch.bloom >= targetBloomMin && batch.bloom <= targetBloomMax

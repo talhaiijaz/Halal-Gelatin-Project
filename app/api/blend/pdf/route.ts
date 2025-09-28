@@ -261,8 +261,111 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
+    // Additional targets (only if present) - below average bloom
+    let additionalY = summaryY - 40;
+    if (blend.targetViscosity !== undefined) {
+      page.drawText(`Target Viscosity: ${blend.targetViscosity}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetPercentage !== undefined) {
+      page.drawText(`Target Percentage: ${blend.targetPercentage}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetPh !== undefined) {
+      page.drawText(`Target pH: ${blend.targetPh}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetConductivity !== undefined) {
+      page.drawText(`Target Conductivity: ${blend.targetConductivity}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetMoisture !== undefined) {
+      page.drawText(`Target Moisture: ${blend.targetMoisture}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetH2o2 !== undefined) {
+      page.drawText(`Target H2O2: ${blend.targetH2o2}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetSo2 !== undefined) {
+      page.drawText(`Target SO2: ${blend.targetSo2}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetColor !== undefined) {
+      page.drawText(`Target Color: ${blend.targetColor}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetClarity !== undefined) {
+      page.drawText(`Target Clarity: ${blend.targetClarity}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+    if (blend.targetOdour !== undefined) {
+      page.drawText(`Target Odour: ${blend.targetOdour}`, {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
+
     // Notes section
-    let notesY = summaryY - 40;
+    let notesY = additionalY - 20;
     if (blend.notes && blend.notes.trim()) {
       page.drawText('Notes:', {
         x: 50,
