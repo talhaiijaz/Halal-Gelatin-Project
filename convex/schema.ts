@@ -461,4 +461,64 @@ export default defineSchema({
     .index("by_year", ["year"])
     .index("by_fiscal_year", ["fiscalYear"])
     .index("by_reset_date", ["resetDate"]),
+
+  // Blends table - stores blend records
+  blends: defineTable({
+    blendNumber: v.string(), // Unique blend identifier (e.g., "BL-2024-001")
+    serialNumber: v.string(), // Serial number for the blend sheet (e.g., "Sr. No. 491")
+    date: v.number(), // Date when blend was created
+    // Target specifications
+    targetBloomMin: v.optional(v.number()), // Target bloom minimum
+    targetBloomMax: v.optional(v.number()), // Target bloom maximum
+    targetMeanBloom: v.optional(v.number()), // Target mean bloom (preferred average)
+    targetMesh: v.optional(v.number()), // Target mesh size
+    // Additional target parameters (optional)
+    targetViscosity: v.optional(v.number()),
+    targetPercentage: v.optional(v.number()),
+    targetPh: v.optional(v.number()),
+    targetConductivity: v.optional(v.number()),
+    targetMoisture: v.optional(v.number()),
+    targetH2o2: v.optional(v.number()),
+    targetSo2: v.optional(v.number()),
+    targetColor: v.optional(v.string()),
+    targetClarity: v.optional(v.string()),
+    targetOdour: v.optional(v.string()),
+    // Blend results
+    selectedBatches: v.array(v.object({
+      batchId: v.id("productionBatches"),
+      batchNumber: v.number(),
+      bags: v.number(), // Number of bags used from this batch
+      bloom: v.optional(v.number()),
+      viscosity: v.optional(v.number()),
+      percentage: v.optional(v.number()),
+      ph: v.optional(v.number()),
+      conductivity: v.optional(v.number()),
+      moisture: v.optional(v.number()),
+      h2o2: v.optional(v.number()),
+      so2: v.optional(v.number()),
+      color: v.optional(v.string()),
+      clarity: v.optional(v.string()),
+      odour: v.optional(v.string()),
+    })),
+    // Calculated results
+    totalBags: v.number(),
+    totalWeight: v.number(), // Total weight in kg
+    averageBloom: v.number(),
+    ct3AverageBloom: v.optional(v.number()), // CT3 average bloom calculation
+    lotNumber: v.string(), // Generated lot number (e.g., "HG-720-MFI-912-3")
+    // Status and metadata
+    status: v.union(v.literal("draft"), v.literal("completed"), v.literal("approved")),
+    reviewedBy: v.optional(v.string()), // Name of reviewer
+    reviewedAt: v.optional(v.number()), // When it was reviewed
+    notes: v.optional(v.string()),
+    fiscalYear: v.optional(v.string()), // Fiscal year this blend belongs to
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_blend_number", ["blendNumber"])
+    .index("by_serial_number", ["serialNumber"])
+    .index("by_date", ["date"])
+    .index("by_status", ["status"])
+    .index("by_fiscal_year", ["fiscalYear"])
+    .index("by_lot_number", ["lotNumber"]),
 });

@@ -713,6 +713,55 @@ export default function ProductionDetailPage() {
         </div>
       </div>
 
+      {/* Blend Information */}
+      <div className="bg-white rounded-lg shadow-sm border mb-6">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              Blending Information
+            </h2>
+            <button
+              onClick={() => window.open('/production/blend', '_blank')}
+              className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              Create New Blend
+            </button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <p className="text-sm text-blue-600 font-medium">Available for Blending</p>
+              <p className="text-2xl font-bold text-blue-900">
+                {batches.page?.filter(batch => !batch.isUsed).length || 0}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">batches ready to use</p>
+            </div>
+            
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <p className="text-sm text-orange-600 font-medium">Used in Blends</p>
+              <p className="text-2xl font-bold text-orange-900">
+                {batches.page?.filter(batch => batch.isUsed && batch.usedInOrder?.startsWith('BL-')).length || 0}
+              </p>
+              <p className="text-xs text-orange-600 mt-1">batches in blends</p>
+            </div>
+            
+            <div className="bg-green-50 p-4 rounded-lg">
+              <p className="text-sm text-green-600 font-medium">Blend Quality</p>
+              <p className="text-2xl font-bold text-green-900">
+                {availableBatches.length > 0 ? 
+                  Math.round(availableBatches.reduce((sum, batch) => sum + (batch.bloom || 0), 0) / availableBatches.length) : 
+                  'N/A'
+                }
+              </p>
+              <p className="text-xs text-green-600 mt-1">avg bloom available</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Action Buttons */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex gap-3">
@@ -877,7 +926,18 @@ export default function ProductionDetailPage() {
                         ? 'bg-orange-100 text-orange-800' 
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {batch.isUsed ? 'Used' : 'Available'}
+                      {batch.isUsed ? (
+                        <span className="flex items-center gap-1">
+                          <span>Used</span>
+                          {batch.usedInOrder && (
+                            <span className="text-xs opacity-75">
+                              ({batch.usedInOrder})
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        'Available'
+                      )}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

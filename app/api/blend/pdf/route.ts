@@ -1,0 +1,322 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { ConvexHttpClient } from 'convex/browser';
+import { api } from '../../../../convex/_generated/api';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import fs from 'fs';
+import path from 'path';
+
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { blendId } = body;
+
+    if (!blendId) {
+      return NextResponse.json(
+        { error: 'Blend ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Get blend data
+    const blend = await convex.query(api.blends.getBlendById, { blendId });
+    
+    if (!blend) {
+      return NextResponse.json(
+        { error: 'Blend not found' },
+        { status: 404 }
+      );
+    }
+
+    // Create PDF
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([612, 792]); // Letter size
+    const { width, height } = page.getSize();
+
+    // Load fonts
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    // Colors
+    const black = rgb(0, 0, 0);
+    const darkGray = rgb(0.2, 0.2, 0.2);
+
+    // Load and embed logo
+    let logoImage;
+    try {
+      const logoPath = path.join(process.cwd(), 'public', 'images', 'Logo-with-text-trans.png');
+      const logoBytes = fs.readFileSync(logoPath);
+      logoImage = await pdfDoc.embedPng(logoBytes);
+    } catch (error) {
+      console.warn('Could not load logo, using text fallback:', error);
+    }
+
+    // Header with logo
+    if (logoImage) {
+      // Draw logo at the top
+      const logoWidth = 200;
+      const logoHeight = (logoImage.height * logoWidth) / logoImage.width;
+      page.drawImage(logoImage, {
+        x: 50,
+        y: height - logoHeight - 20,
+        width: logoWidth,
+        height: logoHeight,
+      });
+    } else {
+      // Fallback to text if logo not available
+      page.drawText('HALAL GELATIN PVT. LTD.', {
+        x: 50,
+        y: height - 50,
+        size: 16,
+        font: boldFont,
+        color: black,
+      });
+
+      page.drawText('Serving Health', {
+        x: 50,
+        y: height - 70,
+        size: 12,
+        font: font,
+        color: darkGray,
+      });
+    }
+
+    // Calculate logo height for positioning
+    const logoHeight = logoImage ? (logoImage.height * 200) / logoImage.width : 0;
+    const contentStartY = logoImage ? height - logoHeight - 60 : height - 120;
+
+    // Title
+    page.drawText('BLENDING SHEET', {
+      x: 50,
+      y: contentStartY,
+      size: 20,
+      font: boldFont,
+      color: black,
+    });
+
+    // Serial number and date
+    const serialText = `Sr. No. ${blend.serialNumber}`;
+    const dateText = `Date: ${new Date(blend.date).toLocaleDateString('en-GB')}`;
+    
+    const serialWidth = font.widthOfTextAtSize(serialText, 12);
+    const dateWidth = font.widthOfTextAtSize(dateText, 12);
+
+    page.drawText(serialText, {
+      x: width - 50 - serialWidth,
+      y: contentStartY + 20,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    page.drawText(dateText, {
+      x: width - 50 - dateWidth,
+      y: contentStartY,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    // Lot number (moved to top, under date)
+    const lotText = `Lot #: ${blend.lotNumber}`;
+    const lotWidth = font.widthOfTextAtSize(lotText, 12);
+    page.drawText(lotText, {
+      x: width - 50 - lotWidth,
+      y: contentStartY - 20,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    // Target specifications
+    page.drawText(`Blending Bloom: ${blend.targetBloomMin}-${blend.targetBloomMax}`, {
+      x: 50,
+      y: contentStartY - 30,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    if (blend.targetMeanBloom) {
+      page.drawText(`Target Mean: ${blend.targetMeanBloom}`, {
+        x: 50,
+        y: contentStartY - 50,
+        size: 12,
+        font: font,
+        color: black,
+      });
+    }
+
+    if (blend.targetMesh) {
+      page.drawText(`Mesh: ${blend.targetMesh}`, {
+        x: 50,
+        y: contentStartY - (blend.targetMeanBloom ? 70 : 50),
+        size: 12,
+        font: font,
+        color: black,
+      });
+    }
+
+    // Table header
+    const tableY = contentStartY - (blend.targetMeanBloom ? 100 : 80);
+    const colWidths = [60, 100, 80, 80];
+    const colX = [50, 110, 210, 290];
+
+    // Draw table header
+    page.drawText('S.No.', {
+      x: colX[0],
+      y: tableY,
+      size: 12,
+      font: boldFont,
+      color: black,
+    });
+
+    page.drawText('Batch NO.', {
+      x: colX[1],
+      y: tableY,
+      size: 12,
+      font: boldFont,
+      color: black,
+    });
+
+    page.drawText('Bloom', {
+      x: colX[2],
+      y: tableY,
+      size: 12,
+      font: boldFont,
+      color: black,
+    });
+
+    page.drawText('Bags', {
+      x: colX[3],
+      y: tableY,
+      size: 12,
+      font: boldFont,
+      color: black,
+    });
+
+    // Draw table rows
+    let currentY = tableY - 30;
+    blend.selectedBatches.forEach((batch, index) => {
+      page.drawText((index + 1).toString(), {
+        x: colX[0],
+        y: currentY,
+        size: 10,
+        font: font,
+        color: black,
+      });
+
+      page.drawText(batch.batchNumber.toString(), {
+        x: colX[1],
+        y: currentY,
+        size: 10,
+        font: font,
+        color: black,
+      });
+
+      page.drawText((batch.bloom || 0).toString(), {
+        x: colX[2],
+        y: currentY,
+        size: 10,
+        font: font,
+        color: black,
+      });
+
+      page.drawText(batch.bags.toString(), {
+        x: colX[3],
+        y: currentY,
+        size: 10,
+        font: font,
+        color: black,
+      });
+
+      currentY -= 20;
+    });
+
+    // Total row
+    currentY -= 10;
+    page.drawText('TOTAL', {
+      x: colX[0],
+      y: currentY,
+      size: 12,
+      font: boldFont,
+      color: black,
+    });
+
+    // Calculate total bloom (sum of all bloom values)
+    const totalBloom = blend.selectedBatches.reduce((sum, batch) => sum + (batch.bloom || 0), 0);
+    page.drawText(totalBloom.toString(), {
+      x: colX[2],
+      y: currentY,
+      size: 12,
+      font: boldFont,
+      color: black,
+    });
+
+    page.drawText(blend.totalBags.toString(), {
+      x: colX[3],
+      y: currentY,
+      size: 12,
+      font: boldFont,
+      color: black,
+    });
+
+    // Summary section
+    const summaryY = currentY - 40;
+    page.drawText(`Average Bloom: ${blend.averageBloom}`, {
+      x: 50,
+      y: summaryY,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    page.drawText(`Weight (Kg): ${blend.totalWeight.toLocaleString()}`, {
+      x: 50,
+      y: summaryY - 20,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    // Removed CT3 Average Bloom and moved Lot # to header
+
+    // Review section
+    page.drawText('Reviewed By:', {
+      x: 50,
+      y: summaryY - 100,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    if (blend.reviewedBy) {
+      page.drawText(blend.reviewedBy, {
+        x: 150,
+        y: summaryY - 100,
+        size: 12,
+        font: font,
+        color: black,
+      });
+    }
+
+    // Generate PDF bytes
+    const pdfBytes = await pdfDoc.save();
+
+    // Return PDF as response
+    return new NextResponse(pdfBytes, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="blending-sheet-${blend.blendNumber}.pdf"`,
+      },
+    });
+
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    return NextResponse.json(
+      { error: 'Failed to generate PDF' },
+      { status: 500 }
+    );
+  }
+}

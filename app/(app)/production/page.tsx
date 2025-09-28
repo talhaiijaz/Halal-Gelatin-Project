@@ -13,7 +13,8 @@ import {
   CheckCircle,
   Clock,
   ChevronDown,
-  Plus
+  Plus,
+  Calculator
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -175,6 +176,19 @@ export default function ProductionPage() {
                   </div>
                   <p className="text-sm text-blue-700">
                     View and manage all production batch data
+                  </p>
+                </div>
+                
+                <div
+                  onClick={() => router.push('/production/blend')}
+                  className="p-4 rounded-lg border border-green-200 bg-green-50 hover:bg-green-100 cursor-pointer transition-all"
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <Calculator className="h-5 w-5 text-green-600" />
+                    <h3 className="font-medium text-green-900">Blending Sheet</h3>
+                  </div>
+                  <p className="text-sm text-green-700">
+                    Create optimized blends from available batches
                   </p>
                 </div>
               </div>
