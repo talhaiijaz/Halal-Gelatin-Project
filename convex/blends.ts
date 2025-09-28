@@ -228,8 +228,11 @@ export const optimizeBatchSelection = query({
     }
     const totalWeight = totalBags * 25; // 25kg per bag
 
+    // Sort selected batches by batch number (lowest to highest) for easier reading
+    const sortedSelectedBatches = selectedBatches.sort((a, b) => a.batchNumber - b.batchNumber);
+
     return {
-      selectedBatches,
+      selectedBatches: sortedSelectedBatches,
       totalBags,
       totalWeight,
       averageBloom,
