@@ -30,6 +30,7 @@ import type * as interBankTransfers from "../interBankTransfers.js";
 import type * as invoices from "../invoices.js";
 import type * as migrations from "../migrations.js";
 import type * as orders from "../orders.js";
+import type * as outsourceBatches from "../outsourceBatches.js";
 import type * as payments from "../payments.js";
 import type * as productionBatches from "../productionBatches.js";
 import type * as productionProcessing from "../productionProcessing.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   invoices: typeof invoices;
   migrations: typeof migrations;
   orders: typeof orders;
+  outsourceBatches: typeof outsourceBatches;
   payments: typeof payments;
   productionBatches: typeof productionBatches;
   productionProcessing: typeof productionProcessing;

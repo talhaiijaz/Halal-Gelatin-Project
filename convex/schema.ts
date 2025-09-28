@@ -447,6 +447,51 @@ export default defineSchema({
     .index("by_fiscal_year", ["fiscalYear"])
     .index("by_fiscal_year_and_active", ["fiscalYear", "isActive"]),
 
+  // Outsource Batch Data table - batches from other companies/factories
+  outsourceBatches: defineTable({
+    batchNumber: v.number(), // Continuous batch number for outsource batches (1, 2, 3...)
+    supplierName: v.string(), // Name of the supplier company/factory
+    supplierBatchId: v.optional(v.string()), // Supplier's own batch ID
+    // Quality parameters
+    viscosity: v.optional(v.number()),
+    bloom: v.optional(v.number()),
+    percentage: v.optional(v.number()),
+    ph: v.optional(v.number()),
+    conductivity: v.optional(v.number()),
+    moisture: v.optional(v.number()),
+    h2o2: v.optional(v.number()), // H2O2 content
+    so2: v.optional(v.number()), // SO2 content
+    color: v.optional(v.string()),
+    clarity: v.optional(v.string()),
+    odour: v.optional(v.string()),
+    // Metadata
+    sourceReport: v.optional(v.string()), // Original PDF filename
+    reportDate: v.optional(v.number()), // Date when the report was generated
+    fileId: v.optional(v.id("_storage")), // Storage ID for the original PDF file
+    isUsed: v.optional(v.boolean()), // For future batch selection logic - tracks if batch has been used
+    usedInOrder: v.optional(v.string()), // Order number where this batch was used
+    usedDate: v.optional(v.number()), // When this batch was used
+    notes: v.optional(v.string()), // Additional notes
+    // Year tracking for reset functionality
+    year: v.optional(v.number()), // Year this batch belongs to (e.g., 2024, 2025) - legacy
+    fiscalYear: v.optional(v.string()), // Fiscal year this batch belongs to (e.g., "2025-26", "2026-27")
+    isActive: v.optional(v.boolean()), // Whether this batch is active (not reset)
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_batch_number", ["batchNumber"])
+    .index("by_supplier_name", ["supplierName"])
+    .index("by_supplier_batch_id", ["supplierBatchId"])
+    .index("by_source_report", ["sourceReport"])
+    .index("by_is_used", ["isUsed"])
+    .index("by_used_in_order", ["usedInOrder"])
+    .index("by_viscosity_range", ["viscosity"])
+    .index("by_bloom_range", ["bloom"])
+    .index("by_year", ["year"])
+    .index("by_year_and_active", ["year", "isActive"])
+    .index("by_fiscal_year", ["fiscalYear"])
+    .index("by_fiscal_year_and_active", ["fiscalYear", "isActive"]),
+
   // Batch Reset Records table - tracks when batch numbers were reset
   batchResetRecords: defineTable({
     year: v.number(), // Year the reset was for (legacy)
@@ -506,6 +551,7 @@ export default defineSchema({
     totalBags: v.number(),
     totalWeight: v.number(), // Total weight in kg
     averageBloom: v.number(),
+    averageViscosity: v.optional(v.number()),
     ct3AverageBloom: v.optional(v.number()), // CT3 average bloom calculation
     // Status and metadata
     status: v.union(v.literal("draft"), v.literal("completed"), v.literal("approved")),

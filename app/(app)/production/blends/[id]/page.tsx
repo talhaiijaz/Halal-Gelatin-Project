@@ -68,6 +68,12 @@ export default function BlendDetailPage() {
                   <p className="text-sm text-orange-600 font-medium">Average Bloom</p>
                   <p className="text-2xl font-bold text-orange-900">{blend.averageBloom}</p>
                 </div>
+                {('averageViscosity' in blend) && (
+                  <div className="bg-teal-50 p-4 rounded-lg">
+                    <p className="text-sm text-teal-600 font-medium">Average Viscosity</p>
+                    <p className="text-2xl font-bold text-teal-900">{(blend as any).averageViscosity ?? 'N/A'}</p>
+                  </div>
+                )}
                 <div className="bg-green-50 p-4 rounded-lg">
                   <p className="text-sm text-green-600 font-medium">Total Bags</p>
                   <p className="text-2xl font-bold text-green-900">{blend.totalBags}</p>

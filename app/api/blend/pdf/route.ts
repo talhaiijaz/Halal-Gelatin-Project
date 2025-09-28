@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
 
     // Summary section
     const summaryY = currentY - 40;
-    page.drawText(`Average Bloom: ${blend.averageBloom}`, {
+    page.drawText(`Average Bloom: ${blend.averageBloom}` , {
       x: 50,
       y: summaryY,
       size: 12,
@@ -263,6 +263,16 @@ export async function POST(request: NextRequest) {
 
     // Additional targets (only if present) - below average bloom
     let additionalY = summaryY - 40;
+    if ((blend as any).averageViscosity !== undefined) {
+      page.drawText(`Average Viscosity: ${(blend as any).averageViscosity}` , {
+        x: 50,
+        y: additionalY,
+        size: 12,
+        font: font,
+        color: black,
+      });
+      additionalY -= 20;
+    }
     if (blend.targetViscosity !== undefined) {
       page.drawText(`Target Viscosity: ${blend.targetViscosity}`, {
         x: 50,

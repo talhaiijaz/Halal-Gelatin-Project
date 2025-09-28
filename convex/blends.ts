@@ -263,6 +263,8 @@ export const optimizeBatchSelection = query({
     const totalBags = selectedBatches.length * 10;
     const totalBloom = selectedBatches.reduce((sum, batch) => sum + ((batch.bloom || 0) * batch.bags), 0);
     let averageBloom = totalBags > 0 ? Math.round(totalBloom / totalBags) : 0;
+    const totalViscosity = selectedBatches.reduce((sum, batch) => sum + ((batch.viscosity || 0) * batch.bags), 0);
+    const averageViscosity = totalBags > 0 ? Math.round((totalViscosity / totalBags) * 100) / 100 : 0;
     
     // If average is outside range, try one-pass local improvement by swapping
     if (selected.length > 0 && remaining.length > 0) {
@@ -366,6 +368,7 @@ export const optimizeBatchSelection = query({
       totalBags,
       totalWeight,
       averageBloom,
+      averageViscosity,
       ct3AverageBloom: averageBloom, // Same as average for now
       message: `Selected ${selectedBatches.length} batches (10 bags each) for ${totalBags} bags`,
       warning,
@@ -450,6 +453,8 @@ export const createBlend = mutation({
     const totalBags = args.selectedBatches.reduce((sum, batch) => sum + batch.bags, 0);
     const totalBloom = args.selectedBatches.reduce((sum, batch) => sum + ((batch.bloom || 0) * batch.bags), 0);
     const averageBloom = totalBags > 0 ? Math.round(totalBloom / totalBags) : 0;
+    const totalViscosity = args.selectedBatches.reduce((sum, batch) => sum + ((batch.viscosity || 0) * batch.bags), 0);
+    const averageViscosity = totalBags > 0 ? Math.round((totalViscosity / totalBags) * 100) / 100 : 0;
     const totalWeight = totalBags * 25; // 25kg per bag
     
     // Create the blend
@@ -474,6 +479,7 @@ export const createBlend = mutation({
       totalBags,
       totalWeight,
       averageBloom,
+      averageViscosity,
       ct3AverageBloom: averageBloom,
       status: "completed",
       notes: args.notes,

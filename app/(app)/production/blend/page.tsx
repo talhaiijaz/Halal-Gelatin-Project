@@ -42,6 +42,9 @@ interface OptimizationResult {
   averageBloom: number;
   ct3AverageBloom?: number;
   message: string;
+  averageViscosity?: number;
+  warning?: string;
+  optimizationStatus?: string;
 }
 
 export default function BlendPage() {
@@ -459,6 +462,10 @@ export default function BlendPage() {
                   <div className="bg-orange-50 p-4 rounded-lg">
                     <p className="text-sm text-orange-600 font-medium">Average Bloom</p>
                     <p className="text-2xl font-bold text-orange-900">{optimizationResult.averageBloom}</p>
+                  </div>
+                  <div className="bg-teal-50 p-4 rounded-lg">
+                    <p className="text-sm text-teal-600 font-medium">Average Viscosity</p>
+                    <p className="text-2xl font-bold text-teal-900">{optimizationResult.averageViscosity ?? 'N/A'}</p>
                   </div>
                   <div className="bg-purple-50 p-4 rounded-lg">
                     <p className="text-sm text-purple-600 font-medium">Target Range</p>

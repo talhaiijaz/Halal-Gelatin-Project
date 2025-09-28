@@ -60,6 +60,7 @@ const navigation: NavItem[] = [
     children: [
       { name: "Overview", href: "/production" },
       { name: "Production Detail", href: "/production/detail" },
+      { name: "Outsource Detail", href: "/production/outsource" },
       { name: "Blending Sheet", href: "/production/blend" },
       { name: "Blends", href: "/production/blends" },
     ],
