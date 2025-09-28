@@ -296,178 +296,167 @@ export const createOutsourceBatchesFromExtractedData = mutation({
     fileId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    const fiscalYear = "2025-26"; // Current fiscal year
+    try {
+      // Update processing state to "processing"
+      if (args.processingId) {
+        await ctx.db.patch(args.processingId, {
+          status: "processing",
+          progress: "Extracting data from PDF...",
+          updatedAt: Date.now(),
+        });
+      }
 
-    // Get the next batch number
-    const existingBatches = await ctx.db
-      .query("outsourceBatches")
-      .withIndex("by_fiscal_year_and_active", (q) => q.eq("fiscalYear", fiscalYear).eq("isActive", true))
-      .collect();
+      const now = Date.now();
+      const fiscalYear = "2025-26"; // Current fiscal year
+      const currentYear = new Date().getFullYear();
 
-    let nextBatchNumber = 1;
-    if (existingBatches.length > 0) {
-      const maxBatchNumber = Math.max(...existingBatches.map(batch => batch.batchNumber));
-      nextBatchNumber = maxBatchNumber + 1;
-    }
-
-    // Parse the extracted data (similar to production batches)
-    const lines = args.extractedData.split('\n').filter(line => line.trim());
-    const createdBatches: any[] = [];
-    const skippedBatches: Array<{batchNumber: number; reason: string}> = [];
-    let currentBatchNumber = nextBatchNumber;
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) continue;
-
-      // Try to extract batch data from the line
-      // This is a simplified parser - you might need to adjust based on your PDF format
-      const batchData = parseOutsourceBatchLine(trimmedLine);
+      // Get the next batch number to start from for current fiscal year
+      const lastBatch = await ctx.db
+        .query("outsourceBatches")
+        .withIndex("by_fiscal_year_and_active", (q) => 
+          q.eq("fiscalYear", fiscalYear).eq("isActive", true)
+        )
+        .order("desc")
+        .first();
       
-      if (batchData) {
-        try {
-          const batchId = await ctx.db.insert("outsourceBatches", {
-            batchNumber: currentBatchNumber,
-            serialNumber: batchData.serialNumber || `OUT-${currentBatchNumber}`,
-            viscosity: batchData.viscosity,
-            bloom: batchData.bloom,
-            percentage: batchData.percentage,
-            ph: batchData.ph,
-            conductivity: batchData.conductivity,
-            moisture: batchData.moisture,
-            h2o2: batchData.h2o2,
-            so2: batchData.so2,
-            color: batchData.color,
-            clarity: batchData.clarity,
-            odour: batchData.odour,
+      let nextBatchNumber = lastBatch ? lastBatch.batchNumber + 1 : 1;
+
+      // Parse the extracted data to create batch records
+      const lines = args.extractedData.split('\n').filter(line => line.trim());
+      const createdBatches = [];
+      const skippedBatches = [];
+
+      console.log(`Processing ${lines.length} lines from extracted data`);
+      console.log('Raw extracted data:', args.extractedData);
+      console.log('First 5 lines:', lines.slice(0, 5));
+      console.log('Last 5 lines:', lines.slice(-5));
+
+      for (const line of lines) {
+        // Skip header lines, empty lines, and unwanted sections
+        if (line.includes('Batch') || line.includes('Viscocity') || line.includes('Bloom') || line.includes('PH') || line.includes('Conductivity') || line.includes('Moisture') || line.includes('H2O2') || line.includes('SO2') || line.includes('Color') || line.includes('Clarity') || line.includes('Odour') || 
+            line.includes('Average') || line.includes('Total') || line.includes('Lot num') || line.includes('Lot Num') || 
+            line.includes('201-220') || line.includes('221-240') || line.includes('241-260') || 
+            line.includes('Checked By') || line.includes('Verified By') || line.includes('Document Number') || 
+            line.includes('Internal Use Only') || line.includes('HGPL-QA') || line.trim() === '') {
+          continue;
+        }
+
+        // Parse the line data using pipe delimiter (|)
+        const parts = line.split('|').map(part => part.trim());
+        
+        console.log(`Processing line with ${parts.length} parts:`, parts);
+        
+        if (parts.length >= 12) { // Expected format: Batch | Viscocity | Bloom | % age | PH | Conductivity | Moisture | H2O2 | SO2 | Color | Clarity | Odour
+          // Helper function to parse numeric values, handling percentage signs
+          const parseNumeric = (value: string): number | undefined => {
+            if (!value || value === 'N/A' || value === '' || value === '|') return undefined;
+            const cleaned = value.replace('%', '').trim();
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? undefined : parsed;
+          };
+
+          // Helper function to parse string values, handling empty or pipe values
+          const parseString = (value: string): string | undefined => {
+            if (!value || value === 'N/A' || value === '' || value === '|') return undefined;
+            return value.trim();
+          };
+
+          // Extract batch number from the data (parts[0] is now the Batch column)
+          const extractedBatchNumber = parseNumeric(parts[0]); // Use Batch column as first column
+          if (!extractedBatchNumber) {
+            console.warn(`Skipping row with invalid batch number: ${parts[0]}`);
+            continue;
+          }
+          
+          console.log(`Processing batch number: ${extractedBatchNumber}`);
+
+          // Check if batch number already exists across ALL files and years
+          const existingBatch = await ctx.db
+            .query("outsourceBatches")
+            .withIndex("by_batch_number", (q) => q.eq("batchNumber", extractedBatchNumber))
+            .filter((q) => q.eq(q.field("isActive"), true))
+            .first();
+
+          if (existingBatch) {
+            console.log(`Skipping batch ${extractedBatchNumber} - already exists in file "${existingBatch.sourceReport || 'Unknown file'}"`);
+            skippedBatches.push({
+              batchNumber: extractedBatchNumber,
+              reason: `Already exists in file "${existingBatch.sourceReport || 'Unknown file'}"`
+            });
+            continue; // Skip this batch instead of throwing an error
+          }
+
+          const batchData = {
+            batchNumber: extractedBatchNumber,
+            serialNumber: `Batch ${extractedBatchNumber}`, // Keep for database schema compatibility
+            viscosity: parseNumeric(parts[1]), // Viscocity column (index 1)
+            bloom: parseNumeric(parts[2]), // Bloom column (index 2)
+            percentage: parseNumeric(parts[3]), // % age column (index 3)
+            ph: parseNumeric(parts[4]), // PH column (index 4)
+            conductivity: parseNumeric(parts[5]), // Conductivity column (index 5)
+            moisture: parseNumeric(parts[6]), // Moisture column (index 6)
+            h2o2: parseNumeric(parts[7]), // H2O2 column (index 7)
+            so2: parseNumeric(parts[8]), // SO2 column (index 8)
+            color: parseString(parts[9]), // Color column (index 9)
+            clarity: parseString(parts[10]), // Clarity column (index 10)
+            odour: parseString(parts[11]), // Odour column (index 11)
             sourceReport: args.sourceReport,
             reportDate: args.reportDate,
-            fileId: args.fileId,
+            fileId: args.fileId, // Store the file ID for viewing
             isUsed: false,
-            year: new Date().getFullYear(),
-            fiscalYear,
+            year: currentYear,
+            fiscalYear: fiscalYear,
             isActive: true,
             createdAt: now,
             updatedAt: now,
-          });
+          };
 
-          createdBatches.push({ batchId, batchNumber: currentBatchNumber });
-          currentBatchNumber++;
-        } catch (error) {
-          console.error(`Error creating batch ${currentBatchNumber}:`, error);
-          skippedBatches.push({
-            batchNumber: currentBatchNumber,
-            reason: `Database error: ${error instanceof Error ? error.message : 'Unknown error'}`
-          });
-          currentBatchNumber++;
+          console.log(`Creating batch with data:`, batchData);
+
+          const batchId = await ctx.db.insert("outsourceBatches", batchData);
+          createdBatches.push(batchId);
         }
-      } else {
-        skippedBatches.push({
-          batchNumber: currentBatchNumber,
-          reason: "Could not parse batch data from line"
-        });
-        currentBatchNumber++;
       }
-    }
 
-    return {
-      createdCount: createdBatches.length,
-      skippedCount: skippedBatches.length,
-      summary: `Created ${createdBatches.length} outsource batches, skipped ${skippedBatches.length}`,
-      skippedBatches,
-      extractedLinesCount: lines.length,
-    };
+      // Update processing state to completed
+      if (args.processingId) {
+        await ctx.db.patch(args.processingId, {
+          status: "completed",
+          progress: `Successfully created ${createdBatches.length} batches`,
+          completedBatches: createdBatches,
+          updatedAt: Date.now(),
+        });
+      }
+
+      // Log summary of what was processed
+      const allProcessedBatches = [...createdBatches.map(id => `created`), ...skippedBatches.map(b => `skipped #${b.batchNumber}`)];
+      console.log(`Extraction summary: Found ${lines.length} lines, processed ${allProcessedBatches.length} batches`);
+      console.log(`Created batches: ${createdBatches.length}, Skipped batches: ${skippedBatches.length}`);
+
+      return {
+        createdCount: createdBatches.length,
+        skippedCount: skippedBatches.length,
+        batchIds: createdBatches,
+        skippedBatches: skippedBatches,
+        nextBatchNumber: nextBatchNumber,
+        year: currentYear,
+        summary: `Created ${createdBatches.length} new batches, skipped ${skippedBatches.length} existing batches`,
+        extractedLinesCount: lines.length
+      };
+    } catch (error) {
+      // Update processing state to error
+      if (args.processingId) {
+        await ctx.db.patch(args.processingId, {
+          status: "error",
+          errorMessage: error instanceof Error ? error.message : "Unknown error occurred",
+          updatedAt: Date.now(),
+        });
+      }
+      throw error;
+    }
   },
 });
 
-// Helper function to parse batch data from a line (similar to production batches)
-function parseOutsourceBatchLine(line: string): any {
-  // This uses the same parsing logic as production batches
-  // The AI extraction should work the same way for both
-  
-  const batchData: any = {};
-  
-  // Extract serial number (this is the key field, same as production)
-  const serialMatch = line.match(/(?:serial|sr|batch)[:\s#]*([A-Za-z0-9\-_]+)/i);
-  if (serialMatch) {
-    batchData.serialNumber = serialMatch[1].trim();
-  }
-
-  // Extract bloom
-  const bloomMatch = line.match(/bloom[:\s]+(\d+(?:\.\d+)?)/i);
-  if (bloomMatch) {
-    batchData.bloom = parseFloat(bloomMatch[1]);
-  }
-
-  // Extract viscosity
-  const viscosityMatch = line.match(/viscosity[:\s]+(\d+(?:\.\d+)?)/i);
-  if (viscosityMatch) {
-    batchData.viscosity = parseFloat(viscosityMatch[1]);
-  }
-
-  // Extract pH
-  const phMatch = line.match(/ph[:\s]+(\d+(?:\.\d+)?)/i);
-  if (phMatch) {
-    batchData.ph = parseFloat(phMatch[1]);
-  }
-
-  // Extract percentage
-  const percentageMatch = line.match(/percentage[:\s]+(\d+(?:\.\d+)?)/i);
-  if (percentageMatch) {
-    batchData.percentage = parseFloat(percentageMatch[1]);
-  }
-
-  // Extract conductivity
-  const conductivityMatch = line.match(/conductivity[:\s]+(\d+(?:\.\d+)?)/i);
-  if (conductivityMatch) {
-    batchData.conductivity = parseFloat(conductivityMatch[1]);
-  }
-
-  // Extract moisture
-  const moistureMatch = line.match(/moisture[:\s]+(\d+(?:\.\d+)?)/i);
-  if (moistureMatch) {
-    batchData.moisture = parseFloat(moistureMatch[1]);
-  }
-
-  // Extract H2O2
-  const h2o2Match = line.match(/h2o2[:\s]+(\d+(?:\.\d+)?)/i);
-  if (h2o2Match) {
-    batchData.h2o2 = parseFloat(h2o2Match[1]);
-  }
-
-  // Extract SO2
-  const so2Match = line.match(/so2[:\s]+(\d+(?:\.\d+)?)/i);
-  if (so2Match) {
-    batchData.so2 = parseFloat(so2Match[1]);
-  }
-
-  // Extract color
-  const colorMatch = line.match(/color[:\s]+([^,]+)/i);
-  if (colorMatch) {
-    batchData.color = colorMatch[1].trim();
-  }
-
-  // Extract clarity
-  const clarityMatch = line.match(/clarity[:\s]+([^,]+)/i);
-  if (clarityMatch) {
-    batchData.clarity = clarityMatch[1].trim();
-  }
-
-  // Extract odour
-  const odourMatch = line.match(/odour[:\s]+([^,]+)/i);
-  if (odourMatch) {
-    batchData.odour = odourMatch[1].trim();
-  }
-
-  // Return batch data if we found at least one quality parameter
-  const hasQualityData = batchData.bloom || batchData.viscosity || batchData.ph || 
-                        batchData.percentage || batchData.conductivity || batchData.moisture ||
-                        batchData.h2o2 || batchData.so2 || batchData.color || 
-                        batchData.clarity || batchData.odour;
-
-  return hasQualityData ? batchData : null;
-}
 
 // Get file URL for outsource batch
 export const getOutsourceFileUrl = mutation({
