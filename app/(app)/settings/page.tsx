@@ -23,8 +23,8 @@ export default function SettingsPage() {
 
 
   // Try to get from Convex, fallback to localStorage
-  const currentLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
-  const setMonthlyShipmentLimit = useMutation(api.migrations.setMonthlyShipmentLimit);
+  const currentLimitFromDB = useQuery(api.settings.getMonthlyShipmentLimit, {});
+  const setMonthlyShipmentLimit = useMutation(api.settings.setMonthlyShipmentLimit);
 
   // Load limit from database or localStorage
   useEffect(() => {

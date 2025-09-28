@@ -56,7 +56,7 @@ export default function DashboardPage() {
   // Extract orders array (handle both paginated and non-paginated responses)
   const orders = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
   const orderItems = useQuery(api.orders.listItems, {});
-  const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
+  const monthlyLimitFromDB = useQuery(api.settings.getMonthlyShipmentLimit, {});
   
   // Fetch bank accounts and transfer status for red order highlighting
   const bankAccounts = useQuery(api.banks.list, {});

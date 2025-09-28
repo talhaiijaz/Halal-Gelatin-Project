@@ -54,7 +54,7 @@ export default function ShipmentsPage() {
   const orders = useQuery(api.orders.list, {});
   const clients = useQuery(api.clients.list, {});
   const orderItems = useQuery(api.orders.listItems, {});
-  const monthlyLimitFromDB = useQuery(api.migrations.getMonthlyShipmentLimit, {});
+  const monthlyLimitFromDB = useQuery(api.settings.getMonthlyShipmentLimit, {});
 
   // Load monthly limit from database or localStorage
   useEffect(() => {
