@@ -98,7 +98,7 @@ export default function BlendDetailPage() {
                     {blend.selectedBatches.map((b: any, idx: number) => (
                       <tr key={b.batchId}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{idx + 1}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{b.batchNumber}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{b.batchNumber}{b.isOutsource ? ' (O)' : ''}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{b.bloom || 'N/A'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{b.bags}</td>
                       </tr>

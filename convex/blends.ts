@@ -92,9 +92,11 @@ export const optimizeBatchSelection = query({
     // Get available outsource batches if requested
     let outsourceBatches: any[] = [];
     if (args.includeOutsourceBatches) {
-      outsourceBatches = await ctx.runQuery(api.outsourceBatches.getAvailableOutsourceBatches, {
+      const rawOutsource = await ctx.runQuery(api.outsourceBatches.getAvailableOutsourceBatches, {
         fiscalYear: args.fiscalYear,
       });
+      // Tag outsource batches so we can carry the marker through optimization
+      outsourceBatches = rawOutsource.map((b: any) => ({ ...b, __isOutsource: true }));
     }
 
     // Combine all available batches
@@ -232,7 +234,7 @@ export const optimizeBatchSelection = query({
 
     // Select optimal batches
     const selectedBatches = [] as Array<{
-      batchId: Id<"productionBatches">;
+      batchId: Id<any>;
       batchNumber: number;
       bags: number;
       bloom?: number;
@@ -246,6 +248,7 @@ export const optimizeBatchSelection = query({
       color?: string;
       clarity?: string;
       odour?: string;
+      isOutsource?: boolean;
     }>;
 
     let batchesSelected = 0;
@@ -267,6 +270,7 @@ export const optimizeBatchSelection = query({
         color: batch.color,
         clarity: batch.clarity,
         odour: batch.odour,
+        isOutsource: (batch as any).__isOutsource === true,
       });
       batchesSelected += 1;
     }
@@ -432,7 +436,7 @@ export const createBlend = mutation({
       odour: v.optional(v.string()),
     })),
     selectedBatches: v.array(v.object({
-      batchId: v.id("productionBatches"),
+      batchId: v.union(v.id("productionBatches"), v.id("outsourceBatches")),
       batchNumber: v.number(),
       bags: v.number(),
       bloom: v.optional(v.number()),
@@ -446,6 +450,7 @@ export const createBlend = mutation({
       color: v.optional(v.string()),
       clarity: v.optional(v.string()),
       odour: v.optional(v.string()),
+      isOutsource: v.optional(v.boolean()),
     })),
     notes: v.optional(v.string()),
     fiscalYear: v.optional(v.string()),

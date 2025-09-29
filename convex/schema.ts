@@ -543,7 +543,7 @@ export default defineSchema({
     targetOdour: v.optional(v.string()),
     // Blend results
     selectedBatches: v.array(v.object({
-      batchId: v.id("productionBatches"),
+      batchId: v.union(v.id("productionBatches"), v.id("outsourceBatches")),
       batchNumber: v.number(),
       bags: v.number(), // Number of bags used from this batch
       bloom: v.optional(v.number()),
@@ -557,6 +557,7 @@ export default defineSchema({
       color: v.optional(v.string()),
       clarity: v.optional(v.string()),
       odour: v.optional(v.string()),
+      isOutsource: v.optional(v.boolean()),
     })),
     // Calculated results
     totalBags: v.number(),

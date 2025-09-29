@@ -33,6 +33,7 @@ interface SelectedBatch {
   color?: string;
   clarity?: string;
   odour?: string;
+  isOutsource?: boolean;
 }
 
 interface OptimizationResult {
@@ -525,7 +526,7 @@ export default function BlendPage() {
                       {optimizationResult.selectedBatches.map((batch, index) => (
                         <tr key={batch.batchId}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{batch.batchNumber}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{batch.batchNumber}{batch.isOutsource ? ' (O)' : ''}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{batch.bloom || 'N/A'}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             <span className="font-medium">10</span>

@@ -179,7 +179,7 @@ export async function POST(request: NextRequest) {
 
     // Draw table rows
     let currentY = tableY - 30;
-    blend.selectedBatches.forEach((batch, index) => {
+    blend.selectedBatches.forEach((batch: any, index: number) => {
       page.drawText((index + 1).toString(), {
         x: colX[0],
         y: currentY,
@@ -188,7 +188,8 @@ export async function POST(request: NextRequest) {
         color: black,
       });
 
-      page.drawText(batch.batchNumber.toString(), {
+      const batchLabel = `${batch.batchNumber}${batch.isOutsource ? ' (O)' : ''}`;
+      page.drawText(batchLabel, {
         x: colX[1],
         y: currentY,
         size: 10,
