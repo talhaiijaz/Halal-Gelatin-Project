@@ -39,6 +39,7 @@ export default function ProductionDetailPage() {
   const [filterUsed, setFilterUsed] = useState("all");
   const [selectedBatches, setSelectedBatches] = useState<Set<string>>(new Set());
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showReportsModal, setShowReportsModal] = useState(false);
   
   // Use the shared year management system
   const { currentYear, currentFiscalYear } = useProductionYear();
@@ -674,7 +675,10 @@ export default function ProductionDetailPage() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
+        <div 
+          className="bg-white p-6 rounded-lg shadow-sm border cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setShowReportsModal(true)}
+        >
           <div className="flex items-center">
             <div className="p-2 bg-purple-100 rounded-lg">
               <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1071,6 +1075,80 @@ export default function ProductionDetailPage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reports Modal */}
+      {showReportsModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 xl:w-1/2 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Production Reports ({sourceReports.length})
+                </h3>
+                <button
+                  onClick={() => setShowReportsModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="max-h-96 overflow-y-auto">
+                {sourceReports.length === 0 ? (
+                  <div className="text-center py-8">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No reports found</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      No production reports have been uploaded yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {sourceReports.map((reportName, index) => {
+                      // Find batches with this report name and fileId
+                      const batchesWithFile = batches?.page?.filter(batch => 
+                        batch.sourceReport === reportName && batch.fileId
+                      ) || [];
+                      
+                      return (
+                        <div key={index} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <div className="p-2 bg-purple-100 rounded-lg">
+                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{reportName}</p>
+                                <p className="text-xs text-gray-500">
+                                  {batchesWithFile.length} batch(es) from this report
+                                </p>
+                              </div>
+                            </div>
+                            {batchesWithFile.length > 0 && (
+                              <button
+                                onClick={() => handleViewFile(batchesWithFile[0].fileId!, reportName || 'Unknown Report')}
+                                className="px-3 py-1 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                View File
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
