@@ -332,6 +332,7 @@ export const createBatchesFromExtractedData = mutation({
                   reportDate: args.reportDate,
                   fileId: args.fileId, // Store the file ID for viewing
                   isUsed: false,
+                  isOnHold: false,
                   year: currentYear,
                   fiscalYear: currentFiscalYear,
                   isActive: true,
@@ -400,17 +401,31 @@ export const updateBatch = mutation({
     color: v.optional(v.string()),
     clarity: v.optional(v.string()),
     odour: v.optional(v.string()),
+    isOnHold: v.optional(v.boolean()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
-    
+    const now = Date.now();
     await ctx.db.patch(id, {
       ...updates,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     return id;
+  },
+});
+
+// Toggle hold status for a production batch
+export const toggleBatchHold = mutation({
+  args: {
+    id: v.id("productionBatches"),
+    isOnHold: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    await ctx.db.patch(args.id, { isOnHold: args.isOnHold, updatedAt: now });
+    return args.id;
   },
 });
 
@@ -438,12 +453,14 @@ export const updateBatchStatus = mutation({
     id: v.id("productionBatches"),
     isUsed: v.boolean(),
     usedInOrder: v.optional(v.string()),
+    isOnHold: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const updateData: any = {
       isUsed: args.isUsed,
       updatedAt: Date.now(),
     };
+    if (args.isOnHold !== undefined) updateData.isOnHold = args.isOnHold;
 
     if (args.isUsed) {
       updateData.usedInOrder = args.usedInOrder || null;

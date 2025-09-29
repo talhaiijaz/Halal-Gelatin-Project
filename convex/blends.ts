@@ -50,12 +50,12 @@ export const getAvailableBatches = query({
         .withIndex("by_fiscal_year_and_active", (q) => 
           q.eq("fiscalYear", args.fiscalYear).eq("isActive", true)
         )
-        .filter((q) => q.eq(q.field("isUsed"), false))
+        .filter((q) => q.and(q.eq(q.field("isUsed"), false), q.neq(q.field("isOnHold"), true)))
         .collect();
     } else {
       batches = await ctx.db
         .query("productionBatches")
-        .filter((q) => q.eq(q.field("isUsed"), false))
+        .filter((q) => q.and(q.eq(q.field("isUsed"), false), q.neq(q.field("isOnHold"), true)))
         .collect();
     }
     // Do not filter by bloom range here; optimizer will decide combinations

@@ -26,6 +26,7 @@ interface BatchData {
   reportDate?: number;
   fileId?: Id<"_storage">;
   isUsed?: boolean;
+  isOnHold?: boolean;
   usedInOrder?: string;
   usedDate?: number;
   notes?: string;
@@ -79,6 +80,7 @@ export default function ProductionDetailPage() {
   const clearProcessingState = useMutation(api.productionProcessing.clearProcessingState);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const getFileUrl = useMutation(api.productionBatches.getFileUrl);
+  const toggleBatchHold = useMutation(api.productionBatches.toggleBatchHold);
 
   // Get unique source reports for filter
   const sourceReports = batches?.page ? 
@@ -827,7 +829,7 @@ export default function ProductionDetailPage() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedBatches.map((batch) => (
-                <tr key={batch._id} className={`${batch.isUsed ? 'bg-green-100' : ''} hover:bg-gray-50`}>
+                <tr key={batch._id} className={`${batch.isUsed ? 'bg-green-100' : ''} ${batch.isOnHold ? 'bg-amber-50' : ''} hover:bg-gray-50`}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <input
                       type="checkbox"
@@ -873,24 +875,24 @@ export default function ProductionDetailPage() {
                       {formatValue(batch.odour)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      batch.isUsed 
-                        ? 'bg-orange-100 text-orange-800' 
-                        : 'bg-green-100 text-green-800'
-                    }`}>
-                      {batch.isUsed ? (
-                        <span className="flex items-center gap-1">
-                          <span>Used</span>
-                          {batch.usedInOrder && (
-                            <span className="text-xs opacity-75">
-                              ({batch.usedInOrder})
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        'Available'
-                      )}
-                    </span>
+                    {batch.isOnHold ? (
+                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">On Hold</span>
+                    ) : (
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        batch.isUsed 
+                          ? 'bg-orange-100 text-orange-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}>
+                        {batch.isUsed ? (
+                          <span className="flex items-center gap-1">
+                            <span>Used</span>
+                            {batch.usedInOrder && (
+                              <span className="text-xs opacity-75">({batch.usedInOrder})</span>
+                            )}
+                          </span>
+                        ) : 'Available'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {batch.sourceReport && (
@@ -912,13 +914,20 @@ export default function ProductionDetailPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleDeleteBatch(batch._id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-3">
+                    <button
+                      onClick={() => toggleBatchHold({ id: batch._id, isOnHold: !batch.isOnHold })}
+                      className={`$${''} ${batch.isOnHold ? 'text-amber-700' : 'text-gray-700'} hover:underline`}
+                      title="Toggle hold"
+                    >
+                      {batch.isOnHold ? 'Release Hold' : 'Hold'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteBatch(batch._id)}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      Delete
+                    </button>
                   </td>
                 </tr>
               ))}

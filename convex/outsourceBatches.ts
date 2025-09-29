@@ -64,7 +64,7 @@ export const getAvailableOutsourceBatches = query({
     return await ctx.db
       .query("outsourceBatches")
       .withIndex("by_fiscal_year_and_active", (q) => q.eq("fiscalYear", fiscalYear).eq("isActive", true))
-      .filter((q) => q.eq(q.field("isUsed"), false))
+      .filter((q) => q.and(q.eq(q.field("isUsed"), false), q.neq(q.field("isOnHold"), true)))
       .order("asc")
       .collect();
   },
@@ -156,6 +156,7 @@ export const createOutsourceBatch = mutation({
       reportDate: args.reportDate,
       fileId: args.fileId,
       isUsed: false,
+      isOnHold: false,
       notes: args.notes,
       year: new Date().getFullYear(),
       fiscalYear,
@@ -182,6 +183,7 @@ export const updateOutsourceBatch = mutation({
     color: v.optional(v.string()),
     clarity: v.optional(v.string()),
     odour: v.optional(v.string()),
+    isOnHold: v.optional(v.boolean()),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -190,6 +192,21 @@ export const updateOutsourceBatch = mutation({
 
     return await ctx.db.patch(batchId, {
       ...updates,
+      updatedAt: now,
+    });
+  },
+});
+
+// Toggle hold status for an outsource batch
+export const toggleOutsourceBatchHold = mutation({
+  args: {
+    batchId: v.id("outsourceBatches"),
+    isOnHold: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    return await ctx.db.patch(args.batchId, {
+      isOnHold: args.isOnHold,
       updatedAt: now,
     });
   },

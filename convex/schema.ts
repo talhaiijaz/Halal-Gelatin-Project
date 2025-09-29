@@ -436,6 +436,7 @@ export default defineSchema({
     reportDate: v.optional(v.number()), // Date when the report was generated
     fileId: v.optional(v.id("_storage")), // Storage ID for the original PDF file
     isUsed: v.optional(v.boolean()), // For future batch selection logic - tracks if batch has been used
+    isOnHold: v.optional(v.boolean()), // If true, exclude from blending/optimizer
     usedInOrder: v.optional(v.string()), // Order number where this batch was used
     usedDate: v.optional(v.number()), // When this batch was used
     notes: v.optional(v.string()), // Additional notes
@@ -479,6 +480,7 @@ export default defineSchema({
     reportDate: v.optional(v.number()), // Date when the report was generated
     fileId: v.optional(v.id("_storage")), // Storage ID for the original PDF file
     isUsed: v.optional(v.boolean()), // For future batch selection logic - tracks if batch has been used
+    isOnHold: v.optional(v.boolean()), // If true, exclude from blending/optimizer
     usedInOrder: v.optional(v.string()), // Order number where this batch was used
     usedDate: v.optional(v.number()), // When this batch was used
     notes: v.optional(v.string()), // Additional notes
