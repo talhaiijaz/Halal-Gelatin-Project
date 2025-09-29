@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, DollarSign, FileText, User } from "lucide-react";
+import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, DollarSign, FileText, User, BarChart3, ChevronDown, Plus } from "lucide-react";
 import toast from "react-hot-toast";
+import { useProductionYear } from "../../hooks/useProductionYear";
 // import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
@@ -20,6 +21,21 @@ export default function SettingsPage() {
   const [currentLimit, setCurrentLimit] = useState<number>(150000);
   const [shipmentHasChanges, setShipmentHasChanges] = useState(false);
   const [shipmentLoading, setShipmentLoading] = useState(false);
+
+  // Production Settings State
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+  const [showAddYearModal, setShowAddYearModal] = useState(false);
+  const [newYear, setNewYear] = useState('');
+
+  // Use the production year management system
+  const { 
+    currentFiscalYear, 
+    availableFiscalYears, 
+    setCurrentFiscalYear, 
+    addNewFiscalYear, 
+    isLoading: productionLoading, 
+    error: productionError 
+  } = useProductionYear();
 
 
   // Try to get from Convex, fallback to localStorage
@@ -159,6 +175,27 @@ export default function SettingsPage() {
     setShipmentHasChanges(false);
   };
 
+  // Production year management functions
+  const handleYearSelect = async (fiscalYear: string) => {
+    await setCurrentFiscalYear(fiscalYear);
+    setShowYearDropdown(false);
+    toast.success(`Production year changed to ${fiscalYear}`);
+  };
+
+  const handleAddNewYear = async () => {
+    const year = parseInt(newYear);
+    if (year && year > 2000 && year < 2100) {
+      // Convert to fiscal year format
+      const fiscalYear = `${year}-${(year + 1).toString().slice(-2)}`;
+      await addNewFiscalYear(fiscalYear);
+      setNewYear('');
+      setShowAddYearModal(false);
+      toast.success(`New fiscal year ${fiscalYear} added successfully`);
+    } else {
+      toast.error("Please enter a valid year between 2000 and 2100");
+    }
+  };
+
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -258,6 +295,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      
 
       {/* Order Settings */}
       <div className="bg-white rounded-lg shadow">
@@ -396,6 +434,93 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Production Settings */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center">
+            <BarChart3 className="h-5 w-5 text-orange-500 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Production Settings</h2>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">Configure production year and batch management</p>
+        </div>
+        
+        <div className="p-6">
+          <div className="max-w-md">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Current Production Year
+            </label>
+            <div className="relative">
+              <button
+                onClick={() => setShowYearDropdown(!showYearDropdown)}
+                className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              >
+                <span>{currentFiscalYear}</span>
+                <ChevronDown className="h-4 w-4" />
+              </button>
+              
+              {showYearDropdown && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+                  {availableFiscalYears.map((fiscalYear) => (
+                    <button
+                      key={fiscalYear}
+                      onClick={() => handleYearSelect(fiscalYear)}
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                        fiscalYear === currentFiscalYear ? 'bg-orange-50 text-orange-700' : 'text-gray-700'
+                      }`}
+                    >
+                      {fiscalYear}
+                    </button>
+                  ))}
+                  <div className="border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        setShowYearDropdown(false);
+                        setShowAddYearModal(true);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 flex items-center"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add New Fiscal Year
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-sm text-gray-500">
+              Select the fiscal year for production batch management
+            </p>
+            
+            {/* Current Status */}
+            <div className="mt-4 p-3 bg-gray-50 rounded-md">
+              <div className="flex items-center text-sm">
+                <CheckCircle2 className="h-4 w-4 text-green-500 mr-2" />
+                <span className="text-gray-700">
+                  Active year: <strong>{currentFiscalYear}</strong>
+                </span>
+              </div>
+              <div className="flex items-center text-sm mt-1">
+                <Info className="h-4 w-4 text-blue-500 mr-2" />
+                <span className="text-gray-600">
+                  Available years: <strong>{availableFiscalYears.length}</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Error Display */}
+            {productionError && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                <div className="flex items-start text-sm">
+                  <AlertCircle className="h-4 w-4 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+                  <div className="text-red-700">
+                    <p><strong>Error:</strong> {productionError}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* User Settings */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
@@ -414,6 +539,52 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Add New Year Modal */}
+      {showAddYearModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Fiscal Year</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Starting Year
+                </label>
+                <input
+                  type="number"
+                  value={newYear}
+                  onChange={(e) => setNewYear(e.target.value)}
+                  placeholder="e.g., 2026 (will create 2026-27)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  min="2000"
+                  max="2100"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Enter the starting year (e.g., 2026 for fiscal year 2026-27)
+                </p>
+              </div>
+              <div className="flex space-x-3">
+                <button
+                  onClick={handleAddNewYear}
+                  disabled={!newYear || productionLoading}
+                  className="flex-1 bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {productionLoading ? 'Adding...' : 'Add Fiscal Year'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddYearModal(false);
+                    setNewYear('');
+                  }}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

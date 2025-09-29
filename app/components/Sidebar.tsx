@@ -58,7 +58,6 @@ const navigation: NavItem[] = [
     href: "#",
     icon: BarChart3,
     children: [
-      { name: "Overview", href: "/production" },
       { name: "Production Detail", href: "/production/detail" },
       { name: "Outsource Detail", href: "/production/outsource" },
       { name: "Blending Sheet", href: "/production/blend" },
