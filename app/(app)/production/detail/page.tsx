@@ -816,7 +816,7 @@ export default function ProductionDetailPage() {
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="sticky left-0 bg-gray-50 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider z-10 border-r border-gray-200">
                           Batch
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -874,7 +874,9 @@ export default function ProductionDetailPage() {
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                     />
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className={`sticky left-0 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 z-10 border-r border-gray-200 ${
+                    batch.isUsed ? 'bg-green-100' : batch.isOnHold ? 'bg-amber-50' : 'bg-white'
+                  }`}>
                     {batch.batchNumber}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
