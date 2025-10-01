@@ -1,7 +1,7 @@
 // Centralized role permission configuration
 // This is the single source of truth for all role-based access control
 
-export type Role = "admin" | "production";
+export type Role = "super-admin" | "admin" | "production";
 
 export interface RolePermission {
   canAccess: string[]; // Array of route patterns or "*" for everything
@@ -10,9 +10,26 @@ export interface RolePermission {
 }
 
 export const rolePermissions: Record<Role, RolePermission> = {
+  "super-admin": {
+    canAccess: ["*"], // Super-admin can access everything including user management
+    description: "Full system access - can view, manage all features and user accounts",
+    priority: 200
+  },
   admin: {
-    canAccess: ["*"], // Admin can access everything (including dashboard)
-    description: "Full system access - can view and manage all features",
+    canAccess: [
+      "/", // Root redirect
+      "/home", // Home page accessible to everyone
+      "/dashboard", // Dashboard access
+      "/clients", "/clients/local", "/clients/international", "/clients/[id]",
+      "/orders", "/orders/[id]",
+      "/finance", "/finance/reports",
+      "/production", "/production/detail", "/production/outsource", 
+      "/production/blend", "/production/blends", "/production/blends/[id]", "/production/reader",
+      "/shipments", "/deliveries",
+      "/logs", "/settings", "/help-center"
+      // Note: No /users route - admin cannot access user management
+    ],
+    description: "Full business access - can manage all features except user accounts",
     priority: 100
   },
   production: {

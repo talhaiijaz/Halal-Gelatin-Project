@@ -134,8 +134,13 @@ export default function Sidebar() {
 
       // Filter navigation items based on user role using centralized permissions
       const filteredNavigation = navigation.filter(item => {
-        // Special handling for Dashboard - only show to admin
-        if (item.href === "/dashboard" && currentUserRole !== "admin") {
+        // Special handling for Dashboard - only show to admin and super-admin
+        if (item.href === "/dashboard" && currentUserRole !== "admin" && currentUserRole !== "super-admin") {
+          return false;
+        }
+
+        // Special handling for Users - only show to super-admin
+        if (item.href === "/users" && currentUserRole !== "super-admin") {
           return false;
         }
 

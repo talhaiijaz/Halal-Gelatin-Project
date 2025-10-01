@@ -5,7 +5,7 @@ import { Id } from "./_generated/dataModel";
 // Get current user's role
 export const getCurrentUserRole = query({
   args: {},
-    returns: v.union(v.literal("admin"), v.literal("production"), v.null()),
+  returns: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production"), v.null()),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity?.email) return null;
@@ -23,6 +23,7 @@ export const getCurrentUserRole = query({
 export const isUserInRoles = query({
   args: {
         roles: v.array(v.union(
+          v.literal("super-admin"),
           v.literal("admin"),
           v.literal("production")
         )),
@@ -85,7 +86,7 @@ export const createOrUpdateUser = mutation({
   args: {
     email: v.string(),
     name: v.string(),
-        role: v.optional(v.union(v.literal("admin"), v.literal("production"))),
+    role: v.optional(v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production"))),
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
@@ -124,7 +125,7 @@ export const getAllUsers = query({
     _creationTime: v.number(),
     email: v.string(),
     name: v.string(),
-        role: v.union(v.literal("admin"), v.literal("production")),
+        role: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production")),
     createdAt: v.number(),
     lastLogin: v.optional(v.number()),
   })),

@@ -8,7 +8,7 @@ import { canAccessRoute, type Role } from "@/app/utils/rolePermissions";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-      requiredRoles?: Array<"admin" | "production">;
+  requiredRoles?: Array<"super-admin" | "admin" | "production">;
   route?: string; // Optional route path for automatic permission checking
 }
 

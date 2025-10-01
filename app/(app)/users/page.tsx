@@ -13,7 +13,7 @@ export default function UsersPage() {
   const [formData, setFormData] = useState({
     email: "",
     name: "",
-    role: "admin" as "admin" | "production"
+    role: "admin" as "super-admin" | "admin" | "production"
   });
 
   // Get all users
@@ -57,7 +57,7 @@ export default function UsersPage() {
     setFormData({
       email: user.email as string,
       name: user.name as string,
-      role: user.role as "admin" | "production",
+      role: user.role as "super-admin" | "admin" | "production",
     });
     setShowAddModal(true);
   };
@@ -98,7 +98,7 @@ export default function UsersPage() {
       {/* Users List */}
       <div className="bg-white shadow overflow-hidden sm:rounded-md">
         <ul className="divide-y divide-gray-200">
-          {users?.map((user) => (
+          {users?.map((user: any) => (
             <li key={user._id} className="px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
@@ -116,16 +116,20 @@ export default function UsersPage() {
                 </div>
                 <div className="flex items-center space-x-4">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    user.role === "admin" 
+                    user.role === "super-admin" 
+                      ? "bg-red-100 text-red-800" 
+                      : user.role === "admin" 
                       ? "bg-purple-100 text-purple-800" 
                       : "bg-orange-100 text-orange-800"
                   }`}>
-                    {user.role === "admin" ? (
+                    {user.role === "super-admin" ? (
+                      <Shield className="h-3 w-3 mr-1" />
+                    ) : user.role === "admin" ? (
                       <Shield className="h-3 w-3 mr-1" />
                     ) : (
                       <User className="h-3 w-3 mr-1" />
                     )}
-                    {user.role}
+                    {user.role === "super-admin" ? "Super Admin" : user.role}
                   </span>
                   <button
                     onClick={() => handleEdit(user)}
@@ -184,9 +188,10 @@ export default function UsersPage() {
                   </label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as "admin" | "production" })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as "super-admin" | "admin" | "production" })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                   >
+                    <option value="super-admin">Super Admin</option>
                     <option value="admin">Admin</option>
                     <option value="production">Production</option>
                   </select>
@@ -220,7 +225,7 @@ export default function UsersPage() {
   );
 
   return (
-    <ProtectedRoute route="/users">
+    <ProtectedRoute requiredRoles={["super-admin"]} route="/users">
       {content}
     </ProtectedRoute>
   );

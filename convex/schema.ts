@@ -4,13 +4,13 @@ import { v } from "convex/values";
 
 export default defineSchema({
   // Extended user profile data
-  users: defineTable({
-    email: v.string(),
-    name: v.string(),
-    role: v.union(v.literal("admin"), v.literal("production")),
-    createdAt: v.number(),
-    lastLogin: v.optional(v.number()),
-  })
+      users: defineTable({
+        email: v.string(),
+        name: v.string(),
+        role: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production")),
+        createdAt: v.number(),
+        lastLogin: v.optional(v.number()),
+      })
     .index("by_email", ["email"]),
 
   // Clients table
