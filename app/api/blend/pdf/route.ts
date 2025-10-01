@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    page.drawText(`Weight (Kg): ${blend.totalWeight.toLocaleString()}`, {
+    page.drawText(`Recheck Bloom: ___________`, {
       x: 50,
       y: summaryY - 20,
       size: 12,
@@ -273,8 +273,16 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    // Additional targets (only if present) - below average bloom
-    let additionalY = summaryY - 40;
+    page.drawText(`Weight (Kg): ${blend.totalWeight.toLocaleString()}`, {
+      x: 50,
+      y: summaryY - 40,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    // Additional targets (only if present) - below recheck bloom
+    let additionalY = summaryY - 60;
     if ((blend as any).averageViscosity !== undefined) {
       page.drawText(`Average Viscosity: ${(blend as any).averageViscosity}` , {
         x: 50,
