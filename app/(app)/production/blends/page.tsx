@@ -62,6 +62,7 @@ export default function BlendsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SR #</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lot #</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target Bloom</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bags</th>
@@ -73,6 +74,7 @@ export default function BlendsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {blends?.page?.map((blend: any) => (
                   <tr key={blend._id} className="cursor-pointer hover:bg-gray-50" onClick={() => router.push(`/production/blends/${blend._id}`)}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{blend.serialNumber}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 underline">{blend.lotNumber}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{blend.targetBloomMin}-{blend.targetBloomMax}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{blend.totalBags}</td>

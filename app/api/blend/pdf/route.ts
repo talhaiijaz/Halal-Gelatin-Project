@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    // Date only (serial number removed)
+    // Date
     const dateText = `Date: ${new Date(blend.date).toLocaleDateString('en-GB')}`;
     const dateWidth = font.widthOfTextAtSize(dateText, 12);
 
@@ -107,12 +107,23 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    // Lot number (moved to top, under date)
+    // SR number
+    const srText = `SR #: ${blend.serialNumber}`;
+    const srWidth = font.widthOfTextAtSize(srText, 12);
+    page.drawText(srText, {
+      x: width - 50 - srWidth,
+      y: contentStartY - 20,
+      size: 12,
+      font: font,
+      color: black,
+    });
+
+    // Lot number
     const lotText = `Lot #: ${blend.lotNumber}`;
     const lotWidth = font.widthOfTextAtSize(lotText, 12);
     page.drawText(lotText, {
       x: width - 50 - lotWidth,
-      y: contentStartY - 20,
+      y: contentStartY - 40,
       size: 12,
       font: font,
       color: black,
@@ -121,7 +132,7 @@ export async function POST(request: NextRequest) {
     // Target specifications
     page.drawText(`Blending Bloom: ${blend.targetBloomMin}-${blend.targetBloomMax}`, {
       x: 50,
-      y: contentStartY - 30,
+      y: contentStartY - 60,
       size: 12,
       font: font,
       color: black,
@@ -132,7 +143,7 @@ export async function POST(request: NextRequest) {
     if (blend.targetMesh) {
       page.drawText(`Mesh: ${blend.targetMesh}`, {
         x: 50,
-        y: contentStartY - 50,
+        y: contentStartY - 80,
         size: 12,
         font: font,
         color: black,
@@ -140,7 +151,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Table header
-    const tableY = contentStartY - 80;
+    const tableY = contentStartY - 110;
     const colWidths = [60, 100, 80, 80];
     const colX = [50, 110, 210, 290];
 

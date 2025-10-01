@@ -523,7 +523,7 @@ export default defineSchema({
     lotNumber: v.string(), // Primary unique identifier (e.g., "HG-720-MFI-912-3")
     // Legacy fields kept optional for backward compatibility during migration
     blendNumber: v.optional(v.string()),
-    serialNumber: v.optional(v.string()),
+    serialNumber: v.number(), // SR number - sequential number assigned when blend is created
     date: v.number(), // Date when blend was created
     // Target specifications
     targetBloomMin: v.optional(v.number()), // Target bloom minimum
@@ -575,6 +575,7 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_lot_number", ["lotNumber"])
+    .index("by_serial_number", ["serialNumber"])
     .index("by_date", ["date"])
     .index("by_status", ["status"])
     .index("by_fiscal_year", ["fiscalYear"]),

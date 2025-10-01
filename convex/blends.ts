@@ -12,14 +12,31 @@ export const getAllBlends = query({
   },
   handler: async (ctx, args) => {
     if (args.fiscalYear) {
-      return await ctx.db
+      // For fiscal year filtering, we need to collect all blends and sort by serial number
+      const allBlends = await ctx.db
         .query("blends")
         .withIndex("by_fiscal_year", (q) => q.eq("fiscalYear", args.fiscalYear))
-        .order("desc")
-        .paginate(args.paginationOpts);
+        .collect();
+      
+      // Sort by serial number in descending order (highest first)
+      const sortedBlends = allBlends.sort((a, b) => b.serialNumber - a.serialNumber);
+      
+      // Manual pagination since we can't use the index for both fiscal year and serial number
+      const startIndex = args.paginationOpts.cursor ? parseInt(args.paginationOpts.cursor) : 0;
+      const endIndex = startIndex + args.paginationOpts.numItems;
+      const page = sortedBlends.slice(startIndex, endIndex);
+      
+      return {
+        page,
+        isDone: endIndex >= sortedBlends.length,
+        continueCursor: endIndex < sortedBlends.length ? endIndex.toString() : null,
+        pageStatus: null,
+        splitCursor: null,
+      };
     } else {
       return await ctx.db
         .query("blends")
+        .withIndex("by_serial_number")
         .order("desc")
         .paginate(args.paginationOpts);
     }
@@ -415,6 +432,24 @@ export const generateLotNumber = query({
   },
 });
 
+// Get the next SR number for a new blend
+export const getNextSRNumber = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get all blends and find the highest SR number
+    const allBlends = await ctx.db.query("blends").collect();
+    
+    if (allBlends.length === 0) {
+      return 1; // First blend gets SR number 1
+    }
+    
+    // Find the highest SR number
+    const maxSRNumber = Math.max(...allBlends.map(blend => blend.serialNumber || 0));
+    
+    return maxSRNumber + 1;
+  },
+});
+
 // Create a new blend
 export const createBlend = mutation({
   args: {
@@ -466,6 +501,10 @@ export const createBlend = mutation({
       throw new Error("Lot number already exists. Please choose a unique lot number.");
     }
 
+    // Get the next SR number
+    const allBlends = await ctx.db.query("blends").collect();
+    const nextSRNumber = allBlends.length === 0 ? 1 : Math.max(...allBlends.map(blend => blend.serialNumber || 0)) + 1;
+
     // Calculate totals
     const totalBags = args.selectedBatches.reduce((sum, batch) => sum + batch.bags, 0);
     const totalBloom = args.selectedBatches.reduce((sum, batch) => sum + ((batch.bloom || 0) * batch.bags), 0);
@@ -477,6 +516,7 @@ export const createBlend = mutation({
     // Create the blend
     const blendId = await ctx.db.insert("blends", {
       lotNumber: args.lotNumber,
+      serialNumber: nextSRNumber,
       date: now,
       targetBloomMin: args.targetBloomMin,
       targetBloomMax: args.targetBloomMax,

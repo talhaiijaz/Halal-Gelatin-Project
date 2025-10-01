@@ -47,7 +47,10 @@ export default function BlendDetailPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Blend Detail</h1>
               {blend && (
-                <p className="text-sm text-gray-600 mt-1">Lot #: <span className="font-medium text-gray-900">{blend.lotNumber}</span></p>
+                <div className="text-sm text-gray-600 mt-1 space-y-1">
+                  <p>SR #: <span className="font-medium text-gray-900">{blend.serialNumber}</span></p>
+                  <p>Lot #: <span className="font-medium text-gray-900">{blend.lotNumber}</span></p>
+                </div>
               )}
             </div>
             <button onClick={handleDownload} className="btn-secondary inline-flex items-center gap-2">

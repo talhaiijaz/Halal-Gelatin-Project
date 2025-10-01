@@ -81,6 +81,81 @@ export const migrateToFiscalYear = mutation({
   },
 });
 
+// Migration to assign SR numbers to existing blends
+export const assignSRNumbersToBlends = mutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("Starting migration to assign SR numbers to existing blends...");
+    
+    // Get all existing blends sorted by creation date (oldest first)
+    const allBlends = await ctx.db.query("blends").collect();
+    
+    if (allBlends.length === 0) {
+      console.log("No blends found to migrate");
+      return {
+        success: true,
+        message: "No blends found to migrate",
+        updatedBlends: 0,
+      };
+    }
+    
+    // Sort blends by creation date (oldest first) to assign sequential SR numbers
+    const sortedBlends = allBlends.sort((a, b) => a.createdAt - b.createdAt);
+    
+    let updatedBlends = 0;
+    
+    // Assign SR numbers sequentially starting from 1
+    for (let i = 0; i < sortedBlends.length; i++) {
+      const blend = sortedBlends[i];
+      const srNumber = i + 1; // Start from 1, not 0
+      
+      await ctx.db.patch(blend._id, {
+        serialNumber: srNumber,
+        updatedAt: Date.now(),
+      });
+      
+      updatedBlends++;
+      console.log(`Assigned SR number ${srNumber} to blend ${blend.lotNumber}`);
+    }
+    
+    console.log(`Migration completed. Updated ${updatedBlends} blends with SR numbers.`);
+    
+    return {
+      success: true,
+      message: `Migration completed successfully. Updated ${updatedBlends} blends with SR numbers.`,
+      updatedBlends,
+    };
+  },
+});
+
+// Query to check blend SR number migration status
+export const getBlendSRMigrationStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const allBlends = await ctx.db.query("blends").collect();
+    
+    // Check if any blends are missing SR numbers
+    const blendsWithoutSR = allBlends.filter(blend => 
+      typeof blend.serialNumber !== 'number' || blend.serialNumber === undefined
+    );
+    
+    // Check for duplicate SR numbers
+    const srNumbers = allBlends
+      .filter(blend => typeof blend.serialNumber === 'number')
+      .map(blend => blend.serialNumber);
+    const uniqueSRNumbers = new Set(srNumbers);
+    const hasDuplicates = srNumbers.length !== uniqueSRNumbers.size;
+    
+    return {
+      totalBlends: allBlends.length,
+      blendsWithoutSR: blendsWithoutSR.length,
+      hasDuplicates,
+      needsMigration: blendsWithoutSR.length > 0 || hasDuplicates,
+      srNumbers: srNumbers.sort((a, b) => a - b), // Sorted list of existing SR numbers
+    };
+  },
+});
+
 // Query to check migration status
 export const getMigrationStatus = query({
   args: {},
