@@ -648,6 +648,14 @@ export default function BlendPage() {
                     </table>
                   </div>
                   <div className="flex justify-between items-center">
+                    {preSelectedBatchIds.size > 0 && (
+                      <>
+                        <span className="text-sm text-gray-600">Manually Selected</span>
+                        <span className="font-semibold text-gray-900">{preSelectedBatchIds.size}</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">In Range Batches</span>
                     <span className="font-semibold text-gray-900">
                       {(() => {
