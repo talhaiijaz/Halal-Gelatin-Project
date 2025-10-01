@@ -58,6 +58,7 @@ export default function BlendPage() {
   const [targetMesh, setTargetMesh] = useState<number>(20);
   const [targetBags, setTargetBags] = useState<number>(100);
   const [includeOutsourceBatches, setIncludeOutsourceBatches] = useState<boolean>(false);
+  const [onlyOutsourceBatches, setOnlyOutsourceBatches] = useState<boolean>(false);
   const [lotNumber, setLotNumber] = useState<string>("");
   
   // Additional targets (optional)
@@ -124,6 +125,7 @@ export default function BlendPage() {
           fiscalYear: currentFiscalYear,
           additionalTargets: showAdvanced ? additionalTargets : undefined,
           preSelectedBatchIds: Array.from(preSelectedBatchIds),
+          onlyOutsourceBatches,
         }),
       });
 
@@ -290,31 +292,43 @@ export default function BlendPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Include Outsource Batches
+                      Outsource Batch Options
                     </label>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="includeOutsource"
-                          checked={includeOutsourceBatches === true}
-                          onChange={() => setIncludeOutsourceBatches(true)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-700">Yes</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="radio"
-                          name="includeOutsource"
-                          checked={includeOutsourceBatches === false}
-                          onChange={() => setIncludeOutsourceBatches(false)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm text-gray-700">No</span>
-                      </label>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="outsourceMode"
+                            checked={!includeOutsourceBatches && !onlyOutsourceBatches}
+                            onChange={() => { setIncludeOutsourceBatches(false); setOnlyOutsourceBatches(false); }}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">Production only</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="outsourceMode"
+                            checked={includeOutsourceBatches && !onlyOutsourceBatches}
+                            onChange={() => { setIncludeOutsourceBatches(true); setOnlyOutsourceBatches(false); }}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">Include outsource</span>
+                        </label>
+                        <label className="flex items-center">
+                          <input
+                            type="radio"
+                            name="outsourceMode"
+                            checked={onlyOutsourceBatches}
+                            onChange={() => { setIncludeOutsourceBatches(true); setOnlyOutsourceBatches(true); }}
+                            className="mr-2"
+                          />
+                          <span className="text-sm text-gray-700">Only outsource</span>
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500">Choose whether to use production batches, include outsource, or use only outsource batches.</p>
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">Include outsource batches in optimization (production batches only if No)</p>
                   </div>
                 </div>
               </div>
@@ -589,12 +603,18 @@ export default function BlendPage() {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">Total Available</span>
                     <span className="font-semibold text-gray-900">
-                      {includeOutsourceBatches && availableOutsourceBatches 
-                        ? availableBatches.length + availableOutsourceBatches.length
-                        : availableBatches.length}
+                      {(() => {
+                        if (onlyOutsourceBatches) {
+                          return availableOutsourceBatches ? availableOutsourceBatches.length : 0;
+                        }
+                        if (includeOutsourceBatches && availableOutsourceBatches) {
+                          return availableBatches.length + availableOutsourceBatches.length;
+                        }
+                        return availableBatches.length;
+                      })()}
                     </span>
                   </div>
-                  {includeOutsourceBatches && availableOutsourceBatches && (
+                  {includeOutsourceBatches && !onlyOutsourceBatches && availableOutsourceBatches && (
                     <div className="flex justify-between items-center text-xs text-gray-500">
                       <span>Production: {availableBatches.length}</span>
                       <span>Outsource: {availableOutsourceBatches.length}</span>
@@ -611,9 +631,15 @@ export default function BlendPage() {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
                         {(() => {
-                          const allBatches = includeOutsourceBatches && availableOutsourceBatches
-                            ? [...availableBatches, ...availableOutsourceBatches]
-                            : availableBatches;
+                          const allBatches = (() => {
+                            if (onlyOutsourceBatches) {
+                              return availableOutsourceBatches || [];
+                            }
+                            if (includeOutsourceBatches && availableOutsourceBatches) {
+                              return [...availableBatches, ...availableOutsourceBatches];
+                            }
+                            return availableBatches;
+                          })();
                           
                           return allBatches
                             .filter(b => b.bloom !== undefined)
@@ -659,9 +685,15 @@ export default function BlendPage() {
                     <span className="text-sm text-gray-600">In Range Batches</span>
                     <span className="font-semibold text-gray-900">
                       {(() => {
-                        const allBatches = includeOutsourceBatches && availableOutsourceBatches
-                          ? [...availableBatches, ...availableOutsourceBatches]
-                          : availableBatches;
+                        const allBatches = (() => {
+                          if (onlyOutsourceBatches) {
+                            return availableOutsourceBatches || [];
+                          }
+                          if (includeOutsourceBatches && availableOutsourceBatches) {
+                            return [...availableBatches, ...availableOutsourceBatches];
+                          }
+                          return availableBatches;
+                        })();
                         return allBatches.filter(batch => 
                           batch.bloom && batch.bloom >= targetBloomMin && batch.bloom <= targetBloomMax
                         ).length;

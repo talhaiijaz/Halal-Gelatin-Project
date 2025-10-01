@@ -88,6 +88,7 @@ export const optimizeBatchSelection = query({
     targetMeanBloom: v.optional(v.number()), // Preferred mean bloom
     targetBags: v.optional(v.number()), // Desired number of bags (must be multiple of 10)
     includeOutsourceBatches: v.optional(v.boolean()), // Include outsource batches in optimization
+    onlyOutsourceBatches: v.optional(v.boolean()), // Use only outsource batches (ignore production)
     fiscalYear: v.optional(v.string()),
     preSelectedBatchIds: v.optional(v.array(v.union(v.id("productionBatches"), v.id("outsourceBatches")))),
     additionalTargets: v.optional(v.object({
@@ -101,14 +102,19 @@ export const optimizeBatchSelection = query({
     })),
   },
   handler: async (ctx, args) => {
-    // Get available production batches (no bloom filtering)
-    const productionBatches = await ctx.runQuery(api.blends.getAvailableBatches, {
-      fiscalYear: args.fiscalYear,
-    });
+    const useOnlyOutsource = args.onlyOutsourceBatches === true;
 
-    // Get available outsource batches if requested
+    // Get available production batches unless "only outsource" is selected
+    const productionBatches = useOnlyOutsource
+      ? []
+      : await ctx.runQuery(api.blends.getAvailableBatches, {
+          fiscalYear: args.fiscalYear,
+        });
+
+    // Determine whether to load outsource batches
+    const shouldLoadOutsource = useOnlyOutsource || args.includeOutsourceBatches === true;
     let outsourceBatches: any[] = [];
-    if (args.includeOutsourceBatches) {
+    if (shouldLoadOutsource) {
       const rawOutsource = await ctx.runQuery(api.outsourceBatches.getAvailableOutsourceBatches, {
         fiscalYear: args.fiscalYear,
       });
@@ -116,8 +122,10 @@ export const optimizeBatchSelection = query({
       outsourceBatches = rawOutsource.map((b: any) => ({ ...b, __isOutsource: true }));
     }
 
-    // Combine all available batches
-    const availableBatches = [...productionBatches, ...outsourceBatches];
+    // Combine all available batches based on mode
+    const availableBatches = useOnlyOutsource
+      ? [...outsourceBatches]
+      : [...productionBatches, ...outsourceBatches];
 
     if (availableBatches.length === 0) {
       return { selectedBatches: [], message: "No available batches found for the target bloom range" };
