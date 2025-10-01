@@ -119,6 +119,13 @@ export default function ProductionDetailPage() {
   });
 
   const handleDeleteBatch = async (batchId: Id<"productionBatches">) => {
+    // Find the batch to check if it's used
+    const batch = batches?.page?.find(b => b._id === batchId);
+    if (batch?.isUsed) {
+      alert("Cannot delete batch that has been used in a blend. Please delete the blend first to free up the batch.");
+      return;
+    }
+    
     if (confirm("Are you sure you want to delete this batch?")) {
       try {
         await deleteBatch({ id: batchId });
@@ -131,6 +138,13 @@ export default function ProductionDetailPage() {
   };
 
   const handleSelectBatch = (batchId: string) => {
+    // Find the batch to check if it's used
+    const batch = batches?.page?.find(b => b._id === batchId);
+    if (batch?.isUsed) {
+      alert("Cannot select batch that has been used in a blend for deletion.");
+      return;
+    }
+    
     const newSelected = new Set(selectedBatches);
     if (newSelected.has(batchId)) {
       newSelected.delete(batchId);
@@ -141,10 +155,14 @@ export default function ProductionDetailPage() {
   };
 
   const handleSelectAll = () => {
-    if (selectedBatches.size === sortedBatches.length) {
+    // Only select available (unused) batches
+    const availableBatches = sortedBatches.filter(batch => !batch.isUsed);
+    const availableBatchIds = availableBatches.map(batch => batch._id);
+    
+    if (selectedBatches.size === availableBatchIds.length) {
       setSelectedBatches(new Set());
     } else {
-      setSelectedBatches(new Set(sortedBatches.map(batch => batch._id)));
+      setSelectedBatches(new Set(availableBatchIds));
     }
   };
 
@@ -811,7 +829,7 @@ export default function ProductionDetailPage() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <input
                     type="checkbox"
-                    checked={selectedBatches.size === sortedBatches.length && sortedBatches.length > 0}
+                    checked={selectedBatches.size === sortedBatches.filter(b => !b.isUsed).length && sortedBatches.filter(b => !b.isUsed).length > 0}
                     onChange={handleSelectAll}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -871,7 +889,11 @@ export default function ProductionDetailPage() {
                       type="checkbox"
                       checked={selectedBatches.has(batch._id)}
                       onChange={() => handleSelectBatch(batch._id)}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      disabled={batch.isUsed}
+                      className={`rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+                        batch.isUsed ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      title={batch.isUsed ? 'Cannot select used batch for deletion' : 'Select batch for deletion'}
                     />
                   </td>
                   <td className={`sticky left-0 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 z-10 border-r border-gray-200 ${
@@ -962,7 +984,13 @@ export default function ProductionDetailPage() {
                     </button>
                     <button
                       onClick={() => handleDeleteBatch(batch._id)}
-                      className="text-red-600 hover:text-red-900"
+                      disabled={batch.isUsed}
+                      className={`${
+                        batch.isUsed 
+                          ? 'text-gray-400 cursor-not-allowed' 
+                          : 'text-red-600 hover:text-red-900'
+                      }`}
+                      title={batch.isUsed ? 'Cannot delete batch that has been used in a blend' : 'Delete batch'}
                     >
                       Delete
                     </button>
