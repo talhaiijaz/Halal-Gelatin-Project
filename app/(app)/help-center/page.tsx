@@ -14,6 +14,7 @@ import {
   Send,
   Calendar,
   Eye,
+  Trash2,
 } from "lucide-react";
 import Modal from "../../components/ui/Modal";
 
@@ -45,6 +46,7 @@ export default function HelpCenterPage() {
 
   // Convex mutations and queries
   const submitFeedback = useMutation(api.feedback.submitFeedback);
+  const deleteFeedback = useMutation(api.feedback.deleteFeedback);
   const allTickets = useQuery(api.feedback.getAllFeedback, {});
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,6 +81,18 @@ export default function HelpCenterPage() {
   const handleViewTicket = (ticket: any) => {
     setSelectedTicket(ticket);
     setIsDetailModalOpen(true);
+  };
+
+  const handleDelete = async (ticketId: Id<"feedback">) => {
+    if (confirm("Are you sure you want to delete this ticket?")) {
+      try {
+        await deleteFeedback({ feedbackId: ticketId });
+        toast.success("Ticket deleted successfully!");
+      } catch (error) {
+        console.error("Error deleting ticket:", error);
+        toast.error("Failed to delete ticket. Please try again.");
+      }
+    }
   };
 
   const handleCloseModal = () => {
@@ -306,6 +320,13 @@ export default function HelpCenterPage() {
                           title="View full ticket details"
                         >
                           <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(ticket._id)}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete ticket"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
