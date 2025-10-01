@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useUser, useClerk } from "@clerk/nextjs";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { canAccessRoute, type Role } from "@/app/utils/rolePermissions";
 import {
   Home,
   Users,
@@ -18,6 +21,7 @@ import {
   HelpCircle,
   FileText,
   BarChart3,
+  LogOut,
 } from "lucide-react";
 
 interface NavItem {
@@ -28,7 +32,8 @@ interface NavItem {
 }
 
 const navigation: NavItem[] = [
-  { name: "Home", href: "/dashboard", icon: Home },
+  { name: "Home", href: "/home", icon: Home },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
   {
     name: "Clients",
     href: "#",
@@ -64,26 +69,34 @@ const navigation: NavItem[] = [
       { name: "Blends", href: "/production/blends" },
     ],
   },
+  {
+    name: "Users",
+    href: "/users",
+    icon: Users,
+  },
 ];
 
 export default function Sidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const pathname = usePathname();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const currentUserRole = useQuery(api.users.getCurrentUserRole);
 
   // Auto-expand parent items when on child pages
   useEffect(() => {
     const shouldExpand: string[] = [];
-    navigation.forEach((item) => {
+    filteredNavigation.forEach((item) => {
       if (item.children) {
-        const hasActiveChild = item.children.some((child) => isActive(child.href));
+        const hasActiveChild = item.children.filter(child => hasAccess(child.href)).some((child) => isActive(child.href));
         if (hasActiveChild) {
           shouldExpand.push(item.name);
         }
       }
     });
     setExpandedItems(shouldExpand);
-  }, [pathname]);
+  }, [pathname, currentUserRole]);
 
   const toggleExpanded = (itemName: string) => {
     setExpandedItems((prev) =>
@@ -95,11 +108,13 @@ export default function Sidebar() {
 
   const isActive = (href: string) => {
     if (href === "#") return false;
-    if (href === "/dashboard") return pathname === "/" || pathname === "/dashboard";
-    
+    if (href === "/") return pathname === "/";
+    if (href === "/home") return pathname === "/home";
+    if (href === "/dashboard") return pathname === "/dashboard";
+
     // For exact matches, use exact comparison
     if (href === "/production") return pathname === "/production";
-    
+
     // For other paths, use startsWith but ensure it's not a partial match
     return pathname === href || (pathname?.startsWith(href) && pathname?.charAt(href.length) === "/");
   };
@@ -110,6 +125,30 @@ export default function Sidebar() {
     }
     return isActive(item.href);
   };
+
+  // Helper function to check if user has access to a navigation item
+  const hasAccess = (route: string) => {
+    if (!currentUserRole) return false; // Still loading
+    return canAccessRoute(currentUserRole, route);
+  };
+
+      // Filter navigation items based on user role using centralized permissions
+      const filteredNavigation = navigation.filter(item => {
+        // Special handling for Dashboard - only show to admin
+        if (item.href === "/dashboard" && currentUserRole !== "admin") {
+          return false;
+        }
+
+        // Check access for main item (including Home)
+        if (item.href !== "#" && !hasAccess(item.href)) return false;
+
+        // For items with children, check if user has access to any child
+        if (item.children) {
+          return item.children.some(child => hasAccess(child.href));
+        }
+
+        return true;
+      });
 
   const NavContent = () => (
     <>
@@ -127,7 +166,7 @@ export default function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4">
-        {navigation.map((item) => {
+        {filteredNavigation.map((item) => {
           const Icon = item.icon;
           const isItemActive = isParentActive(item);
           const isExpanded = expandedItems.includes(item.name);
@@ -160,7 +199,7 @@ export default function Sidebar() {
                   </button>
                   {isExpanded && (
                     <div className="ml-9 mt-1 space-y-1">
-                      {item.children.map((child) => (
+                      {item.children.filter(child => hasAccess(child.href)).map((child) => (
                         <Link
                           key={child.href}
                           href={child.href}
@@ -205,46 +244,64 @@ export default function Sidebar() {
         <div className="space-y-3">
           <div className="flex items-center px-3">
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">Admin User</p>
-              <p className="text-xs text-gray-500 capitalize">Administrator</p>
+              <p className="text-sm font-medium text-gray-900">
+                {user?.fullName || user?.firstName || "User"}
+              </p>
+              <p className="text-xs text-gray-500 capitalize">
+                {currentUserRole || "Loading..."}
+              </p>
             </div>
           </div>
-          <div className="space-y-1">
-            <Link
-              href="/logs"
-              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Activity className="mr-3 h-4 w-4 text-gray-400" />
-              Logs
-            </Link>
-            <Link
-              href="/settings"
-              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <Settings className="mr-3 h-4 w-4 text-gray-400" />
-              Settings
-            </Link>
-            <Link
-              href="/help-center"
-              className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <HelpCircle className="mr-3 h-4 w-4 text-gray-400" />
-              Help Center
-            </Link>
+              <div className="space-y-1">
+                {currentUserRole !== "production" && (
+                  <>
+                    <Link
+                      href="/logs"
+                      className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Activity className="mr-3 h-4 w-4 text-gray-400" />
+                      Logs
+                    </Link>
+                    <Link
+                      href="/settings"
+                      className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Settings className="mr-3 h-4 w-4 text-gray-400" />
+                      Settings
+                    </Link>
+                    <Link
+                      href="/help-center"
+                      className="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <HelpCircle className="mr-3 h-4 w-4 text-gray-400" />
+                      Help Center
+                    </Link>
+                  </>
+                )}
             <div className="flex items-center w-full px-3 py-2">
-              <UserButton 
-                appearance={{
-                  elements: {
-                    avatarBox: "w-8 h-8",
-                    userButtonPopoverCard: "shadow-lg",
-                    userButtonPopoverActionButton: "text-gray-700 hover:bg-gray-50"
-                  }
-                }}
-                afterSignOutUrl="/login"
-              />
+              {currentUserRole === "production" ? (
+                <button
+                  onClick={() => signOut({ redirectUrl: "/login" })}
+                  className="flex items-center w-full px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <LogOut className="mr-3 h-4 w-4 text-gray-400" />
+                  Sign Out
+                </button>
+              ) : (
+                <UserButton
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-8 h-8",
+                      userButtonPopoverCard: "shadow-lg",
+                      userButtonPopoverActionButton: "text-gray-700 hover:bg-gray-50"
+                    }
+                  }}
+                  afterSignOutUrl="/login"
+                />
+              )}
             </div>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Plus, Package, Clock, CheckCircle2, XCircle, Truck, Download, Search } from "lucide-react";
 import CreateOrderModal from "@/app/components/orders/CreateOrderModal";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 
 import { Id } from "@/convex/_generated/dataModel";
 import toast from "react-hot-toast";
@@ -628,8 +629,10 @@ function OrdersPageContent() {
 
 export default function OrdersPage() {
   return (
-    <Suspense fallback={<Skeleton />}>
-      <OrdersPageContent />
-    </Suspense>
+    <ProtectedRoute route="/orders">
+      <Suspense fallback={<Skeleton />}>
+        <OrdersPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }

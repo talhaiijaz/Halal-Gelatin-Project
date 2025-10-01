@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useModalManager } from "@/app/hooks/useModalManager";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 // import CustomerCard from "@/app/components/clients/CustomerCard";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import AddCustomerModal from "@/app/components/clients/AddCustomerModal";
@@ -38,7 +39,7 @@ import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
 import { shouldHighlightOrderYellowWithTransfers, shouldHighlightOrderRed, getOrderHighlightClassesWithRed, getOrderTextHighlightClassesWithRed } from "@/app/utils/orderHighlighting";
 
-export default function InternationalClientsPage() {
+function InternationalClientsPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
@@ -1519,5 +1520,13 @@ export default function InternationalClientsPage() {
       />
 
     </div>
+  );
+}
+
+export default function InternationalClientsPage() {
+  return (
+    <ProtectedRoute route="/clients/international">
+      <InternationalClientsPageContent />
+    </ProtectedRoute>
   );
 }

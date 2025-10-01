@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -22,7 +23,7 @@ import { formatCurrency } from "@/app/utils/currencyFormat";
 import { getCurrentFiscalYear, getFiscalYearRange } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 
-export default function ReportsPage() {
+function ReportsPageContent() {
   const [reportType, setReportType] = useState<"revenue" | "clients" | "orders" | "payments">("revenue");
   const [dateRange, setDateRange] = useState<"thisMonth" | "lastMonth" | "thisQuarter" | "thisFiscalYear" | "all">("thisMonth");
   
@@ -443,5 +444,13 @@ export default function ReportsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <ProtectedRoute route="/finance/reports">
+      <ReportsPageContent />
+    </ProtectedRoute>
   );
 }

@@ -5,8 +5,9 @@ import {
   AlertTriangle,
   ArrowLeft
 } from 'lucide-react';
+import ProtectedRoute from '@/app/components/ProtectedRoute';
 
-export default function ProductionReaderPage() {
+function ProductionReaderPageContent() {
   const router = useRouter();
 
   return (
@@ -45,5 +46,13 @@ export default function ProductionReaderPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ProductionReaderPage() {
+  return (
+    <ProtectedRoute route="/production/reader">
+      <ProductionReaderPageContent />
+    </ProtectedRoute>
   );
 }

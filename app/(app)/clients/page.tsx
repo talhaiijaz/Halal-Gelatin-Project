@@ -2,8 +2,9 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 
-export default function ClientsPage() {
+function ClientsPageContent() {
   const router = useRouter();
 
   useEffect(() => {
@@ -18,5 +19,13 @@ export default function ClientsPage() {
         <p className="mt-2 text-sm text-gray-600">Redirecting...</p>
       </div>
     </div>
+  );
+}
+
+export default function ClientsPage() {
+  return (
+    <ProtectedRoute route="/clients">
+      <ClientsPageContent />
+    </ProtectedRoute>
   );
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useProductionYear } from '../../../hooks/useProductionYear';
+import ProtectedRoute from '@/app/components/ProtectedRoute';
 import { 
   Calculator, 
   Save, 
@@ -48,7 +49,7 @@ interface OptimizationResult {
   optimizationStatus?: string;
 }
 
-export default function BlendPage() {
+function BlendPageContent() {
   const { currentFiscalYear } = useProductionYear();
   
   // Form state
@@ -752,5 +753,13 @@ export default function BlendPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BlendPage() {
+  return (
+    <ProtectedRoute route="/production/blend">
+      <BlendPageContent />
+    </ProtectedRoute>
   );
 }

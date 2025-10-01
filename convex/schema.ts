@@ -7,7 +7,7 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user")),
+    role: v.union(v.literal("admin"), v.literal("production")),
     createdAt: v.number(),
     lastLogin: v.optional(v.number()),
   })
@@ -29,10 +29,6 @@ export default defineSchema({
     profilePictureId: v.optional(v.id("_storage")),
     // Historical outstanding balance from previous years (used in finance and payments flows)
     outstandingBalance: v.optional(v.number()),
-    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
-    approvalNotes: v.optional(v.string()),
-    approvedAt: v.optional(v.number()),
-    approvedBy: v.optional(v.id("users")),
     createdAt: v.number(),
     createdBy: v.optional(v.id("users")),
   })
@@ -78,7 +74,6 @@ export default defineSchema({
     commercialInvoiceId: v.optional(v.id("_storage")),
     // Bank account for payment processing
     bankAccountId: v.optional(v.id("bankAccounts")),
-    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -143,7 +138,6 @@ export default defineSchema({
     // Standalone invoice fields
     isStandalone: v.optional(v.boolean()), // True for invoices created without orders
     source: v.optional(v.string()), // "previous_platform", "current_system", etc.
-    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -180,7 +174,6 @@ export default defineSchema({
     withheldTaxRate: v.optional(v.number()), // Percentage rate e.g., 5 for 5%
     withheldTaxAmount: v.optional(v.number()), // Calculated from cashReceived * rate / 100
     recordedBy: v.optional(v.id("users")),
-    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     // Reversal support
     isReversed: v.optional(v.boolean()),
     reversalReason: v.optional(v.string()),
@@ -231,7 +224,6 @@ export default defineSchema({
     openingBalance: v.optional(v.number()), // Opening balance when bank account is created
     currentBalance: v.optional(v.number()), // Current balance (calculated from all transactions)
     status: v.union(v.literal("active"), v.literal("inactive")),
-    approvalStatus: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
     createdAt: v.number(),
   })
     .index("by_currency", ["currency"])
@@ -277,7 +269,6 @@ export default defineSchema({
     notes: v.optional(v.string()),
     tags: v.optional(v.array(v.string())), // For categorization
     recordedBy: v.optional(v.id("users")),
-    approvedBy: v.optional(v.id("users")),
     // Reversal support
     isReversed: v.optional(v.boolean()), // If this transaction has been reversed
     reversalReason: v.optional(v.string()), // Reason for reversal
@@ -566,9 +557,7 @@ export default defineSchema({
     averageViscosity: v.optional(v.number()),
     ct3AverageBloom: v.optional(v.number()), // CT3 average bloom calculation
     // Status and metadata
-    status: v.union(v.literal("draft"), v.literal("completed"), v.literal("approved")),
-    reviewedBy: v.optional(v.string()), // Name of reviewer
-    reviewedAt: v.optional(v.number()), // When it was reviewed
+    status: v.union(v.literal("draft"), v.literal("completed")),
     notes: v.optional(v.string()),
     fiscalYear: v.optional(v.string()), // Fiscal year this blend belongs to
     createdAt: v.number(),

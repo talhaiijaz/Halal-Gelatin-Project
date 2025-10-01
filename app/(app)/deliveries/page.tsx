@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { 
   Truck, 
   Package, 
@@ -20,7 +21,7 @@ import "react-loading-skeleton/dist/skeleton.css";
 import { Id } from "@/convex/_generated/dataModel";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 
-export default function DeliveriesPage() {
+function DeliveriesPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<"all" | "today" | "thisWeek" | "thisMonth">("all");
@@ -374,5 +375,13 @@ export default function DeliveriesPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DeliveriesPage() {
+  return (
+    <ProtectedRoute route="/deliveries">
+      <DeliveriesPageContent />
+    </ProtectedRoute>
   );
 }

@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import toast from "react-hot-toast";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import {
   MessageSquare,
   Bug,
@@ -32,7 +33,7 @@ const categoryLabels = {
   general_feedback: "General Feedback",
 };
 
-export default function HelpCenterPage() {
+function HelpCenterPageContent() {
   // Form state
   const [formData, setFormData] = useState({
     title: "",
@@ -349,5 +350,13 @@ export default function HelpCenterPage() {
       {/* Ticket Detail Modal */}
       <TicketDetailModal />
     </div>
+  );
+}
+
+export default function HelpCenterPage() {
+  return (
+    <ProtectedRoute route="/help-center">
+      <HelpCenterPageContent />
+    </ProtectedRoute>
   );
 }

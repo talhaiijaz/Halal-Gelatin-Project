@@ -3,10 +3,11 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../../convex/_generated/api';
+import ProtectedRoute from '@/app/components/ProtectedRoute';
 import { ArrowLeft, FileDown, Package } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function BlendDetailPage() {
+function BlendDetailPageContent() {
   const params = useParams();
   const router = useRouter();
   const blendId = params?.id as string;
@@ -121,6 +122,14 @@ export default function BlendDetailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BlendDetailPage() {
+  return (
+    <ProtectedRoute route="/production/blends">
+      <BlendDetailPageContent />
+    </ProtectedRoute>
   );
 }
 

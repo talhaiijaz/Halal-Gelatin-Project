@@ -4,6 +4,7 @@ import { useState, useEffect, useId } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 // import CustomerCard from "@/app/components/clients/CustomerCard";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import AddCustomerModal from "@/app/components/clients/AddCustomerModal";
@@ -36,7 +37,7 @@ import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
 import { useModalManager } from "@/app/hooks/useModalManager";
 
-export default function LocalClientsPage() {
+function LocalClientsPageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrderId, setSelectedOrderId] = useState<Id<"orders"> | null>(null);
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false);
@@ -1445,5 +1446,13 @@ export default function LocalClientsPage() {
       )}
 
     </div>
+  );
+}
+
+export default function LocalClientsPage() {
+  return (
+    <ProtectedRoute route="/clients/local">
+      <LocalClientsPageContent />
+    </ProtectedRoute>
   );
 }

@@ -6,6 +6,7 @@ import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { Search, Filter, Loader2, AlertCircle, CheckCircle, Upload, X } from "lucide-react";
 import { useProductionYear } from "../../../hooks/useProductionYear";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 
 interface BatchData {
   _id: Id<"productionBatches">;
@@ -35,7 +36,7 @@ interface BatchData {
   updatedAt: number;
 }
 
-export default function ProductionDetailPage() {
+function ProductionDetailPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterUsed, setFilterUsed] = useState("all");
   const [selectedBatches, setSelectedBatches] = useState<Set<string>>(new Set());
@@ -43,6 +44,9 @@ export default function ProductionDetailPage() {
   
   // Use the shared year management system
   const { currentYear, currentFiscalYear } = useProductionYear();
+  
+  // Get current user role to check permissions
+  const currentUserRole = useQuery(api.users.getCurrentUserRole);
   
   // Upload functionality
   const [isUploading, setIsUploading] = useState(false);
@@ -393,7 +397,7 @@ export default function ProductionDetailPage() {
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Production Batches</h2>
-              {!processingState && (
+              {!processingState && currentUserRole !== "production" && (
                 <button
                   onClick={() => setShowUploadSection(!showUploadSection)}
                   className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -506,7 +510,7 @@ export default function ProductionDetailPage() {
             )}
 
             {/* Upload Form */}
-            {showUploadSection && !processingState && (
+            {showUploadSection && !processingState && currentUserRole !== "production" && (
               <div className="border-t border-gray-200 pt-4">
                 <div className="space-y-4">
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
@@ -1074,5 +1078,13 @@ export default function ProductionDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ProductionDetailPage() {
+  return (
+    <ProtectedRoute route="/production/detail">
+      <ProductionDetailPageContent />
+    </ProtectedRoute>
   );
 }

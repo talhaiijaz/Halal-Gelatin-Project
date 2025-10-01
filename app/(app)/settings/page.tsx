@@ -5,11 +5,12 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Settings, Save, AlertCircle, CheckCircle2, Package, Info, DollarSign, FileText, User, BarChart3, ChevronDown, Plus } from "lucide-react";
 import toast from "react-hot-toast";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { useProductionYear } from "../../hooks/useProductionYear";
 // import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
-export default function SettingsPage() {
+function SettingsPageContent() {
   // Dashboard Settings State
   const [dashboardOrderLimit, setDashboardOrderLimit] = useState<string>("5");
   const [currentDashboardLimit, setCurrentDashboardLimit] = useState<number>(5);
@@ -586,5 +587,13 @@ export default function SettingsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <ProtectedRoute route="/settings">
+      <SettingsPageContent />
+    </ProtectedRoute>
   );
 }

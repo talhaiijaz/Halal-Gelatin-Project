@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import TabNavigation, { useTabNavigation } from "@/app/components/TabNavigation";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import RecordPaymentModal from "@/app/components/finance/RecordPaymentModal";
 import EditPaymentModal from "@/app/components/finance/EditPaymentModal";
 import InvoiceDetailModal from "@/app/components/finance/InvoiceDetailModal";
@@ -38,7 +39,7 @@ import { shouldHighlightOrderYellowWithTransfers, shouldHighlightOrderRed, getOr
 
 // Note: formatCurrency is now imported from utils/currencyFormat
 
-export default function FinancePage() {
+function FinancePageContent() {
   // Calculate current fiscal year
   const currentFiscalYear = getCurrentFiscalYear();
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
@@ -1690,5 +1691,13 @@ export default function FinancePage() {
         bankAccountId={selectedBankAccountId as Id<"bankAccounts"> | null}
       />
     </div>
+  );
+}
+
+export default function FinancePage() {
+  return (
+    <ProtectedRoute route="/finance">
+      <FinancePageContent />
+    </ProtectedRoute>
   );
 }

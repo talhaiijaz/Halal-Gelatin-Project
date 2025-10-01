@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { Calendar, Package, Truck } from "lucide-react";
 import { getCurrentFiscalYear, getFiscalYearOptions, getFiscalYearLabel, getFiscalYearForDate } from "@/app/utils/fiscalYear";
 import { timestampToDateString } from "@/app/utils/dateUtils";
@@ -46,7 +47,7 @@ const getCurrentFiscalMonth = () => {
   return fiscalMonths[fiscalMonthIndex];
 };
 
-export default function ShipmentsPage() {
+function ShipmentsPageContent() {
   const [selectedFiscalYear, setSelectedFiscalYear] = useState(getCurrentFiscalYear());
   const [selectedFiscalMonth, setSelectedFiscalMonth] = useState(getCurrentFiscalMonth());
   const [monthlyLimit, setMonthlyLimit] = useState<number>(150000);
@@ -682,5 +683,13 @@ export default function ShipmentsPage() {
       </div>
 
     </div>
+  );
+}
+
+export default function ShipmentsPage() {
+  return (
+    <ProtectedRoute route="/shipments">
+      <ShipmentsPageContent />
+    </ProtectedRoute>
   );
 }

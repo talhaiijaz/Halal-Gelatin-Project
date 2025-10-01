@@ -4,10 +4,12 @@ import { Authenticated, Unauthenticated, AuthLoading, useQuery } from "convex/re
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { api } from "@/convex/_generated/api";
+import { canAccessRoute, type Role } from "@/app/utils/rolePermissions";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRoles?: Array<"admin" | "sales" | "finance" | "operations" | "user">;
+      requiredRoles?: Array<"admin" | "production">;
+  route?: string; // Optional route path for automatic permission checking
 }
 
 function UnauthenticatedContent() {
@@ -27,18 +29,32 @@ function UnauthenticatedContent() {
   );
 }
 
-export default function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
+export default function ProtectedRoute({ children, requiredRoles, route }: ProtectedRouteProps) {
   const router = useRouter();
-  const hasRoleRequirement = Array.isArray(requiredRoles) && requiredRoles.length > 0;
-  const roleQueryResult = hasRoleRequirement
-    ? useQuery(api.users.isUserInRoles, { roles: requiredRoles! })
-    : true;
+  const currentUserRole = useQuery(api.users.getCurrentUserRole);
+  
+  // Use centralized permission system if route is provided, otherwise fall back to requiredRoles
+  const hasAccess = useMemo(() => {
+    if (!currentUserRole) return false; // Still loading
+    
+    // If route is provided, use centralized permission system
+    if (route) {
+      return canAccessRoute(currentUserRole, route);
+    }
+    
+    // Fall back to requiredRoles if no route provided
+    if (Array.isArray(requiredRoles) && requiredRoles.length > 0) {
+      return requiredRoles.includes(currentUserRole);
+    }
+    
+    // No restrictions
+    return true;
+  }, [currentUserRole, route, requiredRoles]);
 
   const showAccessDenied = useMemo(() => {
-    if (!hasRoleRequirement) return false;
-    if (roleQueryResult === undefined) return false; // loading auth query
-    return roleQueryResult === false;
-  }, [hasRoleRequirement, roleQueryResult]);
+    if (currentUserRole === undefined) return false; // Still loading
+    return !hasAccess;
+  }, [currentUserRole, hasAccess]);
 
   return (
     <>

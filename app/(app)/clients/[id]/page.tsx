@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 import { useParams, useRouter } from "next/navigation";
 import { 
   ArrowLeft,
@@ -36,7 +37,7 @@ import { formatCurrency, getCurrencyForClientType, type SupportedCurrency } from
 import { usePagination } from "@/app/hooks/usePagination";
 import Pagination from "@/app/components/ui/Pagination";
 
-export default function ClientDetailPage() {
+function ClientDetailPageContent() {
   const params = useParams();
   const router = useRouter();
   const clientId = params?.id as Id<"clients">;
@@ -691,5 +692,13 @@ export default function ClientDetailPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ClientDetailPage() {
+  return (
+    <ProtectedRoute route="/clients">
+      <ClientDetailPageContent />
+    </ProtectedRoute>
   );
 }

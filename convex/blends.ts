@@ -583,12 +583,11 @@ export const createBlend = mutation({
   },
 });
 
-// Update blend status (for review/approval)
+// Update blend status
 export const updateBlendStatus = mutation({
   args: {
     blendId: v.id("blends"),
-    status: v.union(v.literal("draft"), v.literal("completed"), v.literal("approved")),
-    reviewedBy: v.optional(v.string()),
+    status: v.union(v.literal("draft"), v.literal("completed")),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -596,8 +595,6 @@ export const updateBlendStatus = mutation({
     
     await ctx.db.patch(args.blendId, {
       status: args.status,
-      reviewedBy: args.reviewedBy,
-      reviewedAt: args.status === "approved" ? now : undefined,
       notes: args.notes,
       updatedAt: now,
     });

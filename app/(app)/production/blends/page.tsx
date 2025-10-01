@@ -8,8 +8,9 @@ import { useProductionYear } from '../../../hooks/useProductionYear';
 import Link from 'next/link';
 import { FileDown, Eye, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import ProtectedRoute from '@/app/components/ProtectedRoute';
 
-export default function BlendsPage() {
+function BlendsPageContent() {
   const router = useRouter();
   const { currentFiscalYear } = useProductionYear();
   const blends = useQuery(api.blends.getAllBlends, {
@@ -17,9 +18,17 @@ export default function BlendsPage() {
     fiscalYear: currentFiscalYear,
   });
   const deleteBlend = useMutation(api.blends.deleteBlend);
+  
+  // Get current user role to check permissions
+  const currentUserRole = useQuery(api.users.getCurrentUserRole);
 
-  // Helper function to check if blend can be deleted (within 48 hours)
+  // Helper function to check if blend can be deleted (within 48 hours and not production role)
   const canDeleteBlend = (blend: any) => {
+    // Production role cannot delete any blends
+    if (currentUserRole === "production") {
+      return false;
+    }
+    
     const now = Date.now();
     const creationTime = blend.createdAt || blend._creationTime;
     const hoursSinceCreation = (now - creationTime) / (1000 * 60 * 60);
@@ -114,6 +123,14 @@ export default function BlendsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BlendsPage() {
+  return (
+    <ProtectedRoute route="/production/blends">
+      <BlendsPageContent />
+    </ProtectedRoute>
   );
 }
 

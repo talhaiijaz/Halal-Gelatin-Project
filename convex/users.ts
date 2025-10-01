@@ -5,7 +5,7 @@ import { Id } from "./_generated/dataModel";
 // Get current user's role
 export const getCurrentUserRole = query({
   args: {},
-  returns: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user"), v.null()),
+    returns: v.union(v.literal("admin"), v.literal("production"), v.null()),
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity?.email) return null;
@@ -22,13 +22,10 @@ export const getCurrentUserRole = query({
 // Check if the current user is in any of the required roles
 export const isUserInRoles = query({
   args: {
-    roles: v.array(v.union(
-      v.literal("admin"),
-      v.literal("sales"),
-      v.literal("finance"),
-      v.literal("operations"),
-      v.literal("user")
-    )),
+        roles: v.array(v.union(
+          v.literal("admin"),
+          v.literal("production")
+        )),
   },
   returns: v.boolean(),
   handler: async (ctx, args) => {
@@ -55,12 +52,40 @@ export const isUserAdmin = query({
   },
 });
 
-// Create or update user
+// Check if user exists and update last login (for authentication)
+export const checkUserAccess = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+  },
+  returns: v.union(v.id("users"), v.null()),
+  handler: async (ctx, args) => {
+    // Check if user exists in database
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .unique();
+
+    if (existingUser) {
+      // Update last login time
+      await ctx.db.patch(existingUser._id, {
+        name: args.name, // Update name in case it changed in Clerk
+        lastLogin: Date.now(),
+      });
+      return existingUser._id;
+    } else {
+      // User not found in database - access denied
+      return null;
+    }
+  },
+});
+
+// Create or update user (for manual user management)
 export const createOrUpdateUser = mutation({
   args: {
     email: v.string(),
     name: v.string(),
-    role: v.optional(v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user"))),
+        role: v.optional(v.union(v.literal("admin"), v.literal("production"))),
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
@@ -79,11 +104,11 @@ export const createOrUpdateUser = mutation({
       });
       return existingUser._id;
     } else {
-      // Create new user with admin permissions by default
+      // Create new user (only for manual user management)
       return await ctx.db.insert("users", {
         email: args.email,
         name: args.name,
-        role: args.role || "admin",
+            role: args.role || "production", // Default to production role for manual creation
         createdAt: Date.now(),
         lastLogin: Date.now(),
       });
@@ -99,7 +124,7 @@ export const getAllUsers = query({
     _creationTime: v.number(),
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("admin"), v.literal("sales"), v.literal("finance"), v.literal("operations"), v.literal("user")),
+        role: v.union(v.literal("admin"), v.literal("production")),
     createdAt: v.number(),
     lastLogin: v.optional(v.number()),
   })),

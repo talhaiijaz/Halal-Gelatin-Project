@@ -90,10 +90,6 @@ export interface Client {
   status: "active" | "inactive";
   profilePictureId?: string;
   outstandingBalance?: number;
-  approvalStatus?: "pending" | "approved" | "rejected";
-  approvalNotes?: string;
-  approvedAt?: number;
-  approvedBy?: string;
   createdAt: number;
   createdBy?: string;
 }

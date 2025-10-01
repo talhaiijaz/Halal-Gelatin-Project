@@ -13,7 +13,7 @@ export default function UsersPage() {
   const [formData, setFormData] = useState({
     email: "",
     name: "",
-    role: "admin" as "admin" | "sales" | "finance" | "operations"
+    role: "admin" as "admin" | "production"
   });
 
   // Get all users
@@ -57,7 +57,7 @@ export default function UsersPage() {
     setFormData({
       email: user.email as string,
       name: user.name as string,
-      role: user.role as "admin" | "sales" | "finance" | "operations",
+      role: user.role as "admin" | "production",
     });
     setShowAddModal(true);
   };
@@ -118,10 +118,6 @@ export default function UsersPage() {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     user.role === "admin" 
                       ? "bg-purple-100 text-purple-800" 
-                      : user.role === "sales"
-                      ? "bg-blue-100 text-blue-800"
-                      : user.role === "finance"
-                      ? "bg-green-100 text-green-800"
                       : "bg-orange-100 text-orange-800"
                   }`}>
                     {user.role === "admin" ? (
@@ -188,13 +184,11 @@ export default function UsersPage() {
                   </label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value as "admin" | "sales" | "finance" | "operations" })}
+                    onChange={(e) => setFormData({ ...formData, role: e.target.value as "admin" | "production" })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                   >
                     <option value="admin">Admin</option>
-                    <option value="sales">Sales</option>
-                    <option value="finance">Finance</option>
-                    <option value="operations">Operations</option>
+                    <option value="production">Production</option>
                   </select>
                 </div>
 
@@ -226,7 +220,7 @@ export default function UsersPage() {
   );
 
   return (
-    <ProtectedRoute requiredRoles={["admin"]}>
+    <ProtectedRoute route="/users">
       {content}
     </ProtectedRoute>
   );

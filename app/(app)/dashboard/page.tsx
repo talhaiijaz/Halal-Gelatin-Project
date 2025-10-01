@@ -28,8 +28,9 @@ import { formatCurrency, type SupportedCurrency } from "@/app/utils/currencyForm
 import { shouldHighlightOrderRed, shouldHighlightOrderYellowWithTransfers } from "@/app/utils/orderHighlighting";
 import OrderDetailModal from "@/app/components/orders/OrderDetailModal";
 import { Id } from "@/convex/_generated/dataModel";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 
-export default function DashboardPage() {
+function DashboardPageContent() {
   console.log("DashboardPage rendering...");
   const router = useRouter();
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
@@ -1184,5 +1185,13 @@ export default function DashboardPage() {
         onClose={() => setSelectedOrderId(null)}
       />
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <ProtectedRoute route="/dashboard">
+      <DashboardPageContent />
+    </ProtectedRoute>
   );
 }

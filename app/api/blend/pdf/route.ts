@@ -4,11 +4,18 @@ import { api } from '../../../../convex/_generated/api';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
+import { auth } from '@clerk/nextjs/server';
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export async function POST(request: NextRequest) {
   try {
+    // Check authentication
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { blendId } = body;
 
@@ -454,15 +461,7 @@ export async function POST(request: NextRequest) {
       color: black,
     });
 
-    if (blend.reviewedBy) {
-      page.drawText(blend.reviewedBy, {
-        x: 150,
-        y: notesY,
-        size: 12,
-        font: font,
-        color: black,
-      });
-    }
+    // Reviewed by field removed - no longer part of approval system
 
     // Generate PDF bytes
     const pdfBytes = await pdfDoc.save();

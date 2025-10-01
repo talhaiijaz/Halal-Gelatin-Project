@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import ProtectedRoute from "@/app/components/ProtectedRoute";
 // Removed usePagination and Pagination imports since we'll use a simpler approach
 import { 
   Search, 
@@ -19,7 +20,7 @@ import Skeleton from "react-loading-skeleton";
 import { timestampToDateString } from "@/app/utils/dateUtils";
 import "react-loading-skeleton/dist/skeleton.css";
 
-export default function LogsPage() {
+function LogsPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [entityFilter, setEntityFilter] = useState<string>("all");
   const [actionFilter, setActionFilter] = useState<string>("all");
@@ -336,5 +337,13 @@ export default function LogsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LogsPage() {
+  return (
+    <ProtectedRoute route="/logs">
+      <LogsPageContent />
+    </ProtectedRoute>
   );
 }
