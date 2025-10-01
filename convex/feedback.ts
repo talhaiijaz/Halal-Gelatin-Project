@@ -79,12 +79,6 @@ export const deleteFeedback = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const feedback = await ctx.db.get(args.feedbackId);
-    if (!feedback) {
-      throw new Error("Feedback not found");
-    }
-    
-    await ctx.db.delete(args.feedbackId);
-    return null;
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });

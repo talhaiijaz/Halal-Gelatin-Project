@@ -216,7 +216,7 @@ export const toggleOutsourceBatchHold = mutation({
 export const deleteOutsourceBatch = mutation({
   args: { batchId: v.id("outsourceBatches") },
   handler: async (ctx, args) => {
-    return await ctx.db.delete(args.batchId);
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 
@@ -224,32 +224,7 @@ export const deleteOutsourceBatch = mutation({
 export const deleteMultipleBatches = mutation({
   args: { batchIds: v.array(v.id("outsourceBatches")) },
   handler: async (ctx, args) => {
-    let deletedCount = 0;
-    const errors: string[] = [];
-    
-    for (const batchId of args.batchIds) {
-      try {
-        // Check if the batch exists before deleting
-        const batch = await ctx.db.get(batchId);
-        if (!batch) {
-          console.warn(`Batch with ID ${batchId} not found, skipping deletion`);
-          continue;
-        }
-        
-        await ctx.db.delete(batchId);
-        deletedCount++;
-      } catch (error) {
-        const errorMessage = `Failed to delete batch ${batchId}: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        console.error(errorMessage);
-        errors.push(errorMessage);
-      }
-    }
-    
-    if (errors.length > 0) {
-      console.warn(`Some batches could not be deleted:`, errors);
-    }
-    
-    return deletedCount;
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 

@@ -274,21 +274,11 @@ export const getWithBalance = query({
   },
 });
 
-// Delete bank account
+// Delete bank account (disabled - admin only)
 export const remove = mutation({
   args: { id: v.id("bankAccounts") },
   handler: async (ctx, args) => {
-    // Get bank account details before deletion for logging
-    const bankAccount = await ctx.db.get(args.id);
-    
-    await ctx.db.delete(args.id);
-    
-    // Create detailed log message
-    const accountDetails = bankAccount ? `${bankAccount.accountName} (${bankAccount.bankName})` : String(args.id);
-    const logMessage = `Bank account deleted: ${accountDetails}`;
-    
-    await logBankEvent(ctx, { entityId: String(args.id), action: "delete", message: logMessage });
-    return { success: true };
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 

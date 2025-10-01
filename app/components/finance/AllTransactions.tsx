@@ -80,20 +80,20 @@ export default function AllTransactions() {
           <table className="w-full table-fixed divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[30%]">Bank</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">Bank</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[45%]">Description</th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Type</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Amount</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Amount</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {!page ? (
                 [...Array(6)].map((_, i) => (
                   <tr key={i}>
-                    <td className="px-4 py-3"><div className="h-4 w-48 bg-gray-200 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-40 bg-gray-200 rounded animate-pulse" /></td>
                     <td className="px-4 py-3"><div className="h-4 w-56 bg-gray-200 rounded animate-pulse" /></td>
                     <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3 text-right"><div className="h-4 w-16 bg-gray-200 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-4 py-3 text-right"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse ml-auto" /></td>
                   </tr>
                 ))
               ) : transactions.length === 0 ? (
@@ -112,7 +112,7 @@ export default function AllTransactions() {
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {bank ? `${bank.accountName} - ${bank.bankName} (${bank.currency})` : "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 truncate" title={tx.description}>{tx.description}</td>
+                      <td className="px-4 py-3 text-sm text-gray-700 break-words" title={tx.description}>{tx.description}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">{tx.transactionType.replace("_", " ")}</td>
                       <td className={`px-4 py-3 text-sm font-medium text-right ${tx.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                         {formatCurrency(tx.amount, tx.currency)}

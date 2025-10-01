@@ -505,41 +505,19 @@ export const updateMultipleBatchStatuses = mutation({
   },
 });
 
-// Delete a batch
+// Delete a batch (disabled - admin only)
 export const deleteBatch = mutation({
   args: { id: v.id("productionBatches") },
   handler: async (ctx, args) => {
-    try {
-      // Check if the batch exists before deleting
-      const batch = await ctx.db.get(args.id);
-      if (!batch) {
-        throw new Error(`Batch with ID ${args.id} not found`);
-      }
-      
-      await ctx.db.delete(args.id);
-      console.log(`Successfully deleted batch ${batch.batchNumber} (ID: ${args.id})`);
-      return args.id;
-    } catch (error) {
-      console.error(`Failed to delete batch ${args.id}:`, error);
-      throw error;
-    }
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 
-// Delete all batches from a specific report
+// Delete all batches from a specific report (disabled - admin only)
 export const deleteBatchesBySourceReport = mutation({
   args: { sourceReport: v.string() },
   handler: async (ctx, args) => {
-    const batches = await ctx.db
-      .query("productionBatches")
-      .withIndex("by_source_report", (q) => q.eq("sourceReport", args.sourceReport))
-      .collect();
-
-    for (const batch of batches) {
-      await ctx.db.delete(batch._id);
-    }
-
-    return batches.length;
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 
@@ -547,34 +525,7 @@ export const deleteBatchesBySourceReport = mutation({
 export const deleteMultipleBatches = mutation({
   args: { batchIds: v.array(v.id("productionBatches")) },
   handler: async (ctx, args) => {
-    let deletedCount = 0;
-    const errors: string[] = [];
-    
-    for (const batchId of args.batchIds) {
-      try {
-        // Check if the batch exists before deleting
-        const batch = await ctx.db.get(batchId);
-        if (!batch) {
-          console.warn(`Batch with ID ${batchId} not found, skipping deletion`);
-          continue;
-        }
-        
-        await ctx.db.delete(batchId);
-        deletedCount++;
-        console.log(`Successfully deleted batch ${batch.batchNumber} (ID: ${batchId})`);
-      } catch (error) {
-        const errorMsg = `Failed to delete batch ${batchId}: ${error}`;
-        console.error(errorMsg);
-        errors.push(errorMsg);
-      }
-    }
-
-    if (errors.length > 0) {
-      console.warn(`Some batches failed to delete: ${errors.join(', ')}`);
-    }
-
-    console.log(`Delete operation completed: ${deletedCount}/${args.batchIds.length} batches deleted`);
-    return deletedCount;
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 

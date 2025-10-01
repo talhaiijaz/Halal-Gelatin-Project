@@ -6,7 +6,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useProductionYear } from '../../../hooks/useProductionYear';
 import Link from 'next/link';
-import { FileDown, Trash2, Eye } from 'lucide-react';
+import { FileDown, Eye } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function BlendsPage() {
@@ -16,7 +16,6 @@ export default function BlendsPage() {
     paginationOpts: { numItems: 100, cursor: null },
     fiscalYear: currentFiscalYear,
   });
-  const deleteBlend = useMutation(api.blends.deleteBlend);
 
   const handleDownload = async (blendId: string, blendNumber: string) => {
     try {
@@ -40,14 +39,6 @@ export default function BlendsPage() {
     }
   };
 
-  const handleDelete = async (blendId: string) => {
-    try {
-      await deleteBlend({ blendId } as any);
-      toast.success('Blend deleted and batches made available');
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete blend');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -83,7 +74,6 @@ export default function BlendsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center gap-3">
                         <button onClick={(e) => { e.stopPropagation(); handleDownload(blend._id, blend.lotNumber); }} className="text-blue-600 hover:text-blue-800 flex items-center gap-1"><FileDown className="h-4 w-4" />PDF</button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(blend._id); }} className="text-red-600 hover:text-red-800 flex items-center gap-1"><Trash2 className="h-4 w-4" />Delete</button>
                       </div>
                     </td>
                   </tr>

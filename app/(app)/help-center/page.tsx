@@ -12,7 +12,6 @@ import {
   Settings,
   Ticket,
   Send,
-  Trash2,
   Calendar,
   Eye,
 } from "lucide-react";
@@ -46,7 +45,6 @@ export default function HelpCenterPage() {
 
   // Convex mutations and queries
   const submitFeedback = useMutation(api.feedback.submitFeedback);
-  const deleteFeedback = useMutation(api.feedback.deleteFeedback);
   const allTickets = useQuery(api.feedback.getAllFeedback, {});
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,17 +75,6 @@ export default function HelpCenterPage() {
     }
   };
 
-  const handleDelete = async (ticketId: string) => {
-    if (!confirm("Are you sure you want to delete this ticket?")) return;
-
-    try {
-      await deleteFeedback({ feedbackId: ticketId as Id<"feedback"> });
-      toast.success("Ticket deleted successfully!");
-    } catch (error) {
-      toast.error("Failed to delete ticket");
-      console.error(error);
-    }
-  };
 
   const handleViewTicket = (ticket: any) => {
     setSelectedTicket(ticket);
@@ -319,13 +306,6 @@ export default function HelpCenterPage() {
                           title="View full ticket details"
                         >
                           <Eye className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(ticket._id)}
-                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete ticket"
-                        >
-                          <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </div>

@@ -809,52 +809,13 @@ export const addItems = mutation({
   },
 });
 
-// Delete order (only if pending)
+// Delete order (disabled - admin only)
 export const remove = mutation({
   args: {
     id: v.id("orders"),
   },
   handler: async (ctx, args) => {
-    
-    
-
-    const order = await ctx.db.get(args.id);
-    if (!order) throw new Error("Order not found");
-
-    if (order.status !== "pending") {
-      throw new Error("Can only delete pending orders");
-    }
-
-    // Delete associated files from storage
-    const filesToDelete = [
-      order.packingListId,
-      order.proformaInvoiceId,
-      order.commercialInvoiceId
-    ].filter(Boolean);
-
-    for (const fileId of filesToDelete) {
-      try {
-        await ctx.storage.delete(fileId as any);
-      } catch (error) {
-        console.error("Failed to delete file from storage:", error);
-        // Continue with deletion even if file cleanup fails
-      }
-    }
-
-    // Delete order items
-    const items = await ctx.db
-      .query("orderItems")
-      .withIndex("by_order", (q) => q.eq("orderId", args.id))
-      .collect();
-
-    for (const item of items) {
-      await ctx.db.delete(item._id);
-    }
-
-    // Delete order
-    await ctx.db.delete(args.id);
-
-    return { success: true };
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 
@@ -1323,57 +1284,13 @@ export const update = mutation({
   },
 });
 
-// Delete order
+// Delete order (disabled - admin only)
 export const deleteOrder = mutation({
   args: {
     orderId: v.id("orders"),
   },
   handler: async (ctx, args) => {
-    // Delete order items
-    const orderItems = await ctx.db
-      .query("orderItems")
-      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
-      .collect();
-    
-    for (const item of orderItems) {
-      await ctx.db.delete(item._id);
-    }
-
-    // Delete invoice if it exists
-    const invoice = await ctx.db
-      .query("invoices")
-      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
-      .first();
-
-    if (invoice) {
-      await ctx.db.delete(invoice._id);
-    }
-
-    // Delete delivery if it exists
-    const delivery = await ctx.db
-      .query("deliveries")
-      .withIndex("by_order", (q) => q.eq("orderId", args.orderId))
-      .first();
-
-    if (delivery) {
-      await ctx.db.delete(delivery._id);
-    }
-
-    // Get order details before deletion for logging
-    const order = await ctx.db.get(args.orderId);
-    const client = order ? await ctx.db.get(order.clientId) : null;
-    
-    // Delete the order
-    await ctx.db.delete(args.orderId);
-    
-    // Create detailed log message
-    const orderDetails = order ? `${order.orderNumber} - ${order.totalAmount} ${order.currency}` : String(args.orderId);
-    const clientName = client ? ` from ${client.name}` : '';
-    const logMessage = `Order deleted: ${orderDetails}${clientName}`;
-    
-    await logOrderEvent(ctx, { entityId: String(args.orderId), action: "delete", message: logMessage });
-
-    return { success: true };
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 

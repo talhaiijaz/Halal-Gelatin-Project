@@ -981,105 +981,13 @@ export const getPaymentReceipt = query({
   },
 });
 
-// Delete a payment (admin only)
+// Delete a payment (disabled - admin only)
 export const deletePayment = mutation({
   args: {
     paymentId: v.id("payments"),
   },
   handler: async (ctx, args) => {
-    // Auth removed - allow all delete operations
-    // In production, implement proper access control
-
-    // Get the payment
-    const payment = await ctx.db.get(args.paymentId);
-    if (!payment) throw new Error("Payment not found");
-
-    // Get related entities for logging and bank account updates
-    const client = await ctx.db.get(payment.clientId);
-    const invoice = payment.invoiceId ? await ctx.db.get(payment.invoiceId) : null;
-    const bankAccount = payment.bankAccountId ? await ctx.db.get(payment.bankAccountId) : null;
-
-    // If payment is linked to a bank account, handle bank transaction deletion
-    if (payment.bankAccountId) {
-      // Find and delete the corresponding bank transaction
-      const bankTransaction = await ctx.db
-        .query("bankTransactions")
-        .filter(q => q.eq(q.field("paymentId"), args.paymentId))
-        .first();
-
-      if (bankTransaction) {
-        // Hard delete the bank transaction to remove it from transaction history
-        await ctx.db.delete(bankTransaction._id);
-
-        // Update bank account balance
-        await updateBankAccountBalance(ctx, payment.bankAccountId);
-
-        // Log bank account activity
-        await logEvent(ctx, {
-          entityTable: "banks",
-          entityId: String(payment.bankAccountId),
-          action: "update",
-          message: `Payment deleted${bankAccount ? ` from ${bankAccount.accountName}` : ""}: ${formatCurrency(payment.amount, payment.currency)}${client ? ` from ${(client as any).name}` : ""}`,
-          metadata: {
-            paymentId: args.paymentId,
-            bankTransactionId: bankTransaction._id,
-            invoiceId: payment.invoiceId,
-            clientId: payment.clientId,
-            method: payment.method,
-            reference: payment.reference,
-            amount: payment.amount,
-            currency: payment.currency,
-          },
-        });
-      }
-    }
-
-    // If this payment is linked to an invoice, update invoice aggregates
-    if (payment.invoiceId && invoice) {
-      // Update invoice
-      const newTotalPaid = Math.max(0, invoice.totalPaid - payment.amount);
-      const newOutstandingBalance = invoice.amount - newTotalPaid;
-      
-      // Determine new status
-      let newStatus: "unpaid" | "partially_paid" | "paid";
-      if (newTotalPaid === 0) {
-        newStatus = "unpaid";
-      } else if (newOutstandingBalance > 0) {
-        newStatus = "partially_paid";
-      } else {
-        newStatus = "paid";
-      }
-
-      await ctx.db.patch(payment.invoiceId, {
-        totalPaid: newTotalPaid,
-        outstandingBalance: newOutstandingBalance,
-        status: newStatus,
-        updatedAt: Date.now(),
-      });
-    }
-
-    // Delete the payment
-    await ctx.db.delete(args.paymentId);
-    
-    // Create detailed log message
-    const paymentDetails = `${formatCurrency(payment.amount, payment.currency)} - ${payment.reference}`;
-    const clientName = client ? ` from ${(client as any).name}` : '';
-    const logMessage = `Payment deleted: ${paymentDetails}${clientName}`;
-    
-    await logEvent(ctx, {
-      entityTable: "payments",
-      entityId: String(args.paymentId),
-      action: "delete",
-      message: logMessage,
-      metadata: { 
-        paymentId: args.paymentId, 
-        payment,
-        bankAccountId: payment.bankAccountId,
-        invoiceId: payment.invoiceId,
-      },
-    });
-
-    return { success: true };
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 

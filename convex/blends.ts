@@ -602,40 +602,6 @@ export const updateBlendStatus = mutation({
 export const deleteBlend = mutation({
   args: { blendId: v.id("blends") },
   handler: async (ctx, args) => {
-    const blend = await ctx.db.get(args.blendId);
-    if (!blend) {
-      throw new Error("Blend not found");
-    }
-    
-    // Free up the batches (handle both production and outsource batches)
-    for (const selectedBatch of blend.selectedBatches) {
-      // Try to patch as production batch first
-      try {
-        await ctx.db.patch(selectedBatch.batchId as unknown as Id<"productionBatches">, {
-          isUsed: false,
-          usedDate: undefined,
-          usedInOrder: undefined,
-          updatedAt: Date.now(),
-        });
-      } catch (error) {
-        // If it fails, try as outsource batch
-        try {
-          await ctx.db.patch(selectedBatch.batchId as unknown as Id<"outsourceBatches">, {
-            isUsed: false,
-            usedDate: undefined,
-            usedInOrder: undefined,
-            updatedAt: Date.now(),
-          });
-        } catch (outError) {
-          console.error(`Failed to free batch ${selectedBatch.batchId}:`, outError);
-          // Continue with other batches even if one fails
-        }
-      }
-    }
-    
-    // Delete the blend
-    await ctx.db.delete(args.blendId);
-    
-    return args.blendId;
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });

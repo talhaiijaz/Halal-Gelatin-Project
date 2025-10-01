@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { Search, Filter, Trash2, Loader2, AlertCircle, CheckCircle, Upload, X } from "lucide-react";
+import { Search, Filter, Loader2, AlertCircle, CheckCircle, Upload, X } from "lucide-react";
 import { useProductionYear } from "../../../hooks/useProductionYear";
 
 interface BatchData {
@@ -38,7 +38,6 @@ export default function OutsourceDetailPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterUsed, setFilterUsed] = useState("all");
   const [selectedBatches, setSelectedBatches] = useState<Set<string>>(new Set());
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showReportsModal, setShowReportsModal] = useState(false);
   
   // Use the shared year management system
@@ -73,8 +72,6 @@ export default function OutsourceDetailPage() {
   const processingState = useQuery(api.outsourceProcessing.getCurrentOutsourceProcessingState);
 
   // Mutations
-  const deleteBatch = useMutation(api.outsourceBatches.deleteOutsourceBatch);
-  const deleteMultipleBatches = useMutation(api.outsourceBatches.deleteMultipleBatches);
   const createBatchesFromExtractedData = useMutation(api.outsourceBatches.createOutsourceBatchesFromExtractedData);
   const startProcessing = useMutation(api.outsourceProcessing.startOutsourceProcessing);
   const updateProcessingState = useMutation(api.outsourceProcessing.updateOutsourceProcessingState);
@@ -118,24 +115,6 @@ export default function OutsourceDetailPage() {
     return b.batchNumber - a.batchNumber;
   });
 
-  const handleDeleteBatch = async (batchId: Id<"outsourceBatches">) => {
-    // Find the batch to check if it's used
-    const batch = batches?.page?.find(b => b._id === batchId);
-    if (batch?.isUsed) {
-      alert("Cannot delete batch that has been used in a blend. Please delete the blend first to free up the batch.");
-      return;
-    }
-    
-    if (confirm("Are you sure you want to delete this batch?")) {
-      try {
-        await deleteBatch({ batchId: batchId });
-        console.log("Batch deleted successfully:", batchId);
-      } catch (error) {
-        console.error("Error deleting batch:", error);
-        alert("Failed to delete batch. Please try again.");
-      }
-    }
-  };
 
   const handleSelectBatch = (batchId: string) => {
     // Find the batch to check if it's used
@@ -166,20 +145,6 @@ export default function OutsourceDetailPage() {
     }
   };
 
-  const handleDeleteSelected = async () => {
-    if (selectedBatches.size === 0) return;
-
-    try {
-      const batchIds = Array.from(selectedBatches) as Id<"outsourceBatches">[];
-      const deletedCount = await deleteMultipleBatches({ batchIds });
-      console.log(`Successfully deleted ${deletedCount} batches:`, batchIds);
-      setSelectedBatches(new Set());
-      setShowDeleteModal(false);
-    } catch (error) {
-      console.error("Error deleting batches:", error);
-      alert("Failed to delete selected batches. Please try again.");
-    }
-  };
 
 
 
@@ -774,12 +739,6 @@ export default function OutsourceDetailPage() {
           {selectedBatches.size > 0 && (
             <>
               <button
-                onClick={() => setShowDeleteModal(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                Delete Selected ({selectedBatches.size})
-              </button>
-              <button
                 onClick={() => setSelectedBatches(new Set())}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
               >
@@ -983,18 +942,6 @@ export default function OutsourceDetailPage() {
                     >
                       {batch.isOnHold ? 'Release Hold' : 'Hold'}
                     </button>
-                    <button
-                      onClick={() => handleDeleteBatch(batch._id)}
-                      disabled={batch.isUsed}
-                      className={`${
-                        batch.isUsed 
-                          ? 'text-gray-400 cursor-not-allowed' 
-                          : 'text-red-600 hover:text-red-900'
-                      }`}
-                      title={batch.isUsed ? 'Cannot delete batch that has been used in a blend' : 'Delete batch'}
-                    >
-                      Delete
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -1019,64 +966,6 @@ export default function OutsourceDetailPage() {
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-2/3 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Delete Selected Batches
-                </h3>
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="mb-4">
-                <p className="text-sm text-gray-600">
-                  Are you sure you want to delete <strong>{selectedBatches.size}</strong> selected batch(es)? 
-                  This action cannot be undone.
-                </p>
-                <div className="mt-3">
-                  <p className="text-xs text-gray-500">Selected batches:</p>
-                  <ul className="text-xs text-gray-600 mt-1 max-h-32 overflow-y-auto">
-                    {Array.from(selectedBatches).map((batchId) => {
-                      const batch = sortedBatches.find(b => b._id === batchId);
-                      return (
-                        <li key={batchId} className="flex justify-between">
-                          <span>Batch #{batch?.batchNumber}</span>
-                          <span className="text-gray-400">{batch?.sourceReport}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeleteSelected}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                  Delete {selectedBatches.size} Batch(es)
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
 
 

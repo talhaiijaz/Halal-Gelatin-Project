@@ -129,14 +129,7 @@ export const deleteTransfer = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const transfer = await ctx.db.get(args.transferId);
-    
-    if (!transfer) {
-      throw new Error("Transfer not found");
-    }
-    
-    // Delete the transfer record
-    await ctx.db.delete(args.transferId);
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
     
     // Note: Bank balance updates are handled by the bank transaction deletion
     // since inter-bank transfers are always linked to bank transactions

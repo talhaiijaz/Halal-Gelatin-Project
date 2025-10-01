@@ -18,13 +18,11 @@ import {
   AlertCircle,
   Upload,
   Edit,
-  Trash2,
   ChevronDown,
   ChevronRight
 } from "lucide-react";
 import DocumentUpload from "./DocumentUpload";
 import EditOrderModal from "./EditOrderModal";
-import DeleteConfirmModal from "./DeleteConfirmModal";
 import RecordPaymentModal from "@/app/components/finance/RecordPaymentModal";
 import InvoiceDetailModal from "@/app/components/finance/InvoiceDetailModal";
 import ActivityLog from "../ActivityLog";
@@ -51,7 +49,6 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
   const updateInvoiceNumber = useMutation(api.orders.updateInvoiceNumber);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isEditingInvoiceNumber, setIsEditingInvoiceNumber] = useState(false);
   const [newInvoiceNumber, setNewInvoiceNumber] = useState("");
   const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
@@ -171,13 +168,6 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                 >
                   <Edit className="h-4 w-4 mr-1" />
                   Edit
-                </button>
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center px-3 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 active:bg-red-200 transition-colors"
-                >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
                 </button>
                 <button
                   onClick={onClose}
@@ -863,17 +853,6 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
         orderId={orderId}
       />
 
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onSuccess={() => {
-          setShowDeleteModal(false);
-          onClose(); // Close the detail modal after successful deletion
-        }}
-        orderId={orderId}
-        invoiceNumber={order?.invoiceNumber}
-      />
 
       {/* Record Payment Modal with preselected invoice and client */}
       {order && (

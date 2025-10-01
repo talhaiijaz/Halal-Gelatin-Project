@@ -248,42 +248,13 @@ export const update = mutation({
   },
 });
 
-// Delete a client (hard delete - removes completely)
+// Delete a client (disabled - admin only)
 export const remove = mutation({
   args: {
     id: v.id("clients"),
   },
   handler: async (ctx, args) => {
-    // Check if client exists
-    const client = await ctx.db.get(args.id);
-    if (!client) {
-      throw new Error("Client not found");
-    }
-
-    // Check if client has any orders (active or completed)
-    const orders = await ctx.db
-      .query("orders")
-      .withIndex("by_client", (q) => q.eq("clientId", args.id))
-      .first();
-
-    if (orders) {
-      throw new Error("Cannot delete client with existing orders. Please remove all orders first.");
-    }
-
-    // Check if client has any invoices
-    const invoices = await ctx.db
-      .query("invoices")
-      .withIndex("by_client", (q) => q.eq("clientId", args.id))
-      .first();
-
-    if (invoices) {
-      throw new Error("Cannot delete client with existing invoices. Please remove all invoices first.");
-    }
-
-    // Hard delete the client
-    await ctx.db.delete(args.id);
-    await logClientEvent(ctx, { entityId: String(args.id), action: "delete", message: `Client deleted: ${client.name || String(args.id)}` });
-    return { success: true };
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 

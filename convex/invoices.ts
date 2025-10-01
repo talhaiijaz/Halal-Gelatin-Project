@@ -612,31 +612,7 @@ export const deleteInvoice = mutation({
     id: v.id("invoices"),
   },
   handler: async (ctx, args) => {
-    const invoice = await ctx.db.get(args.id);
-    if (!invoice) throw new Error("Invoice not found");
-
-    // Check if payments exist
-    const payments = await ctx.db
-      .query("payments")
-      .withIndex("by_invoice", q => q.eq("invoiceId", args.id))
-      .collect();
-
-    if (payments.length > 0) {
-      throw new Error("Cannot delete invoice with recorded payments");
-    }
-
-    // Get invoice details before deletion for logging
-    const client = await ctx.db.get(invoice.clientId);
-    
-    await ctx.db.delete(args.id);
-    
-    // Create detailed log message
-    const invoiceDetails = `${invoice.invoiceNumber || 'INV-' + String(args.id).slice(-6)} - ${invoice.amount} ${invoice.currency}`;
-    const clientName = client ? ` for ${client.name}` : '';
-    const logMessage = `Invoice deleted: ${invoiceDetails}${clientName}`;
-    
-    await logInvoiceEvent(ctx, { entityId: String(args.id), action: "delete", message: logMessage });
-    return { success: true };
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 
