@@ -602,6 +602,21 @@ export const updateBlendStatus = mutation({
 export const deleteBlend = mutation({
   args: { blendId: v.id("blends") },
   handler: async (ctx, args) => {
-    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
+    // Check if blend is within 48 hours of creation
+    const blend = await ctx.db.get(args.blendId);
+    if (!blend) {
+      throw new Error("Blend not found");
+    }
+    
+    const now = Date.now();
+    const creationTime = blend.createdAt || blend._creationTime;
+    const hoursSinceCreation = (now - creationTime) / (1000 * 60 * 60);
+    
+    if (hoursSinceCreation > 48) {
+      throw new Error("Cannot delete blend: Blend is older than 48 hours");
+    }
+    
+    await ctx.db.delete(args.blendId);
+    return { success: true };
   },
 });

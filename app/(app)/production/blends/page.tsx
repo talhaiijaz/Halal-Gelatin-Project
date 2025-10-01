@@ -6,7 +6,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useProductionYear } from '../../../hooks/useProductionYear';
 import Link from 'next/link';
-import { FileDown, Eye } from 'lucide-react';
+import { FileDown, Eye, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function BlendsPage() {
@@ -16,6 +16,27 @@ export default function BlendsPage() {
     paginationOpts: { numItems: 100, cursor: null },
     fiscalYear: currentFiscalYear,
   });
+  const deleteBlend = useMutation(api.blends.deleteBlend);
+
+  // Helper function to check if blend can be deleted (within 48 hours)
+  const canDeleteBlend = (blend: any) => {
+    const now = Date.now();
+    const creationTime = blend.createdAt || blend._creationTime;
+    const hoursSinceCreation = (now - creationTime) / (1000 * 60 * 60);
+    return hoursSinceCreation <= 48;
+  };
+
+  const handleDelete = async (blendId: string) => {
+    if (confirm("Are you sure you want to delete this blend?")) {
+      try {
+        await deleteBlend({ blendId: blendId as any });
+        toast.success("Blend deleted successfully!");
+      } catch (error: any) {
+        console.error("Error deleting blend:", error);
+        toast.error(error.message || "Failed to delete blend. Please try again.");
+      }
+    }
+  };
 
   const handleDownload = async (blendId: string, blendNumber: string) => {
     try {
@@ -74,6 +95,15 @@ export default function BlendsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div className="flex items-center gap-3">
                         <button onClick={(e) => { e.stopPropagation(); handleDownload(blend._id, blend.lotNumber); }} className="text-blue-600 hover:text-blue-800 flex items-center gap-1"><FileDown className="h-4 w-4" />PDF</button>
+                        {canDeleteBlend(blend) && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDelete(blend._id); }} 
+                            className="text-red-600 hover:text-red-800 flex items-center gap-1"
+                            title="Delete blend (within 48 hours)"
+                          >
+                            <Trash2 className="h-4 w-4" />Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

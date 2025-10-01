@@ -509,22 +509,7 @@ export const updateMultipleBatchStatuses = mutation({
 export const deleteBatch = mutation({
   args: { id: v.id("productionBatches") },
   handler: async (ctx, args) => {
-    // Check if batch is within 48 hours of creation
-    const batch = await ctx.db.get(args.id);
-    if (!batch) {
-      throw new Error("Batch not found");
-    }
-    
-    const now = Date.now();
-    const creationTime = batch.createdAt || batch._creationTime;
-    const hoursSinceCreation = (now - creationTime) / (1000 * 60 * 60);
-    
-    if (hoursSinceCreation > 48) {
-      throw new Error("Cannot delete batch: Batch is older than 48 hours");
-    }
-    
-    await ctx.db.delete(args.id);
-    return { success: true };
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 
@@ -540,24 +525,7 @@ export const deleteBatchesBySourceReport = mutation({
 export const deleteMultipleBatches = mutation({
   args: { batchIds: v.array(v.id("productionBatches")) },
   handler: async (ctx, args) => {
-    const now = Date.now();
-    let deletedCount = 0;
-    
-    for (const batchId of args.batchIds) {
-      const batch = await ctx.db.get(batchId);
-      if (!batch) continue;
-      
-      const creationTime = batch.createdAt || batch._creationTime;
-      const hoursSinceCreation = (now - creationTime) / (1000 * 60 * 60);
-      
-      // Only delete if within 48 hours
-      if (hoursSinceCreation <= 48) {
-        await ctx.db.delete(batchId);
-        deletedCount++;
-      }
-    }
-    
-    return deletedCount;
+    throw new Error("Delete functionality is disabled. Please contact the administrator to delete records.");
   },
 });
 

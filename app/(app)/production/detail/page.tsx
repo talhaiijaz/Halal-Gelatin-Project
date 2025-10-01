@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { Search, Filter, Loader2, AlertCircle, CheckCircle, Upload, X, Trash2 } from "lucide-react";
+import { Search, Filter, Loader2, AlertCircle, CheckCircle, Upload, X } from "lucide-react";
 import { useProductionYear } from "../../../hooks/useProductionYear";
 
 interface BatchData {
@@ -80,8 +80,6 @@ export default function ProductionDetailPage() {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const getFileUrl = useMutation(api.productionBatches.getFileUrl);
   const toggleBatchHold = useMutation(api.productionBatches.toggleBatchHold);
-  const deleteBatch = useMutation(api.productionBatches.deleteBatch);
-  const deleteMultipleBatches = useMutation(api.productionBatches.deleteMultipleBatches);
 
   // Get unique source reports for filter
   const sourceReports = batches?.page ? 
@@ -118,65 +116,6 @@ export default function ProductionDetailPage() {
     return b.batchNumber - a.batchNumber;
   });
 
-  // Helper function to check if batch can be deleted (within 48 hours)
-  const canDeleteBatch = (batch: BatchData) => {
-    const now = Date.now();
-    const creationTime = batch.createdAt || batch._creationTime;
-    const hoursSinceCreation = (now - creationTime) / (1000 * 60 * 60);
-    return hoursSinceCreation <= 48;
-  };
-
-  const handleDeleteBatch = async (batchId: Id<"productionBatches">) => {
-    // Find the batch to check if it's used and can be deleted
-    const batch = batches?.page?.find(b => b._id === batchId);
-    if (!batch) return;
-    
-    if (batch.isUsed) {
-      alert("Cannot delete batch that has been used in a blend. Please delete the blend first to free up the batch.");
-      return;
-    }
-    
-    if (!canDeleteBatch(batch)) {
-      alert("Cannot delete batch: Batch is older than 48 hours.");
-      return;
-    }
-    
-    if (confirm("Are you sure you want to delete this batch?")) {
-      try {
-        await deleteBatch({ id: batchId });
-        console.log("Batch deleted successfully:", batchId);
-      } catch (error) {
-        console.error("Error deleting batch:", error);
-        alert("Failed to delete batch. Please try again.");
-      }
-    }
-  };
-
-  const handleDeleteSelected = async () => {
-    if (selectedBatches.size === 0) return;
-
-    // Filter to only include batches that can be deleted
-    const deletableBatches = Array.from(selectedBatches).filter(batchId => {
-      const batch = batches?.page?.find(b => b._id === batchId);
-      return batch && !batch.isUsed && canDeleteBatch(batch);
-    });
-
-    if (deletableBatches.length === 0) {
-      alert("No selected batches can be deleted (either used in blends or older than 48 hours).");
-      return;
-    }
-
-    try {
-      const batchIds = deletableBatches as Id<"productionBatches">[];
-      const deletedCount = await deleteMultipleBatches({ batchIds });
-      console.log(`Successfully deleted ${deletedCount} batches:`, batchIds);
-      setSelectedBatches(new Set());
-      alert(`Successfully deleted ${deletedCount} out of ${selectedBatches.size} selected batches.`);
-    } catch (error) {
-      console.error("Error deleting batches:", error);
-      alert("Failed to delete selected batches. Please try again.");
-    }
-  };
 
   const handleSelectBatch = (batchId: string) => {
     // Find the batch to check if it's used
@@ -1003,20 +942,6 @@ export default function ProductionDetailPage() {
                     >
                       {batch.isOnHold ? 'Release Hold' : 'Hold'}
                     </button>
-                    {canDeleteBatch(batch) && (
-                      <button
-                        onClick={() => handleDeleteBatch(batch._id)}
-                        disabled={batch.isUsed}
-                        className={`${
-                          batch.isUsed 
-                            ? 'text-gray-400 cursor-not-allowed' 
-                            : 'text-red-600 hover:text-red-900'
-                        }`}
-                        title={batch.isUsed ? 'Cannot delete batch that has been used in a blend' : 'Delete batch (within 48 hours)'}
-                      >
-                        Delete
-                      </button>
-                    )}
                   </td>
                 </tr>
               ))}
