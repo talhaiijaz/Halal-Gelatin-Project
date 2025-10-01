@@ -615,7 +615,34 @@ export const deleteBlend = mutation({
     if (hoursSinceCreation > 48) {
       throw new Error("Cannot delete blend: Blend is older than 48 hours");
     }
-    
+    // Revert batches used in this blend back to available before deleting
+    if (Array.isArray(blend.selectedBatches) && blend.selectedBatches.length > 0) {
+      for (const batch of blend.selectedBatches as Array<{ batchId: Id<any> }>) {
+        // Try reverting as production batch first
+        try {
+          await ctx.db.patch(batch.batchId as unknown as Id<"productionBatches">, {
+            isUsed: false,
+            usedInOrder: undefined,
+            usedDate: undefined,
+            updatedAt: now,
+          });
+          continue; // done for this batch
+        } catch (_) {
+          // Fallback to outsource batch
+        }
+        try {
+          await ctx.db.patch(batch.batchId as unknown as Id<"outsourceBatches">, {
+            isUsed: false,
+            usedInOrder: undefined,
+            usedDate: undefined,
+            updatedAt: now,
+          });
+        } catch (err) {
+          console.error("Failed to revert batch to available during blend deletion:", batch.batchId, err);
+        }
+      }
+    }
+
     await ctx.db.delete(args.blendId);
     return { success: true };
   },
