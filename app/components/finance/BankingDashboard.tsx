@@ -262,10 +262,9 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
               <table className="min-w-full table-fixed divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">Type</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[40%]">Description</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">Time</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[20%]">Amount</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">Type</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[50%]">Description</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">Amount</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -274,20 +273,18 @@ export default function BankingDashboard({ bankAccountId }: BankingDashboardProp
                       <tr key={i}>
                         <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse" /></td>
                         <td className="px-4 py-3"><div className="h-4 w-64 bg-gray-200 rounded animate-pulse" /></td>
-                        <td className="px-4 py-3"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse" /></td>
                         <td className="px-4 py-3 text-right"><div className="h-4 w-16 bg-gray-200 rounded animate-pulse ml-auto" /></td>
                       </tr>
                     ))
                   ) : dailyTransactions.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">No transactions on this day</td>
+                      <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">No transactions on this day</td>
                     </tr>
                   ) : (
                     dailyTransactions.map((tx: any) => (
                       <tr key={tx._id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedTxId(tx._id); setIsTxDetailOpen(true); }}>
                         <td className="px-4 py-3 text-sm text-gray-900">{getTransactionTypeLabel(tx.transactionType)}</td>
                         <td className="px-4 py-3 text-sm text-gray-700 truncate" title={tx.description}>{tx.description}</td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{new Date(tx.transactionDate).toLocaleTimeString()}</td>
                         <td className={`px-4 py-3 text-sm font-medium text-right ${tx.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}> 
                           {formatCurrency(tx.amount, tx.currency)}
                         </td>

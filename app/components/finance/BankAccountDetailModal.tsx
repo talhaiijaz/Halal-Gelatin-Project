@@ -5,10 +5,9 @@ import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, Building2, Edit, Trash2, Calendar, CreditCard, DollarSign } from "lucide-react";
+import { X, Building2, Edit, Calendar, CreditCard, DollarSign } from "lucide-react";
 import ActivityLog from "@/app/components/ActivityLog";
 import BankAccountModal from "./BankAccountModal";
-import DeleteBankConfirmModal from "./DeleteBankConfirmModal";
 import { useModalManager } from "@/app/hooks/useModalManager";
 import { formatCurrency } from "@/app/utils/currencyFormat";
 
@@ -22,7 +21,6 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
   const bankAccount = useQuery(api.banks.getWithBalance, bankAccountId ? { id: bankAccountId } : "skip");
   const payments = useQuery(api.banks.getPayments, bankAccountId ? { bankAccountId } : "skip");
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
   // Generate unique modal ID and manage modal state
   const modalId = useId();
@@ -221,13 +219,6 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </button>
-                <button
-                  className="btn-danger"
-                  onClick={() => setIsDeleteModalOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </button>
               </div>
             </div>
           )}
@@ -245,16 +236,6 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
         }}
       />
 
-      {/* Delete Bank Confirmation Modal */}
-      <DeleteBankConfirmModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        bankAccount={bankAccount}
-        onSuccess={() => {
-          setIsDeleteModalOpen(false);
-          onClose(); // Close the detail modal after deletion
-        }}
-      />
     </div>
   );
 

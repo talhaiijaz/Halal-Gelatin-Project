@@ -5,10 +5,9 @@ import { createPortal } from "react-dom";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, DollarSign, Calendar, User, Building, FileText, Edit, Trash2, Eye } from "lucide-react";
+import { X, DollarSign, Calendar, User, Building, FileText, Edit, Eye } from "lucide-react";
 import ActivityLog from "../ActivityLog";
 import EditPaymentModal from "./EditPaymentModal";
-import DeleteConfirmModal from "./DeleteConfirmModal";
 import { useModalManager } from "@/app/hooks/useModalManager";
 import { formatCurrency, SupportedCurrency } from "@/app/utils/currencyFormat";
 
@@ -20,9 +19,7 @@ interface PaymentDetailModalProps {
 
 export default function PaymentDetailModal({ paymentId, isOpen, onClose }: PaymentDetailModalProps) {
   const payment = useQuery(api.payments.get, paymentId ? { id: paymentId } : "skip");
-  const deletePayment = useMutation(api.payments.deletePayment);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   // Generate unique modal ID and manage modal state
   const modalId = useId();
@@ -331,13 +328,6 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </button>
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  className="flex items-center px-3 py-2 text-sm font-medium text-red-700 bg-white border border-red-300 rounded-md hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </button>
               </div>
             </div>
           )}
@@ -364,17 +354,6 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
         } : null}
       />
 
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onSuccess={() => {
-          setShowDeleteModal(false);
-          onClose(); // Close the detail modal after successful deletion
-        }}
-        paymentId={paymentId}
-        paymentReference={payment?.reference}
-      />
     </div>
   );
 

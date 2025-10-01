@@ -76,31 +76,29 @@ export default function AllTransactions() {
           </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto">
-          <table className="min-w-full table-fixed divide-y divide-gray-200">
+        <div className="mt-4">
+          <table className="w-full table-fixed divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[18%]">Bank</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[40%]">Description</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14%]">Type</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[14%]">Time</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[14%]">Amount</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[30%]">Bank</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[45%]">Description</th>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Type</th>
+                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[10%]">Amount</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {!page ? (
                 [...Array(6)].map((_, i) => (
                   <tr key={i}>
-                    <td className="px-4 py-3"><div className="h-4 w-40 bg-gray-200 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-64 bg-gray-200 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-48 bg-gray-200 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-56 bg-gray-200 rounded animate-pulse" /></td>
                     <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse" /></td>
                     <td className="px-4 py-3 text-right"><div className="h-4 w-16 bg-gray-200 rounded animate-pulse ml-auto" /></td>
                   </tr>
                 ))
               ) : transactions.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center">
+                  <td colSpan={4} className="px-6 py-12 text-center">
                     <Building2 className="mx-auto h-12 w-12 text-gray-400" />
                     <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions for this day</h3>
                     <p className="mt-1 text-sm text-gray-500">Pick another day or change the bank filter</p>
@@ -116,7 +114,6 @@ export default function AllTransactions() {
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-700 truncate" title={tx.description}>{tx.description}</td>
                       <td className="px-4 py-3 text-sm text-gray-900">{tx.transactionType.replace("_", " ")}</td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{new Date(tx.transactionDate).toLocaleTimeString()}</td>
                       <td className={`px-4 py-3 text-sm font-medium text-right ${tx.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                         {formatCurrency(tx.amount, tx.currency)}
                       </td>

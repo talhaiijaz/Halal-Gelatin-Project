@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { X, RotateCcw, Link2, AlertTriangle, Calendar, DollarSign, FileText, ArrowUpDown, ArrowUp, ArrowDown, CreditCard, Info, Trash2 } from "lucide-react";
+import { X, RotateCcw, Link2, AlertTriangle, Calendar, DollarSign, FileText, ArrowUpDown, ArrowUp, ArrowDown, CreditCard, Info } from "lucide-react";
 import Modal from "@/app/components/ui/Modal";
 import toast from "react-hot-toast";
 import { formatCurrency } from "@/app/utils/currencyFormat";
@@ -412,13 +412,6 @@ export default function BankTransactionDetailModal({ transactionId, isOpen, onCl
                         >
                           <RotateCcw className="h-4 w-4" />
                           Reverse Transaction
-                        </button>
-                        <button
-                          onClick={() => setShowDeleteConfirm(true)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-700 bg-red-100 border border-red-300 rounded-lg hover:bg-red-200 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete Transaction
                         </button>
                       </div>
                     )}
