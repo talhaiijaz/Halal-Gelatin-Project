@@ -1407,37 +1407,6 @@ export const checkInvoiceNumberConflicts = mutation({
   },
 });
 
-// Clear all invoice numbers (for testing purposes)
-export const clearAllInvoiceNumbers = mutation({
-  args: {},
-  handler: async (ctx, args) => {
-    // Clear invoice numbers from all orders
-    const orders = await ctx.db.query("orders").collect();
-    let updatedOrders = 0;
-    
-    for (const order of orders) {
-      await ctx.db.patch(order._id, {
-        invoiceNumber: undefined,
-        updatedAt: Date.now(),
-      });
-      updatedOrders++;
-    }
-    
-    // Clear invoice numbers from all invoices
-    const invoices = await ctx.db.query("invoices").collect();
-    let updatedInvoices = 0;
-    
-    for (const invoice of invoices) {
-      await ctx.db.patch(invoice._id, {
-        invoiceNumber: undefined,
-        updatedAt: Date.now(),
-      });
-      updatedInvoices++;
-    }
-    
-    return { updatedOrders, updatedInvoices };
-  },
-});
 
 // List all order items
 export const listItems = query({

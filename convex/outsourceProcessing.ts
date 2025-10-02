@@ -93,23 +93,3 @@ export const updateOutsourceProcessingState = mutation({
   },
 });
 
-// Clear outsource processing state
-export const clearOutsourceProcessingState = mutation({
-  args: {},
-  handler: async (ctx) => {
-    const existingStates = await ctx.db
-      .query("outsourceProcessing")
-      .order("desc")
-      .take(1);
-    
-    const existingState = existingStates.length > 0 && 
-      (existingStates[0].status === "uploading" || existingStates[0].status === "processing") 
-      ? existingStates[0] : null;
-    
-    if (existingState) {
-      await ctx.db.delete(existingState._id);
-    }
-    
-    return { success: true };
-  },
-});

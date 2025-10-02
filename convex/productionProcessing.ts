@@ -111,19 +111,3 @@ export const clearProcessingState = mutation({
   },
 });
 
-// Clear all processing states (cleanup)
-export const clearAllProcessingStates = mutation({
-  args: {},
-  returns: v.object({ cleared: v.number() }),
-  handler: async (ctx) => {
-    const states = await ctx.db.query("productionProcessing").collect();
-    let cleared = 0;
-    
-    for (const state of states) {
-      await ctx.db.delete(state._id);
-      cleared++;
-    }
-    
-    return { cleared };
-  },
-});

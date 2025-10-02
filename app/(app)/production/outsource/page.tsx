@@ -80,7 +80,6 @@ function OutsourceDetailPageContent() {
   const createBatchesFromExtractedData = useMutation(api.outsourceBatches.createOutsourceBatchesFromExtractedData);
   const startProcessing = useMutation(api.outsourceProcessing.startOutsourceProcessing);
   const updateProcessingState = useMutation(api.outsourceProcessing.updateOutsourceProcessingState);
-  const clearProcessingState = useMutation(api.outsourceProcessing.clearOutsourceProcessingState);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const getFileUrl = useMutation(api.outsourceBatches.getOutsourceFileUrl);
   const toggleOutsourceBatchHold = useMutation(api.outsourceBatches.toggleOutsourceBatchHold);
@@ -318,14 +317,8 @@ function OutsourceDetailPageContent() {
     }
   };
 
-  const handleClearProcessingState = async () => {
-    if (processingState) {
-      await clearProcessingState({});
-    }
-  };
 
   const handleStartNewUpload = () => {
-    handleClearProcessingState();
     setShowUploadSection(true);
   };
 
@@ -334,11 +327,6 @@ function OutsourceDetailPageContent() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
-    }
-
-    // Clear processing state
-    if (processingState) {
-      await clearProcessingState({});
     }
     
     // Reset all upload states
@@ -463,12 +451,6 @@ function OutsourceDetailPageContent() {
                       </div>
                       <div className="flex space-x-2">
                         <button
-                          onClick={handleClearProcessingState}
-                          className="px-3 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200"
-                        >
-                          Dismiss
-                        </button>
-                        <button
                           onClick={handleStartNewUpload}
                           className="px-3 py-1 text-xs font-medium text-white bg-green-600 rounded-md hover:bg-green-700"
                         >
@@ -490,12 +472,6 @@ function OutsourceDetailPageContent() {
                         </div>
                       </div>
                       <div className="flex space-x-2">
-                        <button
-                          onClick={handleClearProcessingState}
-                          className="px-3 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200"
-                        >
-                          Dismiss
-                        </button>
                         <button
                           onClick={handleStartNewUpload}
                           className="px-3 py-1 text-xs font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
