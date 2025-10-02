@@ -170,7 +170,7 @@ export default function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
         {filteredNavigation.map((item) => {
           const Icon = item.icon;
           const isItemActive = isParentActive(item);
@@ -349,7 +349,7 @@ export default function Sidebar() {
             className="fixed inset-0 bg-gray-600 bg-opacity-75"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+          <div className="relative flex-1 flex flex-col max-w-xs w-full bg-white min-h-0" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <NavContent />
             <div className="mt-auto p-3 border-t border-gray-200">
               <button
@@ -364,7 +364,7 @@ export default function Sidebar() {
       )}
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-gray-200">
+      <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 bg-white border-r border-gray-200 min-h-0">
         <NavContent />
       </div>
     </>
