@@ -18,7 +18,6 @@ import type * as bankUtils from "../bankUtils.js";
 import type * as banks from "../banks.js";
 import type * as blends from "../blends.js";
 import type * as cities from "../cities.js";
-import type * as clearData from "../clearData.js";
 import type * as clients from "../clients.js";
 import type * as dashboard from "../dashboard.js";
 import type * as deliveries from "../deliveries.js";
@@ -53,7 +52,6 @@ declare const fullApi: ApiFromModules<{
   banks: typeof banks;
   blends: typeof blends;
   cities: typeof cities;
-  clearData: typeof clearData;
   clients: typeof clients;
   dashboard: typeof dashboard;
   deliveries: typeof deliveries;
