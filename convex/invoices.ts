@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { requireFinancialAccess } from "./authUtils";
 import { Id } from "./_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 
@@ -45,6 +46,7 @@ export const createForOrder = mutation({
     dueDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireFinancialAccess(ctx);
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
 
@@ -96,6 +98,7 @@ export const createStandalone = mutation({
     source: v.optional(v.string()), // e.g., "previous_platform"
   },
   handler: async (ctx, args) => {
+    await requireFinancialAccess(ctx);
     // Verify client exists
     const client = await ctx.db.get(args.clientId);
     if (!client) throw new Error("Client not found");
@@ -210,6 +213,7 @@ export const list = query({
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
+    await requireFinancialAccess(ctx);
     let invoices = await ctx.db.query("invoices").collect();
 
     // Apply filters
@@ -354,6 +358,7 @@ export const get = query({
     id: v.id("invoices"),
   },
   handler: async (ctx, args) => {
+    await requireFinancialAccess(ctx);
     const invoice = await ctx.db.get(args.id);
     if (!invoice) return null;
 
@@ -422,6 +427,7 @@ export const updateStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    await requireFinancialAccess(ctx);
     await ctx.db.patch(args.id, {
       status: args.status,
       updatedAt: Date.now(),
@@ -566,6 +572,7 @@ export const updateOverdueInvoices = mutation({
 export const fixInvoiceStatuses = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireFinancialAccess(ctx);
     const invoices = await ctx.db.query("invoices").collect();
     let updatedCount = 0;
     

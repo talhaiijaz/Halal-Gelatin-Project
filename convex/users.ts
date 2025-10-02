@@ -1,21 +1,25 @@
 import { query, mutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { 
+  getCurrentUser, 
+  requireSuperAdmin, 
+  requireUserManagementAccess,
+  validateRoleChange,
+  type Role 
+} from "./authUtils";
 
 // Get current user's role
 export const getCurrentUserRole = query({
   args: {},
   returns: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production"), v.null()),
   handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) return null;
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .unique();
-
-    return user?.role ?? null;
+    try {
+      const user = await getCurrentUser(ctx);
+      return user.role;
+    } catch {
+      return null;
+    }
   },
 });
 
@@ -30,26 +34,26 @@ export const isUserInRoles = query({
   },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity?.email) return false;
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", identity.email!))
-      .unique();
-
-    if (!user) return false;
-    return args.roles.includes(user.role);
+    try {
+      const user = await getCurrentUser(ctx);
+      return args.roles.includes(user.role);
+    } catch {
+      return false;
+    }
   },
 });
 
-// Check if user has permissions (all users have full permissions)
+// Check if user has admin permissions
 export const isUserAdmin = query({
   args: { userId: v.string() },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    // Deprecated: prefer isUserInRoles/getCurrentUserRole. Keep returning true for now.
-    return true;
+    try {
+      const currentUser = await getCurrentUser(ctx);
+      return ["admin", "super-admin"].includes(currentUser.role);
+    } catch {
+      return false;
+    }
   },
 });
 
@@ -81,7 +85,7 @@ export const checkUserAccess = mutation({
   },
 });
 
-// Create or update user (for manual user management)
+// Create or update user (for manual user management) - SUPER-ADMIN ONLY
 export const createOrUpdateUser = mutation({
   args: {
     email: v.string(),
@@ -90,17 +94,26 @@ export const createOrUpdateUser = mutation({
   },
   returns: v.id("users"),
   handler: async (ctx, args) => {
+    // Require super-admin access for user management
+    const currentUser = await requireUserManagementAccess(ctx);
+    
     // Check if user already exists
     const existingUser = await ctx.db
       .query("users")
       .withIndex("by_email", (q) => q.eq("email", args.email))
       .unique();
 
+    const targetRole = args.role || "production";
+    const targetUserId = existingUser?._id || "new";
+
+    // Validate role change permissions
+    validateRoleChange(currentUser.role, targetRole, targetUserId, currentUser.id);
+
     if (existingUser) {
       // Update existing user
       await ctx.db.patch(existingUser._id, {
         name: args.name,
-        role: args.role || existingUser.role,
+        role: targetRole,
         lastLogin: Date.now(),
       });
       return existingUser._id;
@@ -109,7 +122,7 @@ export const createOrUpdateUser = mutation({
       return await ctx.db.insert("users", {
         email: args.email,
         name: args.name,
-            role: args.role || "production", // Default to production role for manual creation
+        role: targetRole,
         createdAt: Date.now(),
         lastLogin: Date.now(),
       });
@@ -117,7 +130,7 @@ export const createOrUpdateUser = mutation({
   },
 });
 
-// Get all users
+// Get all users - SUPER-ADMIN ONLY
 export const getAllUsers = query({
   args: {},
   returns: v.array(v.object({
@@ -130,6 +143,8 @@ export const getAllUsers = query({
     lastLogin: v.optional(v.number()),
   })),
   handler: async (ctx) => {
+    // Require super-admin access to view all users
+    await requireUserManagementAccess(ctx);
     return await ctx.db.query("users").collect();
   },
 });

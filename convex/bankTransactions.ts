@@ -4,6 +4,7 @@ import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { updateBankAccountBalance, calculateBankAccountBalance } from "./bankUtils";
 import { paginationOptsValidator } from "convex/server";
+import { requireFinancialAccess, getCurrentUser } from "./authUtils";
 
 // Helper function to format currency with proper locale and symbol support
 function formatCurrency(amount: number, currency: string) {
@@ -76,6 +77,8 @@ export const recordTransaction = mutation({
     tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
     const bankAccount = await ctx.db.get(args.bankAccountId);
     if (!bankAccount) {
       throw new Error("Bank account not found");
@@ -141,6 +144,9 @@ export const getTransactions = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let query = ctx.db
       .query("bankTransactions")
       .filter((q: any) => q.eq(q.field("bankAccountId"), args.bankAccountId));
@@ -176,6 +182,9 @@ export const getTransaction = query({
     id: v.id("bankTransactions"),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     return await ctx.db.get(args.id);
   },
 });
@@ -190,6 +199,9 @@ export const updateTransaction = mutation({
     status: v.optional(v.union(v.literal("pending"), v.literal("completed"), v.literal("cancelled"))),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const transaction = await ctx.db.get(args.id);
     if (!transaction) {
       throw new Error("Transaction not found");
@@ -236,6 +248,9 @@ export const reverseTransaction = mutation({
     success: v.boolean(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     try {
       const original = await ctx.db.get(args.id);
       if (!original) throw new Error("Transaction not found");
@@ -326,6 +341,9 @@ export const transferBetweenAccounts = mutation({
     netAmountReceived: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     try {
       if (args.fromBankAccountId === args.toBankAccountId) {
         throw new Error("Cannot transfer to the same account");
@@ -564,6 +582,9 @@ export const getAccountWithTransactions = query({
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const bankAccount = await ctx.db.get(args.bankAccountId);
     if (!bankAccount) {
       return null;
@@ -635,6 +656,9 @@ export const getTransactionStats = query({
     endDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let query = ctx.db
       .query("bankTransactions")
       .filter(q => q.eq(q.field("bankAccountId"), args.bankAccountId));
@@ -688,6 +712,9 @@ export const listDailyTransactions = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Use compound index for efficient range scan
     const page = await ctx.db
       .query("bankTransactions")
@@ -718,6 +745,9 @@ export const getDailySummary = query({
     count: v.number(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let totalCredits = 0;
     let totalDebits = 0;
     let count = 0;
@@ -757,6 +787,9 @@ export const listAllDailyTransactions = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     if (args.bankAccountId) {
       return await ctx.db
         .query("bankTransactions")
@@ -795,6 +828,9 @@ export const getAllDailySummary = query({
     count: v.number(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let totalCredits = 0;
     let totalDebits = 0;
     let count = 0;

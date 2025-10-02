@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
+import { requireFinancialAccess, getCurrentUser } from "./authUtils";
 
 // Exchange rate type
 export type UsdRates = {
@@ -56,6 +57,8 @@ export const listLogs = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
+    // Require financial access for logs
+    await requireFinancialAccess(ctx);
     return await ctx.db.query("logs").order("desc").paginate(args.paginationOpts);
   }
 });
@@ -64,6 +67,9 @@ export const listLogs = query({
 export const getLogsCount = query({
   args: {},
   handler: async (ctx) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const logs = await ctx.db.query("logs").collect();
     return logs.length;
   }
@@ -75,6 +81,9 @@ export const listEntityLogs = query({
     entityId: v.string(),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const logs = await ctx.db
       .query("logs")
       .withIndex("by_entity", q => q.eq("entityTable", args.entityTable).eq("entityId", args.entityId))
@@ -102,6 +111,9 @@ export const getEntityActivityLogs = query({
     createdAt: v.number(),
   })),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const limit = Math.min(args.limit || 20, 50);
     const logs = await ctx.db
       .query("logs")
@@ -152,6 +164,9 @@ export const getStats = query({
     advancePaymentsPKR: v.number(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Get all data
     const clients = await ctx.db.query("clients").collect();
     let orders = await ctx.db.query("orders").collect();
@@ -402,6 +417,9 @@ export const getRecentOrders = query({
     })),
   })),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const limit = args.limit || 5;
     
     const orders = await ctx.db
@@ -457,6 +475,9 @@ export const getRecentActivity = query({
     color: v.string(),
   })),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const limit = args.limit || 10;
 
     // Get recent orders
@@ -594,6 +615,9 @@ export const getOrdersByStatus = query({
     })),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const limit = args.limit || 5;
     
     // Helper function to process orders

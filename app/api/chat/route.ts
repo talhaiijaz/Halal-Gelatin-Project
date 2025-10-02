@@ -1,20 +1,14 @@
 import { openai } from '@ai-sdk/openai';
 import { streamText } from 'ai';
-import { auth } from '@clerk/nextjs/server';
+import { requireApiProductionAccess } from '@/app/utils/apiAuth';
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {
-    // Check authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
+    // Check authentication and authorization
+    await requireApiProductionAccess();
 
     const { messages } = await req.json();
 

@@ -1,5 +1,6 @@
 // convex/migrations.ts
 import { mutation, query } from "./_generated/server";
+import { requireSuperAdmin } from "./authUtils";
 import { v } from "convex/values";
 import { getFiscalYear } from "./fiscalYearUtils";
 
@@ -7,6 +8,7 @@ import { getFiscalYear } from "./fiscalYearUtils";
 export const migrateToFiscalYear = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireSuperAdmin(ctx);
     console.log("Starting migration to fiscal year format...");
     
     // 1. Update production year settings
@@ -85,6 +87,7 @@ export const migrateToFiscalYear = mutation({
 export const assignSRNumbersToBlends = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireSuperAdmin(ctx);
     console.log("Starting migration to assign SR numbers to existing blends...");
     
     // Get all existing blends sorted by creation date (oldest first)
@@ -132,6 +135,7 @@ export const assignSRNumbersToBlends = mutation({
 export const getBlendSRMigrationStatus = query({
   args: {},
   handler: async (ctx) => {
+    await requireSuperAdmin(ctx);
     const allBlends = await ctx.db.query("blends").collect();
     
     // Check if any blends are missing SR numbers
@@ -160,6 +164,7 @@ export const getBlendSRMigrationStatus = query({
 export const getMigrationStatus = query({
   args: {},
   handler: async (ctx) => {
+    await requireSuperAdmin(ctx);
     const yearSettings = await ctx.db.query("productionYearSettings").first();
     const batches = await ctx.db.query("productionBatches").collect();
     const resetRecords = await ctx.db.query("batchResetRecords").collect();

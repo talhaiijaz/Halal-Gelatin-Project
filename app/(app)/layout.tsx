@@ -13,7 +13,7 @@ export default function AppLayout({
   useScrollRestoration();
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRoles={["production", "admin", "super-admin"]}>
       <div className="min-h-screen bg-gray-50">
         <Sidebar />
         

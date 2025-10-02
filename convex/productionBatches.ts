@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getFiscalYear, getCalendarYearFromFiscal, isValidFiscalYear } from "./fiscalYearUtils";
+import { requireProductionAccess, getCurrentUser } from "./authUtils";
 
 // Get all production batches with pagination (only active batches)
 export const getAllBatches = query({
@@ -14,6 +15,8 @@ export const getAllBatches = query({
     fiscalYear: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     const paginationOpts = args.paginationOpts || { numItems: 50 };
     
     // Ensure cursor is either string or null, not undefined
@@ -53,6 +56,9 @@ export const getAllBatches = query({
 export const getBatchByNumber = query({
   args: { batchNumber: v.number() },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const batch = await ctx.db
       .query("productionBatches")
       .withIndex("by_batch_number", (q) => q.eq("batchNumber", args.batchNumber))
@@ -69,6 +75,9 @@ export const getNextBatchNumber = query({
     fiscalYear: v.optional(v.string())
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     let lastBatch;
     
     if (args.fiscalYear) {
@@ -100,6 +109,9 @@ export const getNextBatchNumber = query({
 export const getBatchesBySourceReport = query({
   args: { sourceReport: v.string() },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const batches = await ctx.db
       .query("productionBatches")
       .withIndex("by_source_report", (q) => q.eq("sourceReport", args.sourceReport))
@@ -113,6 +125,9 @@ export const getBatchesBySourceReport = query({
 export const getUnusedBatches = query({
   args: {},
   handler: async (ctx) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const batches = await ctx.db
       .query("productionBatches")
       .withIndex("by_is_used", (q) => q.eq("isUsed", false))
@@ -188,6 +203,9 @@ export const createBatch = mutation({
     fiscalYear: v.optional(v.string()), // Optional fiscal year override
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const now = Date.now();
     const currentYear = new Date().getFullYear();
     
@@ -405,6 +423,9 @@ export const updateBatch = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const { id, ...updates } = args;
     const now = Date.now();
     await ctx.db.patch(id, {

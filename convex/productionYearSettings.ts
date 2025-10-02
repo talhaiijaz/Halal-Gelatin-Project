@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getFiscalYear, getNextFiscalYear, getCurrentFiscalYear, isValidFiscalYear } from "./fiscalYearUtils";
+import { requireProductionAccess } from "./authUtils";
 
 // Get current production year settings
 export const getCurrentYearSettings = query({
@@ -19,6 +20,9 @@ export const getCurrentYearSettings = query({
     })
   ),
   handler: async (ctx) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     // Get the first (and only) settings record
     const settings = await ctx.db.query("productionYearSettings").first();
     return settings;
@@ -39,6 +43,9 @@ export const initializeYearSettings = mutation({
     updatedAt: v.float64(),
   }),
   handler: async (ctx) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const currentYear = new Date().getFullYear();
     const currentFiscalYear = getFiscalYear(currentYear);
     const settingsId = await ctx.db.insert("productionYearSettings", {
@@ -69,6 +76,9 @@ export const setCurrentYear = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const fiscalYear = getFiscalYear(args.year);
     const settings = await ctx.db.query("productionYearSettings").first();
     

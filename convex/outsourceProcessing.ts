@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
+import { requireProductionAccess, getCurrentUser } from "./authUtils";
 
 // Get current outsource processing state
 export const getCurrentOutsourceProcessingState = query({
@@ -19,6 +20,9 @@ export const getCurrentOutsourceProcessingState = query({
     })
   ),
   handler: async (ctx) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     // Get the most recent processing state
     const states = await ctx.db
       .query("outsourceProcessing")
@@ -46,6 +50,9 @@ export const startOutsourceProcessing = mutation({
     fileName: v.string(),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const now = Date.now();
     
     // Clear any existing processing state
@@ -83,6 +90,9 @@ export const updateOutsourceProcessingState = mutation({
     completedBatches: v.optional(v.array(v.id("outsourceBatches"))),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const { processingId, ...updates } = args;
     const now = Date.now();
     

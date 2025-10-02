@@ -4,6 +4,7 @@ import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
 import { updateBankAccountBalance, calculateBankAccountBalance } from "./bankUtils";
 import { paginationOptsValidator } from "convex/server";
+import { requireFinancialAccess, getCurrentUser } from "./authUtils";
 
 
 async function logBankEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
@@ -24,6 +25,9 @@ async function logBankEvent(ctx: any, params: { entityId: string; action: "creat
 export const list = query({
   args: {},
   handler: async (ctx) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const bankAccounts = await ctx.db.query("bankAccounts").collect();
     return bankAccounts.sort((a, b) => b.createdAt - a.createdAt);
   },
@@ -34,6 +38,9 @@ export const list = query({
 export const get = query({
   args: { id: v.id("bankAccounts") },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const bankAccount = await ctx.db.get(args.id);
     if (!bankAccount) {
       throw new Error("Bank account not found");
@@ -53,6 +60,9 @@ export const create = mutation({
     openingBalance: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Check if all existing banks have countries
     const validationResult: { allHaveCountries: boolean; banksWithoutCountries: any[] } = await ctx.runQuery(api.banks.checkAllBanksHaveCountries, {});
     if (!validationResult.allHaveCountries) {
@@ -127,6 +137,9 @@ export const update = mutation({
     status: v.union(v.literal("active"), v.literal("inactive")),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Get the current bank account
     const currentAccount = await ctx.db.get(args.id);
     if (!currentAccount) {
@@ -205,6 +218,9 @@ export const getPayments = query({
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const payments = await ctx.db
       .query("payments")
       .filter(q => q.eq(q.field("bankAccountId"), args.bankAccountId))
@@ -241,6 +257,9 @@ export const updateCurrentBalance = mutation({
     bankAccountId: v.id("bankAccounts"),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const currentBalance = await updateBankAccountBalance(ctx, args.bankAccountId);
     return currentBalance;
   },
@@ -252,6 +271,9 @@ export const getWithBalance = query({
     id: v.id("bankAccounts"),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const bankAccount = await ctx.db.get(args.id);
     if (!bankAccount) {
       return null;
@@ -286,6 +308,9 @@ export const remove = mutation({
 export const listWithBalances = query({
   args: {},
   handler: async (ctx) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const bankAccounts = await ctx.db.query("bankAccounts").collect();
     
     // Calculate current balance for each account
@@ -314,6 +339,9 @@ export const listWithBalances = query({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const bankAccounts = await ctx.db.query("bankAccounts").collect();
     
     const totalAccounts = bankAccounts.length;
@@ -349,6 +377,9 @@ export const checkAllBanksHaveCountries = query({
     })),
   }),
   handler: async (ctx) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const bankAccounts = await ctx.db.query("bankAccounts").collect();
     
     // Filter banks without countries (this will catch existing banks that don't have the country field)
@@ -374,6 +405,9 @@ export const canCreateNewBank = query({
     reason: v.optional(v.string()),
   }),
   handler: async (ctx): Promise<{ canCreate: boolean; reason?: string }> => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const validationResult: { allHaveCountries: boolean; banksWithoutCountries: any[] } = await ctx.runQuery(api.banks.checkAllBanksHaveCountries, {});
     
     if (!validationResult.allHaveCountries) {

@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
+import { requireClientAccess, getCurrentUser } from "./authUtils";
 
 async function logClientEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
@@ -26,6 +27,8 @@ export const list = query({
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
+    // Require client access
+    await requireClientAccess(ctx);
     // Apply filters
     const clients = await (args.type
       ? ctx.db.query("clients").withIndex("by_type", (q) => q.eq("type", args.type!))
@@ -75,6 +78,9 @@ export const get = query({
     id: v.id("clients"),
   },
   handler: async (ctx, args) => {
+    // Require client access
+    await requireClientAccess(ctx);
+    
     const client = await ctx.db.get(args.id);
     if (!client) return null;
 
@@ -135,6 +141,9 @@ export const getStandaloneInvoices = query({
     clientId: v.id("clients"),
   },
   handler: async (ctx, args) => {
+    // Require client access
+    await requireClientAccess(ctx);
+    
     const invoices = await ctx.db
       .query("invoices")
       .withIndex("by_client", (q) => q.eq("clientId", args.clientId))
@@ -181,6 +190,9 @@ export const create = mutation({
     profilePictureId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
+    // Require client access
+    await requireClientAccess(ctx);
+    
     // Check for duplicate email only if email is provided
     if (args.email) {
       const existing = await ctx.db
@@ -231,6 +243,9 @@ export const update = mutation({
     profilePictureId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
+    // Require client access
+    await requireClientAccess(ctx);
+    
     const { id, ...updates } = args;
 
     // Remove undefined values
@@ -265,6 +280,9 @@ export const getClientSummary = query({
     fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require client access
+    await requireClientAccess(ctx);
+    
     // Get all clients of the specified type
     const clients = await ctx.db
       .query("clients")
@@ -377,6 +395,9 @@ export const getStats = query({
     advancePaymentsByCurrency: v.record(v.string(), v.number()),
   }),
   handler: async (ctx, args) => {
+    // Require client access
+    await requireClientAccess(ctx);
+    
     const clients = await (args.type
       ? ctx.db.query("clients").withIndex("by_type", (q) => q.eq("type", args.type!))
       : ctx.db.query("clients")

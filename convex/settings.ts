@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { requireModifyAccess, getCurrentUser } from "./authUtils";
 
 // Get a setting by key
 export const get = query({
@@ -14,6 +15,9 @@ export const get = query({
     updatedBy: v.optional(v.string()),
   }), v.null()),
   handler: async (ctx, args) => {
+    // Require admin access for settings
+    await requireModifyAccess(ctx);
+    
     const setting = await ctx.db
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", args.key))
@@ -28,6 +32,9 @@ export const getMonthlyShipmentLimit = query({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
+    // Require admin access for settings
+    await requireModifyAccess(ctx);
+    
     const setting = await ctx.db
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", "monthlyShipmentLimit"))
@@ -51,6 +58,9 @@ export const list = query({
     updatedBy: v.optional(v.string()),
   })),
   handler: async (ctx, args) => {
+    // Require admin access for settings
+    await requireModifyAccess(ctx);
+    
     if (args.category) {
       return await ctx.db
         .query("settings")
@@ -73,6 +83,9 @@ export const set = mutation({
   },
   returns: v.id("settings"),
   handler: async (ctx, args) => {
+    // Require admin access for settings modification
+    await requireModifyAccess(ctx);
+    
     const existing = await ctx.db
       .query("settings")
       .withIndex("by_key", (q) => q.eq("key", args.key))
@@ -144,6 +157,9 @@ export const setMonthlyShipmentLimit = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
+    // Require admin access for settings modification
+    await requireModifyAccess(ctx);
+    
     if (args.limit < 0) {
       throw new Error("Monthly shipment limit cannot be negative");
     }

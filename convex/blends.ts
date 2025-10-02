@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
+import { requireProductionAccess, getCurrentUser } from "./authUtils";
 
 // Get all blends with pagination
 export const getAllBlends = query({
@@ -11,6 +12,8 @@ export const getAllBlends = query({
     fiscalYear: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     if (args.fiscalYear) {
       // For fiscal year filtering, we need to collect all blends and sort by serial number
       const allBlends = await ctx.db
@@ -47,6 +50,9 @@ export const getAllBlends = query({
 export const getBlendById = query({
   args: { blendId: v.id("blends") },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     return await ctx.db.get(args.blendId);
   },
 });
@@ -59,6 +65,9 @@ export const getAvailableBatches = query({
     targetBloomMax: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     let batches;
     
     if (args.fiscalYear) {
@@ -102,6 +111,9 @@ export const optimizeBatchSelection = query({
     })),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const useOnlyOutsource = args.onlyOutsourceBatches === true;
 
     // Get available production batches unless "only outsource" is selected
@@ -422,6 +434,9 @@ export const optimizeBatchSelection = query({
 export const generateLotNumber = query({
   args: {},
   handler: async (ctx) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const currentDate = new Date();
     const year = currentDate.getFullYear().toString().slice(-2);
     const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
@@ -444,6 +459,9 @@ export const generateLotNumber = query({
 export const getNextSRNumber = query({
   args: {},
   handler: async (ctx) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     // Get all blends and find the highest SR number
     const allBlends = await ctx.db.query("blends").collect();
     
@@ -499,6 +517,9 @@ export const createBlend = mutation({
     fiscalYear: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const now = Date.now();
     // Enforce unique lot number
     const existingLot = await ctx.db
@@ -591,6 +612,9 @@ export const updateBlendStatus = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const now = Date.now();
     
     await ctx.db.patch(args.blendId, {
@@ -607,6 +631,9 @@ export const updateBlendStatus = mutation({
 export const deleteBlend = mutation({
   args: { blendId: v.id("blends") },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     // Check if blend is within 48 hours of creation
     const blend = await ctx.db.get(args.blendId);
     if (!blend) {

@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
+import { requireProductionAccess, getCurrentUser } from "./authUtils";
 
 // Get all outsource batches with pagination
 export const getAllOutsourceBatches = query({
@@ -9,6 +10,8 @@ export const getAllOutsourceBatches = query({
     fiscalYear: v.optional(v.string())
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     const fiscalYear = args.fiscalYear || "2025-26";
     return await ctx.db
       .query("outsourceBatches")
@@ -22,6 +25,9 @@ export const getAllOutsourceBatches = query({
 export const getCurrentYearInfo = query({
   args: {},
   handler: async (ctx) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     // Get the current year info from production year settings
     const yearSettings = await ctx.db
       .query("productionYearSettings")
@@ -40,6 +46,9 @@ export const getCurrentYearInfo = query({
 export const getOutsourceBatchById = query({
   args: { batchId: v.id("outsourceBatches") },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     return await ctx.db.get(args.batchId);
   },
 });
@@ -48,6 +57,9 @@ export const getOutsourceBatchById = query({
 export const getOutsourceBatchesByFiscalYear = query({
   args: { fiscalYear: v.string() },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     return await ctx.db
       .query("outsourceBatches")
       .withIndex("by_fiscal_year_and_active", (q) => q.eq("fiscalYear", args.fiscalYear).eq("isActive", true))
@@ -125,6 +137,9 @@ export const createOutsourceBatch = mutation({
     fiscalYear: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const now = Date.now();
     const fiscalYear = args.fiscalYear || "2025-26";
 
@@ -187,6 +202,9 @@ export const updateOutsourceBatch = mutation({
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
     const { batchId, ...updates } = args;
     const now = Date.now();
 

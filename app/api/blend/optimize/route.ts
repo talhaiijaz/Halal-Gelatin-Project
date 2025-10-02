@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../convex/_generated/api';
-import { auth } from '@clerk/nextjs/server';
+import { requireApiProductionAccess } from '@/app/utils/apiAuth';
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // Check authentication and authorization
+    await requireApiProductionAccess();
 
     const body = await request.json();
     const {

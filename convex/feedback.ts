@@ -1,4 +1,5 @@
 import { query, mutation } from "./_generated/server";
+import { requireProductionAccess, requireAdmin } from "./authUtils";
 import { v } from "convex/values";
 
 // Submit new feedback
@@ -16,6 +17,7 @@ export const submitFeedback = mutation({
   },
   returns: v.id("feedback"),
   handler: async (ctx, args) => {
+    await requireProductionAccess(ctx);
     const now = Date.now();
     
     return await ctx.db.insert("feedback", {
@@ -48,6 +50,7 @@ export const getAllFeedback = query({
     updatedAt: v.number(),
   })),
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     // Get all feedback ordered by creation date (newest first)
     const feedback = await ctx.db
       .query("feedback")
@@ -79,6 +82,7 @@ export const deleteFeedback = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
     await ctx.db.delete(args.feedbackId);
     return null;
   },

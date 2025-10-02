@@ -47,8 +47,9 @@ export default function ProtectedRoute({ children, requiredRoles, route }: Prote
       return requiredRoles.includes(currentUserRole);
     }
     
-    // No restrictions
-    return true;
+    // SECURITY: Default to DENY access if no explicit permissions are set
+    // This prevents accidental exposure of protected routes
+    return false;
   }, [currentUserRole, route, requiredRoles]);
 
   const showAccessDenied = useMemo(() => {

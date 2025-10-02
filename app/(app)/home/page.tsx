@@ -47,7 +47,7 @@ function HomePageContent() {
 
 export default function HomePage() {
   return (
-    <ProtectedRoute route="/">
+    <ProtectedRoute route="/home">
       <HomePageContent />
     </ProtectedRoute>
   );

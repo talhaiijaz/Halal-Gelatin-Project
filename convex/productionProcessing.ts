@@ -1,4 +1,5 @@
 import { mutation, query } from "./_generated/server";
+import { requireProductionAccess } from "./authUtils";
 import { v } from "convex/values";
 
 // Start processing state
@@ -8,6 +9,7 @@ export const startProcessing = mutation({
   },
   returns: v.id("productionProcessing"),
   handler: async (ctx, args) => {
+    await requireProductionAccess(ctx);
     // Clear any existing processing states first
     const existingStates = await ctx.db
       .query("productionProcessing")
@@ -48,6 +50,7 @@ export const updateProcessingState = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireProductionAccess(ctx);
     await ctx.db.patch(args.processingId, {
       status: args.status,
       progress: args.progress,
@@ -77,6 +80,7 @@ export const getCurrentProcessingState = query({
     })
   ),
   handler: async (ctx) => {
+    await requireProductionAccess(ctx);
     // Get the most recent processing state
     const states = await ctx.db
       .query("productionProcessing")
@@ -106,6 +110,7 @@ export const clearProcessingState = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requireProductionAccess(ctx);
     await ctx.db.delete(args.processingId);
     return null;
   },

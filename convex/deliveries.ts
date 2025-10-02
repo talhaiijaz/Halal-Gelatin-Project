@@ -1,5 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { requireOrderAccess, getCurrentUser } from "./authUtils";
 
 // List deliveries with optional filters and enrichment
 export const list = query({
@@ -9,6 +10,8 @@ export const list = query({
     endDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require order access
+    await requireOrderAccess(ctx);
     let deliveries = await ctx.db.query("deliveries").order("desc").collect();
 
     if (args.status) {
@@ -47,6 +50,9 @@ export const list = query({
 export const getStats = query({
   args: {},
   handler: async (ctx) => {
+    // Require order access
+    await requireOrderAccess(ctx);
+    
     const deliveries = await ctx.db.query("deliveries").collect();
     const total = deliveries.length;
     const inTransit = deliveries.filter(d => d.status === "in_transit").length;
@@ -71,6 +77,9 @@ export const updateStatus = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    // Require order access
+    await requireOrderAccess(ctx);
+    
     await ctx.db.patch(args.deliveryId, {
       status: args.status,
       updatedAt: Date.now(),

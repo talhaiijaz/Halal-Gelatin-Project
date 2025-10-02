@@ -2,6 +2,12 @@ import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { api } from "./_generated/api";
+import { 
+  requireOrderAccess, 
+  requireModifyAccess, 
+  requireFinancialAccess,
+  getCurrentUser 
+} from "./authUtils";
 
 async function logOrderEvent(ctx: any, params: { entityId: string; action: "create" | "update" | "delete"; message: string; metadata?: any; userId?: Id<"users"> | undefined; }) {
   try {
@@ -72,6 +78,8 @@ export const list = query({
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
+    // Require order access
+    await requireOrderAccess(ctx);
     
     
 
@@ -247,9 +255,7 @@ export const get = query({
     id: v.id("orders"),
   },
   handler: async (ctx, args) => {
-    
-    
-
+    await requireOrderAccess(ctx);
     const order = await ctx.db.get(args.id);
     if (!order) return null;
 
@@ -336,6 +342,8 @@ export const create = mutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Require order management access
+    await requireOrderAccess(ctx);
     
     // Check if all existing orders have banks
     const validationResult: { allHaveBanks: boolean; ordersWithoutBanks: any[] } = await ctx.runQuery(api.orders.checkAllOrdersHaveBanks, {});
@@ -827,6 +835,7 @@ export const uploadDocument = mutation({
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
+    await requireOrderAccess(ctx);
     const order = await ctx.db.get(args.orderId);
     if (!order) throw new Error("Order not found");
 
@@ -1038,6 +1047,7 @@ export const updateTimeline = mutation({
     shippingOrderNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requireOrderAccess(ctx);
     const { orderId, ...timelineData } = args;
     
     // Remove undefined values
@@ -1065,9 +1075,7 @@ export const getStats = query({
     fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    
-    
-
+    await requireOrderAccess(ctx);
     let orders = await ctx.db.query("orders").collect();
 
     // Filter by client type if specified
@@ -1172,6 +1180,9 @@ export const update = mutation({
     }))),
   },
   handler: async (ctx, args) => {
+    // Require order management access
+    await requireOrderAccess(ctx);
+    
     const { orderId, items, ...updateData } = args;
     
     // Remove undefined values
@@ -1298,6 +1309,8 @@ export const deleteOrder = mutation({
 export const migrateInvoiceNumbers = mutation({
   args: {},
   handler: async (ctx, args) => {
+    // Require admin access for migration operations
+    await requireModifyAccess(ctx);
     // Get all orders without invoice numbers
     const orders = await ctx.db.query("orders").collect();
     const ordersWithoutInvoiceNumbers = orders.filter(order => !order.invoiceNumber);
@@ -1412,6 +1425,7 @@ export const checkInvoiceNumberConflicts = mutation({
 export const listItems = query({
   args: {},
   handler: async (ctx, args) => {
+    await requireOrderAccess(ctx);
     const orderItems = await ctx.db.query("orderItems").collect();
     return orderItems;
   },
@@ -1430,6 +1444,7 @@ export const checkAllOrdersHaveBanks = query({
     })),
   }),
   handler: async (ctx) => {
+    await requireOrderAccess(ctx);
     const orders = await ctx.db.query("orders").collect();
     const ordersWithoutBanks = orders.filter(order => !order.bankAccountId);
     return {
@@ -1452,6 +1467,7 @@ export const canCreateNewOrder = query({
     reason: v.optional(v.string()),
   }),
   handler: async (ctx): Promise<{ canCreate: boolean; reason?: string }> => {
+    await requireOrderAccess(ctx);
     const validationResult: { allHaveBanks: boolean; ordersWithoutBanks: any[] } = await ctx.runQuery(api.orders.checkAllOrdersHaveBanks, {});
     
     if (!validationResult.allHaveBanks) {

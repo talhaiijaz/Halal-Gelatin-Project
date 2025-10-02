@@ -2,6 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { api } from "./_generated/api";
+import { requireFinancialAccess, getCurrentUser } from "./authUtils";
 
 /**
  * Create a new inter-bank transfer
@@ -27,6 +28,9 @@ export const create = mutation({
   },
   returns: v.id("interBankTransfers"),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const now = Date.now();
     
     // Validate that both bank accounts exist
@@ -83,6 +87,9 @@ export const updateStatus = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const transfer = await ctx.db.get(args.transferId);
     
     if (!transfer) {
@@ -162,6 +169,9 @@ export const getBatchTransferStatus = query({
     })),
   })),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const results: Record<string, any> = {};
     
     for (const invoiceId of args.invoiceIds) {
@@ -228,6 +238,9 @@ export const getByBankAccount = query({
     })),
   })),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let transfers;
     
     if (args.type === "from") {
@@ -340,6 +353,9 @@ export const getByInvoice = query({
     })),
   })),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const transfers = await ctx.db
       .query("interBankTransfers")
       .withIndex("by_invoice", (q) => q.eq("invoiceId", args.invoiceId))
@@ -402,6 +418,9 @@ export const checkInvoicePakistanTransferStatus = query({
     })),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const invoice = await ctx.db.get(args.invoiceId);
     
     if (!invoice) {
@@ -512,6 +531,9 @@ export const list = query({
     continueCursor: v.union(v.string(), v.null()),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const result = await ctx.db
       .query("interBankTransfers")
       .order("desc")

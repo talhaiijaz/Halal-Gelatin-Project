@@ -1,5 +1,6 @@
-import { query } from "./_generated/server";
+import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { requireFinancialAccess, getCurrentUser } from "./authUtils";
 
 // Get dashboard statistics
 export const getDashboardStats = query({
@@ -44,6 +45,9 @@ export const getDashboardStats = query({
     pendingOrdersValueAED: v.number(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const year = args.year || new Date().getFullYear();
     // Convert to fiscal year: July 1 to June 30
     const startOfYear = new Date(year, 6, 1).getTime(); // July 1
@@ -257,6 +261,9 @@ export const getMonthlyOrderStats = query({
     year: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const year = args.year || new Date().getFullYear();
     // Convert to fiscal year: July 1 to June 30
     const startOfYear = new Date(year, 6, 1).getTime(); // July 1
@@ -325,6 +332,9 @@ export const getRevenueByCustomerType = query({
     fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Get all clients
     const clients = await ctx.db.query("clients").collect();
     const localClients = clients.filter(c => c.type === "local");
@@ -392,6 +402,9 @@ export const getInvoiceStats = query({
     advancePaymentsAED: v.number(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let invoices = await ctx.db.query("invoices").collect();
     const now = Date.now();
 
@@ -503,6 +516,9 @@ export const getTopCustomers = query({
     fiscalYear: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const limit = args.limit || 5;
 
     // Get all clients
@@ -546,6 +562,9 @@ export const getCashFlowAnalysis = query({
     endDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Default to current fiscal year if no dates provided
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth();
@@ -602,6 +621,9 @@ export const getCashFlowAnalysis = query({
 // Get overdue invoices summary
 export const getOverdueInvoicesSummary = query({
   handler: async (ctx) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const invoices = await ctx.db.query("invoices").collect();
     const now = Date.now();
 
@@ -651,6 +673,9 @@ export const getPaymentTrends = query({
     months: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const months = args.months || 12;
     const endDate = Date.now();
     const startDate = new Date();
@@ -693,6 +718,9 @@ export const getPaymentTrends = query({
 export const getFinanceStats = query({
   args: {},
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const invoices = await ctx.db.query("invoices").collect();
     const orders = await ctx.db.query("orders").collect();
     const payments = await ctx.db.query("payments").collect();

@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
+import { requireFinancialAccess, getCurrentUser } from "./authUtils";
 import { updateBankAccountBalance } from "./bankUtils";
 import { paginationOptsValidator } from "convex/server";
 
@@ -78,6 +79,8 @@ export const recordPayment = mutation({
     withheldTaxRate: v.optional(v.number()), // e.g., 4, 5 or custom
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
     // Validate required fields
     if (!args.amount || args.amount <= 0) {
       throw new Error("Payment validation failed: Payment amount must be greater than 0. Please enter a valid amount.");
@@ -616,6 +619,9 @@ export const list = query({
     paginationOpts: v.optional(paginationOptsValidator),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let payments = await ctx.db.query("payments").collect();
 
     // Filter by invoice
@@ -795,6 +801,9 @@ export const getStats = query({
     averagePayment: v.number(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Default to current fiscal year if no start date provided
     const now = new Date();
     const fiscalYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
@@ -885,6 +894,9 @@ export const getUnpaidInvoices = query({
     clientId: v.optional(v.id("clients")),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     let baseQuery = ctx.db
       .query("invoices")
       .filter(q => q.neq(q.field("status"), "paid"));
@@ -960,6 +972,9 @@ export const getPaymentReceipt = query({
     paymentId: v.id("payments"),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const payment = await ctx.db.get(args.paymentId);
     if (!payment) return null;
 
@@ -1001,6 +1016,9 @@ export const reversePayment = mutation({
     success: v.boolean(),
   }),
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const payment = await ctx.db.get(args.paymentId);
     if (!payment) throw new Error("Payment not found");
     if ((payment as any).isReversed) throw new Error("Payment already reversed");
@@ -1073,6 +1091,9 @@ export const updatePayment = mutation({
     withheldTaxRate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const existing = await ctx.db.get(args.paymentId);
     if (!existing) throw new Error("Payment not found");
 
@@ -1270,6 +1291,9 @@ export const getClientPaymentHistory = query({
     endDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     // Get all invoices for the client
     const clientInvoices = await ctx.db
       .query("invoices")
@@ -1323,6 +1347,9 @@ export const get = query({
     id: v.id("payments"),
   },
   handler: async (ctx, args) => {
+    // Require financial access
+    await requireFinancialAccess(ctx);
+    
     const payment = await ctx.db.get(args.id);
     if (!payment) return null;
 
