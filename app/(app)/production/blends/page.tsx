@@ -6,7 +6,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { useProductionYear } from '../../../hooks/useProductionYear';
 import Link from 'next/link';
-import { FileDown, Eye, Trash2 } from 'lucide-react';
+import { FileDown, Eye, Trash2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import ProtectedRoute from '@/app/components/ProtectedRoute';
 
@@ -18,6 +18,7 @@ function BlendsPageContent() {
     fiscalYear: currentFiscalYear,
   });
   const deleteBlend = useMutation(api.blends.deleteBlend);
+  const [searchTerm, setSearchTerm] = useState("");
   
   // Get current user role to check permissions
   const currentUserRole = useQuery(api.users.getCurrentUserRole);
@@ -78,6 +79,20 @@ function BlendsPageContent() {
           <Link href="/production/blend" className="btn-primary">Create Blend</Link>
         </div>
 
+        {/* Filters */}
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search blends..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            />
+          </div>
+        </div>
+
         <div className="bg-white rounded-lg border">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -93,7 +108,21 @@ function BlendsPageContent() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {blends?.page?.map((blend: any) => (
+                {blends?.page
+                  ?.filter((blend: any) => {
+                    if (!searchTerm) return true;
+                    const term = searchTerm.toLowerCase();
+                    const fields: Array<string> = [
+                      String(blend.serialNumber ?? ""),
+                      String(blend.lotNumber ?? ""),
+                      `${blend.targetBloomMin ?? ""}-${blend.targetBloomMax ?? ""}`,
+                      String(blend.totalBags ?? ""),
+                      String(blend.averageBloom ?? ""),
+                      new Date(blend.date).toLocaleDateString(),
+                    ];
+                    return fields.some((f) => f.toLowerCase().includes(term));
+                  })
+                  .map((blend: any) => (
                   <tr key={blend._id} className="cursor-pointer hover:bg-gray-50" onClick={() => router.push(`/production/blends/${blend._id}`)}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{blend.serialNumber}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 underline">{blend.lotNumber}</td>
