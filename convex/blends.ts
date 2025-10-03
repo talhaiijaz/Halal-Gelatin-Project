@@ -492,7 +492,7 @@ export const optimizeBatchSelection = query({
                 const matchedValue = allMatchMin ? min : max;
                 status.push(`✅ ${key}: ${matchedValue} (target range: ${min}-${max})`);
               } else {
-                const uniqueValues = [...new Set(batchValues)];
+                const uniqueValues = Array.from(new Set(batchValues.filter(val => val !== undefined)));
                 warnings.push(`⚠️ ${key}: ${uniqueValues.join(', ')} (target range: ${min}-${max}) - inconsistent values`);
               }
             }
