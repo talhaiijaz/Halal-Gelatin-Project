@@ -7,6 +7,7 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import { Search, Filter, Loader2, AlertCircle, CheckCircle, Upload, X } from "lucide-react";
 import { useProductionYear } from "../../../hooks/useProductionYear";
 import ProtectedRoute from "@/app/components/ProtectedRoute";
+import MissingBatchNotification from "@/app/components/MissingBatchNotification";
 
 interface BatchData {
   _id: Id<"outsourceBatches">;
@@ -75,6 +76,11 @@ function OutsourceDetailPageContent() {
   
   // Fetch current processing state
   const processingState = useQuery(api.outsourceProcessing.getCurrentOutsourceProcessingState);
+
+  // Check for missing batches
+  const missingBatchesData = useQuery(api.outsourceBatches.checkMissingOutsourceBatches, {
+    fiscalYear: currentFiscalYear
+  });
 
   // Mutations
   const createBatchesFromExtractedData = useMutation(api.outsourceBatches.createOutsourceBatchesFromExtractedData);
@@ -382,6 +388,16 @@ function OutsourceDetailPageContent() {
             </div>
           </div>
         </div>
+
+        {/* Missing Batches Notification */}
+        {missingBatchesData && missingBatchesData.hasGaps && (
+          <MissingBatchNotification
+            missingBatches={missingBatchesData.missingBatches}
+            range={missingBatchesData.range}
+            totalBatches={missingBatchesData.totalBatches}
+            batchType="outsource"
+          />
+        )}
 
         {/* Upload Section */}
         <div className="bg-white rounded-lg shadow-sm border mb-6">

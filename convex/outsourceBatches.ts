@@ -487,6 +487,58 @@ export const getOutsourceFileUrl = mutation({
   },
 });
 
+// Check for missing batches in a range for outsource batches
+export const checkMissingOutsourceBatches = query({
+  args: { 
+    fiscalYear: v.optional(v.string())
+  },
+  handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
+    
+    const fiscalYear = args.fiscalYear || "2025-26";
+    
+    // Get all batches for the fiscal year
+    const batches = await ctx.db
+      .query("outsourceBatches")
+      .withIndex("by_fiscal_year_and_active", (q) => 
+        q.eq("fiscalYear", fiscalYear).eq("isActive", true)
+      )
+      .collect();
+    
+    if (batches.length === 0) {
+      return {
+        hasGaps: false,
+        missingBatches: [],
+        range: { min: 0, max: 0 },
+        totalBatches: 0
+      };
+    }
+    
+    // Get min and max batch numbers
+    const batchNumbers = batches.map(batch => batch.batchNumber).sort((a, b) => a - b);
+    const minBatch = batchNumbers[0];
+    const maxBatch = batchNumbers[batchNumbers.length - 1];
+    
+    // Check for missing batches in the range
+    const missingBatches = [];
+    const existingBatchNumbers = new Set(batchNumbers);
+    
+    for (let i = minBatch; i <= maxBatch; i++) {
+      if (!existingBatchNumbers.has(i)) {
+        missingBatches.push(i);
+      }
+    }
+    
+    return {
+      hasGaps: missingBatches.length > 0,
+      missingBatches,
+      range: { min: minBatch, max: maxBatch },
+      totalBatches: batches.length
+    };
+  },
+});
+
 // Reset outsource batches for a new fiscal year
 export const resetOutsourceBatchesForFiscalYear = mutation({
   args: { newFiscalYear: v.string() },
