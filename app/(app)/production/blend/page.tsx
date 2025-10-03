@@ -65,15 +65,16 @@ function BlendPageContent() {
   // Additional targets (optional)
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [additionalTargets, setAdditionalTargets] = useState({
-    viscosity: undefined as number | undefined,
-    percentage: undefined as number | undefined,
-    ph: undefined as number | undefined,
-    conductivity: undefined as number | undefined,
-    moisture: undefined as number | undefined,
-    h2o2: undefined as number | undefined,
-    so2: undefined as number | undefined,
-    color: undefined as string | undefined,
-    clarity: undefined as string | undefined,
+    viscosity: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    percentage: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    ph: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    conductivity: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    moisture: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    h2o2: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    so2: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    color: { enabled: false, min: undefined as string | undefined, max: undefined as string | undefined },
+    clarity: { enabled: false, min: undefined as number | undefined, max: undefined as number | undefined },
+    odour: { enabled: false, min: undefined as string | undefined, max: undefined as string | undefined },
   });
 
   // Results state
@@ -95,6 +96,28 @@ function BlendPageContent() {
     fiscalYear: currentFiscalYear,
   });
 
+  // Helper function to check if any additional targets are enabled
+  const hasEnabledTargets = () => {
+    return Object.values(additionalTargets).some(target => target.enabled);
+  };
+
+  // Helper function to validate range inputs
+  const validateRanges = () => {
+    for (const [key, target] of Object.entries(additionalTargets)) {
+      if (target.enabled) {
+        if (target.min === undefined || target.max === undefined) {
+          toast.error(`Please enter both min and max values for ${key}`);
+          return false;
+        }
+        if (typeof target.min === 'number' && typeof target.max === 'number' && target.min >= target.max) {
+          toast.error(`${key}: Minimum value must be less than maximum value`);
+          return false;
+        }
+      }
+    }
+    return true;
+  };
+
   // Optimize batch selection
   const handleOptimize = async () => {
     if (!lotNumber.trim()) {
@@ -112,6 +135,10 @@ function BlendPageContent() {
       return;
     }
 
+    if (showAdvanced && hasEnabledTargets() && !validateRanges()) {
+      return;
+    }
+
     setIsOptimizing(true);
     try {
       const response = await fetch('/api/blend/optimize', {
@@ -126,7 +153,7 @@ function BlendPageContent() {
           targetBags,
           includeOutsourceBatches,
           fiscalYear: currentFiscalYear,
-          additionalTargets: showAdvanced ? additionalTargets : undefined,
+          additionalTargets: showAdvanced && hasEnabledTargets() ? additionalTargets : undefined,
           preSelectedBatchIds: Array.from(preSelectedBatchIds),
           onlyOutsourceBatches,
         }),
@@ -173,7 +200,7 @@ function BlendPageContent() {
           targetMeanBloom,
           targetMesh,
           lotNumber,
-          additionalTargets: showAdvanced ? additionalTargets : undefined,
+          additionalTargets: showAdvanced && hasEnabledTargets() ? additionalTargets : undefined,
           selectedBatches: optimizationResult.selectedBatches,
           notes,
           fiscalYear: currentFiscalYear,
@@ -384,98 +411,64 @@ function BlendPageContent() {
               {showAdvanced && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
                   <h3 className="text-sm font-medium text-gray-700 mb-3">Additional Quality Targets</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Viscosity</label>
-                      <input
-                        type="number"
-                        value={additionalTargets.viscosity || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, viscosity: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Percentage</label>
-                      <input
-                        type="number"
-                        value={additionalTargets.percentage || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, percentage: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">pH</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={additionalTargets.ph || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, ph: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Conductivity</label>
-                      <input
-                        type="number"
-                        value={additionalTargets.conductivity || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, conductivity: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Moisture</label>
-                      <input
-                        type="number"
-                        value={additionalTargets.moisture || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, moisture: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">H2O2</label>
-                      <input
-                        type="number"
-                        value={additionalTargets.h2o2 || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, h2o2: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">SO2</label>
-                      <input
-                        type="number"
-                        value={additionalTargets.so2 || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, so2: e.target.value ? Number(e.target.value) : undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Color</label>
-                      <input
-                        type="text"
-                        value={additionalTargets.color || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, color: e.target.value || undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Clarity</label>
-                      <input
-                        type="text"
-                        value={additionalTargets.clarity || ''}
-                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, clarity: e.target.value || undefined }))}
-                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        placeholder="Optional"
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(additionalTargets).map(([key, target]) => (
+                      <div key={key} className="border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center mb-2">
+                          <input
+                            type="checkbox"
+                            id={`${key}-enabled`}
+                            checked={target.enabled}
+                            onChange={(e) => setAdditionalTargets(prev => ({
+                              ...prev,
+                              [key]: { ...prev[key as keyof typeof prev], enabled: e.target.checked }
+                            }))}
+                            className="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`${key}-enabled`} className="text-sm font-medium text-gray-700 capitalize">
+                            {key}
+                          </label>
+                        </div>
+                        {target.enabled && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Min</label>
+                              <input
+                                type={['color', 'odour'].includes(key) ? 'text' : 'number'}
+                                step={key === 'ph' ? '0.1' : undefined}
+                                value={target.min || ''}
+                                onChange={(e) => setAdditionalTargets(prev => ({
+                                  ...prev,
+                                  [key]: { 
+                                    ...prev[key as keyof typeof prev], 
+                                    min: ['color', 'odour'].includes(key) ? (e.target.value || undefined) : (e.target.value ? Number(e.target.value) : undefined)
+                                  }
+                                }))}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="Min"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Max</label>
+                              <input
+                                type={['color', 'odour'].includes(key) ? 'text' : 'number'}
+                                step={key === 'ph' ? '0.1' : undefined}
+                                value={target.max || ''}
+                                onChange={(e) => setAdditionalTargets(prev => ({
+                                  ...prev,
+                                  [key]: { 
+                                    ...prev[key as keyof typeof prev], 
+                                    max: ['color', 'odour'].includes(key) ? (e.target.value || undefined) : (e.target.value ? Number(e.target.value) : undefined)
+                                  }
+                                }))}
+                                className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="Max"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}

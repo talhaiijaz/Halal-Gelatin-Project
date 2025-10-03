@@ -522,13 +522,13 @@ export default defineSchema({
     targetMeanBloom: v.optional(v.number()), // Target mean bloom (preferred average)
     targetMesh: v.optional(v.number()), // Target mesh size
     // Additional target parameters (optional)
-    targetViscosity: v.optional(v.number()),
-    targetPercentage: v.optional(v.number()),
-    targetPh: v.optional(v.number()),
-    targetConductivity: v.optional(v.number()),
-    targetMoisture: v.optional(v.number()),
-    targetH2o2: v.optional(v.number()),
-    targetSo2: v.optional(v.number()),
+    targetViscosity: v.optional(v.string()),
+    targetPercentage: v.optional(v.string()),
+    targetPh: v.optional(v.string()),
+    targetConductivity: v.optional(v.string()),
+    targetMoisture: v.optional(v.string()),
+    targetH2o2: v.optional(v.string()),
+    targetSo2: v.optional(v.string()),
     targetColor: v.optional(v.string()),
     targetClarity: v.optional(v.string()),
     targetOdour: v.optional(v.string()),

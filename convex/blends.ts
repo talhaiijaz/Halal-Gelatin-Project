@@ -101,15 +101,56 @@ export const optimizeBatchSelection = query({
     fiscalYear: v.optional(v.string()),
     preSelectedBatchIds: v.optional(v.array(v.union(v.id("productionBatches"), v.id("outsourceBatches")))),
     additionalTargets: v.optional(v.object({
-      viscosity: v.optional(v.number()),
-      percentage: v.optional(v.number()),
-      ph: v.optional(v.number()),
-      conductivity: v.optional(v.number()),
-      moisture: v.optional(v.number()),
-      h2o2: v.optional(v.number()),
-      so2: v.optional(v.number()),
-      color: v.optional(v.string()),
-      clarity: v.optional(v.string()),
+      viscosity: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      percentage: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      ph: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      conductivity: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      moisture: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      h2o2: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      so2: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      color: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.string()),
+        max: v.optional(v.string()),
+      })),
+      clarity: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      odour: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.string()),
+        max: v.optional(v.string()),
+      })),
     })),
   },
   handler: async (ctx, args) => {
@@ -173,7 +214,7 @@ export const optimizeBatchSelection = query({
     let sum = 0; // sum of bloom values times bags (bags are always 10 so weight is uniform)
     
     // Define hierarchy of additional targets (in order of importance)
-    const targetHierarchy = ['viscosity', 'percentage', 'ph', 'conductivity', 'moisture', 'h2o2', 'so2', 'color', 'clarity'];
+    const targetHierarchy = ['viscosity', 'percentage', 'ph', 'conductivity', 'moisture', 'h2o2', 'so2', 'color', 'clarity', 'odour'];
     const attrSums: Record<string, number> = {
       viscosity: 0,
       percentage: 0,
@@ -182,12 +223,13 @@ export const optimizeBatchSelection = query({
       moisture: 0,
       h2o2: 0,
       so2: 0,
+      clarity: 0,
     };
     
-    // Track color and clarity matches for string-based filtering
-    const colorClarityMatches: Record<string, string[]> = {
+    // Track string field values for exact matching or averaging
+    const stringFieldValues: Record<string, string[]> = {
       color: [],
-      clarity: []
+      odour: []
     };
 
     // Seed with user pre-selected batches (if provided)
@@ -206,9 +248,10 @@ export const optimizeBatchSelection = query({
           attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
           attrSums.so2 += (chosen.so2 ?? 0) * 10;
           
-          // Track color and clarity for pre-selected batches
-          if (chosen.color) colorClarityMatches.color.push(chosen.color);
-          if (chosen.clarity) colorClarityMatches.clarity.push(chosen.clarity);
+          // Track string field values for pre-selected batches
+          if (chosen.color) stringFieldValues.color.push(chosen.color);
+          if (chosen.odour) stringFieldValues.odour.push(chosen.odour);
+          if (chosen.clarity) attrSums.clarity += (chosen.clarity ?? 0) * 10;
         }
       }
     }
@@ -233,50 +276,50 @@ export const optimizeBatchSelection = query({
         
         // Secondary optimization: Additional targets (only if bloom range is satisfied)
         if (args.additionalTargets && withinBloomRange) {
-          const withAttr = {
-            viscosity: (attrSums.viscosity + (candidate.viscosity ?? 0) * 10) / nextBags,
-            percentage: (attrSums.percentage + (candidate.percentage ?? 0) * 10) / nextBags,
-            ph: (attrSums.ph + (candidate.ph ?? 0) * 10) / nextBags,
-            conductivity: (attrSums.conductivity + (candidate.conductivity ?? 0) * 10) / nextBags,
-            moisture: (attrSums.moisture + (candidate.moisture ?? 0) * 10) / nextBags,
-            h2o2: (attrSums.h2o2 + (candidate.h2o2 ?? 0) * 10) / nextBags,
-            so2: (attrSums.so2 + (candidate.so2 ?? 0) * 10) / nextBags,
-          };
-          
           const targets = args.additionalTargets as any;
           let additionalScore = 0;
           
           // Apply hierarchical weighting (higher priority = lower weight multiplier)
           for (let h = 0; h < targetHierarchy.length; h++) {
             const key = targetHierarchy[h];
-            if (targets[key] !== undefined) {
-              const tgt = targets[key];
+            const targetConfig = targets[key];
+            
+            if (targetConfig && targetConfig.enabled) {
+              const { min, max } = targetConfig;
               
-              // Handle string-based fields (color, clarity) differently
-              if (key === 'color' || key === 'clarity') {
+              // Handle string-based fields (color, odour) - exact match or averaging
+              if (key === 'color' || key === 'odour') {
                 const candidateValue = candidate[key];
-                const targetValue = tgt;
                 
-                // If we have pre-selected batches with specific color/clarity, prefer matching
-                if (colorClarityMatches[key].length > 0) {
-                  // Strong penalty for not matching the established color/clarity
-                  if (candidateValue !== targetValue) {
+                // If we have established values, prefer matching them
+                if (stringFieldValues[key].length > 0) {
+                  const establishedValues = stringFieldValues[key];
+                  const allMatch = establishedValues.every(val => val === candidateValue);
+                  if (!allMatch) {
                     additionalScore += 100; // Heavy penalty for mismatch
                   }
                 } else {
-                  // First batch - prefer exact match with target
-                  if (candidateValue !== targetValue) {
+                  // First batch - check if value is within range (for string fields, this means exact match)
+                  if (candidateValue !== min && candidateValue !== max) {
                     additionalScore += 50; // Moderate penalty for mismatch
                   }
                 }
               } else {
-                // Handle numeric fields as before
-                const val = (withAttr as any)[key];
-                const denom = Math.max(Math.abs(tgt), 1);
-                const deviation = Math.abs((val - tgt) / denom);
-                // Weight decreases with hierarchy position (viscosity = 1.0, ph = 0.8, etc.)
-                const weight = 1.0 - (h * 0.1);
-                additionalScore += deviation * weight;
+                // Handle numeric fields - check if adding this candidate keeps average within range
+                const currentSum = attrSums[key] || 0;
+                const candidateValue = candidate[key] || 0;
+                const nextSum = currentSum + (candidateValue * 10);
+                const nextAverage = nextSum / nextBags;
+                
+                // Check if the new average would be within range
+                if (min !== undefined && max !== undefined) {
+                  if (nextAverage < min || nextAverage > max) {
+                    // Calculate how far outside the range
+                    const deviation = nextAverage < min ? (min - nextAverage) / Math.max(min, 1) : (nextAverage - max) / Math.max(max, 1);
+                    const weight = 1.0 - (h * 0.1);
+                    additionalScore += deviation * weight * 10; // Scale up penalty for range violations
+                  }
+                }
               }
             }
           }
@@ -301,9 +344,10 @@ export const optimizeBatchSelection = query({
       attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
       attrSums.so2 += (chosen.so2 ?? 0) * 10;
       
-      // Track color and clarity for chosen batches
-      if (chosen.color) colorClarityMatches.color.push(chosen.color);
-      if (chosen.clarity) colorClarityMatches.clarity.push(chosen.clarity);
+      // Track field values for chosen batches
+      if (chosen.color) stringFieldValues.color.push(chosen.color);
+      if (chosen.odour) stringFieldValues.odour.push(chosen.odour);
+      if (chosen.clarity) attrSums.clarity += (chosen.clarity ?? 0) * 10;
     }
 
     // Select optimal batches
@@ -422,29 +466,47 @@ export const optimizeBatchSelection = query({
     // Check additional targets with hierarchy awareness
     if (args.additionalTargets) {
       const countBags = selectedBatches.length * 10 || 1;
-      const achieved = {
-        viscosity: selectedBatches.reduce((s, b) => s + (b.viscosity ?? 0) * b.bags, 0) / countBags,
-        percentage: selectedBatches.reduce((s, b) => s + (b.percentage ?? 0) * b.bags, 0) / countBags,
-        ph: selectedBatches.reduce((s, b) => s + (b.ph ?? 0) * b.bags, 0) / countBags,
-        conductivity: selectedBatches.reduce((s, b) => s + (b.conductivity ?? 0) * b.bags, 0) / countBags,
-        moisture: selectedBatches.reduce((s, b) => s + (b.moisture ?? 0) * b.bags, 0) / countBags,
-        h2o2: selectedBatches.reduce((s, b) => s + (b.h2o2 ?? 0) * b.bags, 0) / countBags,
-        so2: selectedBatches.reduce((s, b) => s + (b.so2 ?? 0) * b.bags, 0) / countBags,
-      } as any;
-      
       const targets = args.additionalTargets as any;
+      
       for (const key of targetHierarchy) {
-        if (targets[key] !== undefined) {
-          const tgt = targets[key];
-          const val = achieved[key] ?? 0;
-          const denom = Math.max(Math.abs(tgt), 1);
-          const ratio = Math.abs(val - tgt) / denom;
-          const tolerance = 0.05; // 5% tolerance
+        const targetConfig = targets[key];
+        
+        if (targetConfig && targetConfig.enabled) {
+          const { min, max } = targetConfig;
           
-          if (ratio <= tolerance) {
-            status.push(`✅ ${key}: ${val.toFixed(2)} (target: ${tgt})`);
+          // Handle string-based fields (color, odour)
+          if (key === 'color' || key === 'odour') {
+            const batchValues = selectedBatches
+              .filter(b => b[key] !== undefined && b[key] !== null)
+              .map(b => b[key]);
+            
+            if (batchValues.length === 0) {
+              warnings.push(`⚠️ ${key}: No data available (target range: ${min}-${max})`);
+            } else {
+              // Check if all values match the target range (exact match for strings)
+              const allMatchMin = batchValues.every(val => val === min);
+              const allMatchMax = batchValues.every(val => val === max);
+              const allMatch = allMatchMin || allMatchMax;
+              
+              if (allMatch) {
+                const matchedValue = allMatchMin ? min : max;
+                status.push(`✅ ${key}: ${matchedValue} (target range: ${min}-${max})`);
+              } else {
+                const uniqueValues = [...new Set(batchValues)];
+                warnings.push(`⚠️ ${key}: ${uniqueValues.join(', ')} (target range: ${min}-${max}) - inconsistent values`);
+              }
+            }
           } else {
-            warnings.push(`⚠️ ${key}: ${val.toFixed(2)} (target: ${tgt}) - outside tolerance`);
+            // Handle numeric fields - calculate average and check if within range
+            const average = selectedBatches.reduce((s, b) => s + (((b as any)[key] ?? 0) * b.bags), 0) / countBags;
+            
+            if (min !== undefined && max !== undefined) {
+              if (average >= min && average <= max) {
+                status.push(`✅ ${key}: ${average.toFixed(2)} (target range: ${min}-${max})`);
+              } else {
+                warnings.push(`⚠️ ${key}: ${average.toFixed(2)} (target range: ${min}-${max}) - outside range`);
+              }
+            }
           }
         }
       }
@@ -522,16 +584,56 @@ export const createBlend = mutation({
     lotNumber: v.string(),
     targetMesh: v.optional(v.number()),
     additionalTargets: v.optional(v.object({
-      viscosity: v.optional(v.number()),
-      percentage: v.optional(v.number()),
-      ph: v.optional(v.number()),
-      conductivity: v.optional(v.number()),
-      moisture: v.optional(v.number()),
-      h2o2: v.optional(v.number()),
-      so2: v.optional(v.number()),
-      color: v.optional(v.string()),
-      clarity: v.optional(v.string()),
-      odour: v.optional(v.string()),
+      viscosity: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      percentage: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      ph: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      conductivity: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      moisture: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      h2o2: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      so2: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      color: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.string()),
+        max: v.optional(v.string()),
+      })),
+      clarity: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.number()),
+        max: v.optional(v.number()),
+      })),
+      odour: v.optional(v.object({
+        enabled: v.boolean(),
+        min: v.optional(v.string()),
+        max: v.optional(v.string()),
+      })),
     })),
     selectedBatches: v.array(v.object({
       batchId: v.union(v.id("productionBatches"), v.id("outsourceBatches")),
@@ -588,16 +690,16 @@ export const createBlend = mutation({
       targetBloomMax: args.targetBloomMax,
       targetMeanBloom: args.targetMeanBloom,
       targetMesh: args.targetMesh,
-      targetViscosity: args.additionalTargets?.viscosity,
-      targetPercentage: args.additionalTargets?.percentage,
-      targetPh: args.additionalTargets?.ph,
-      targetConductivity: args.additionalTargets?.conductivity,
-      targetMoisture: args.additionalTargets?.moisture,
-      targetH2o2: args.additionalTargets?.h2o2,
-      targetSo2: args.additionalTargets?.so2,
-      targetColor: args.additionalTargets?.color,
-      targetClarity: args.additionalTargets?.clarity,
-      targetOdour: args.additionalTargets?.odour,
+      targetViscosity: args.additionalTargets?.viscosity?.enabled ? `${args.additionalTargets.viscosity.min}-${args.additionalTargets.viscosity.max}` : undefined,
+      targetPercentage: args.additionalTargets?.percentage?.enabled ? `${args.additionalTargets.percentage.min}-${args.additionalTargets.percentage.max}` : undefined,
+      targetPh: args.additionalTargets?.ph?.enabled ? `${args.additionalTargets.ph.min}-${args.additionalTargets.ph.max}` : undefined,
+      targetConductivity: args.additionalTargets?.conductivity?.enabled ? `${args.additionalTargets.conductivity.min}-${args.additionalTargets.conductivity.max}` : undefined,
+      targetMoisture: args.additionalTargets?.moisture?.enabled ? `${args.additionalTargets.moisture.min}-${args.additionalTargets.moisture.max}` : undefined,
+      targetH2o2: args.additionalTargets?.h2o2?.enabled ? `${args.additionalTargets.h2o2.min}-${args.additionalTargets.h2o2.max}` : undefined,
+      targetSo2: args.additionalTargets?.so2?.enabled ? `${args.additionalTargets.so2.min}-${args.additionalTargets.so2.max}` : undefined,
+      targetColor: args.additionalTargets?.color?.enabled ? `${args.additionalTargets.color.min}-${args.additionalTargets.color.max}` : undefined,
+      targetClarity: args.additionalTargets?.clarity?.enabled ? `${args.additionalTargets.clarity.min}-${args.additionalTargets.clarity.max}` : undefined,
+      targetOdour: args.additionalTargets?.odour?.enabled ? `${args.additionalTargets.odour.min}-${args.additionalTargets.odour.max}` : undefined,
       selectedBatches: args.selectedBatches,
       totalBags,
       totalWeight,
