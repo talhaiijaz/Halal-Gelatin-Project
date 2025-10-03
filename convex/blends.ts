@@ -108,6 +108,8 @@ export const optimizeBatchSelection = query({
       moisture: v.optional(v.number()),
       h2o2: v.optional(v.number()),
       so2: v.optional(v.number()),
+      color: v.optional(v.string()),
+      clarity: v.optional(v.string()),
     })),
   },
   handler: async (ctx, args) => {
@@ -171,7 +173,7 @@ export const optimizeBatchSelection = query({
     let sum = 0; // sum of bloom values times bags (bags are always 10 so weight is uniform)
     
     // Define hierarchy of additional targets (in order of importance)
-    const targetHierarchy = ['viscosity', 'percentage', 'ph', 'conductivity', 'moisture', 'h2o2', 'so2'];
+    const targetHierarchy = ['viscosity', 'percentage', 'ph', 'conductivity', 'moisture', 'h2o2', 'so2', 'color', 'clarity'];
     const attrSums: Record<string, number> = {
       viscosity: 0,
       percentage: 0,
@@ -180,6 +182,12 @@ export const optimizeBatchSelection = query({
       moisture: 0,
       h2o2: 0,
       so2: 0,
+    };
+    
+    // Track color and clarity matches for string-based filtering
+    const colorClarityMatches: Record<string, string[]> = {
+      color: [],
+      clarity: []
     };
 
     // Seed with user pre-selected batches (if provided)
@@ -197,6 +205,10 @@ export const optimizeBatchSelection = query({
           attrSums.moisture += (chosen.moisture ?? 0) * 10;
           attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
           attrSums.so2 += (chosen.so2 ?? 0) * 10;
+          
+          // Track color and clarity for pre-selected batches
+          if (chosen.color) colorClarityMatches.color.push(chosen.color);
+          if (chosen.clarity) colorClarityMatches.clarity.push(chosen.clarity);
         }
       }
     }
@@ -239,12 +251,33 @@ export const optimizeBatchSelection = query({
             const key = targetHierarchy[h];
             if (targets[key] !== undefined) {
               const tgt = targets[key];
-              const val = (withAttr as any)[key];
-              const denom = Math.max(Math.abs(tgt), 1);
-              const deviation = Math.abs((val - tgt) / denom);
-              // Weight decreases with hierarchy position (viscosity = 1.0, ph = 0.8, etc.)
-              const weight = 1.0 - (h * 0.1);
-              additionalScore += deviation * weight;
+              
+              // Handle string-based fields (color, clarity) differently
+              if (key === 'color' || key === 'clarity') {
+                const candidateValue = candidate[key];
+                const targetValue = tgt;
+                
+                // If we have pre-selected batches with specific color/clarity, prefer matching
+                if (colorClarityMatches[key].length > 0) {
+                  // Strong penalty for not matching the established color/clarity
+                  if (candidateValue !== targetValue) {
+                    additionalScore += 100; // Heavy penalty for mismatch
+                  }
+                } else {
+                  // First batch - prefer exact match with target
+                  if (candidateValue !== targetValue) {
+                    additionalScore += 50; // Moderate penalty for mismatch
+                  }
+                }
+              } else {
+                // Handle numeric fields as before
+                const val = (withAttr as any)[key];
+                const denom = Math.max(Math.abs(tgt), 1);
+                const deviation = Math.abs((val - tgt) / denom);
+                // Weight decreases with hierarchy position (viscosity = 1.0, ph = 0.8, etc.)
+                const weight = 1.0 - (h * 0.1);
+                additionalScore += deviation * weight;
+              }
             }
           }
           
@@ -267,6 +300,10 @@ export const optimizeBatchSelection = query({
       attrSums.moisture += (chosen.moisture ?? 0) * 10;
       attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
       attrSums.so2 += (chosen.so2 ?? 0) * 10;
+      
+      // Track color and clarity for chosen batches
+      if (chosen.color) colorClarityMatches.color.push(chosen.color);
+      if (chosen.clarity) colorClarityMatches.clarity.push(chosen.clarity);
     }
 
     // Select optimal batches

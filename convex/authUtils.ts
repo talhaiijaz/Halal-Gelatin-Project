@@ -18,13 +18,77 @@ export async function getCurrentUser(ctx: QueryCtx | MutationCtx) {
     throw new AuthError("User not authenticated");
   }
 
-  const user = await ctx.db
+  // Use case-insensitive email comparison
+  const normalizedEmail = identity.email.toLowerCase();
+  
+  // First try exact match with original email
+  let user = await ctx.db
     .query("users")
     .withIndex("by_email", (q) => q.eq("email", identity.email!))
     .unique();
 
+  // If not found, try with lowercase email
   if (!user) {
-    throw new AuthError("User not found in database");
+    user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
+      .unique();
+  }
+
+  // If still not found, search through all users for case-insensitive match
+  if (!user) {
+    const allUsers = await ctx.db.query("users").collect();
+    user = allUsers.find(u => u.email.toLowerCase() === normalizedEmail) || null;
+  }
+
+  if (!user) {
+    // Provide more detailed error information for debugging
+    const allUsers = await ctx.db.query("users").collect();
+    const userEmails = allUsers.map(u => u.email);
+    throw new AuthError(`User not found in database. Looking for: "${identity.email}" (normalized: "${normalizedEmail}"). Available users: ${userEmails.join(", ")}`);
+  }
+
+  return {
+    id: user._id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    identity
+  };
+}
+
+// Get current user with role information - graceful version that returns null instead of throwing
+export async function getCurrentUserGraceful(ctx: QueryCtx | MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity?.email) {
+    return null;
+  }
+
+  // Use case-insensitive email comparison
+  const normalizedEmail = identity.email.toLowerCase();
+  
+  // First try exact match with original email
+  let user = await ctx.db
+    .query("users")
+    .withIndex("by_email", (q) => q.eq("email", identity.email!))
+    .unique();
+
+  // If not found, try with lowercase email
+  if (!user) {
+    user = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
+      .unique();
+  }
+
+  // If still not found, search through all users for case-insensitive match
+  if (!user) {
+    const allUsers = await ctx.db.query("users").collect();
+    user = allUsers.find(u => u.email.toLowerCase() === normalizedEmail) || null;
+  }
+
+  if (!user) {
+    return null;
   }
 
   return {
@@ -65,6 +129,21 @@ export async function requireAdmin(ctx: QueryCtx | MutationCtx) {
 // Check if user can access production features
 export async function requireProductionAccess(ctx: QueryCtx | MutationCtx) {
   return await requireRole(ctx, ["production", "admin", "super-admin"]);
+}
+
+// Check if user can access production features - graceful version
+export async function requireProductionAccessGraceful(ctx: QueryCtx | MutationCtx) {
+  const user = await getCurrentUserGraceful(ctx);
+  if (!user) {
+    throw new AuthError("User not authenticated or not found in database");
+  }
+  
+  const allowedRoles = ["production", "admin", "super-admin"];
+  if (!allowedRoles.includes(user.role)) {
+    throw new AuthError(`Access denied. Required role: ${allowedRoles.join(" or ")}, user role: ${user.role}`);
+  }
+
+  return user;
 }
 
 // Check if user can modify data (admin or super-admin only)

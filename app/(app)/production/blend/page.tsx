@@ -72,6 +72,8 @@ function BlendPageContent() {
     moisture: undefined as number | undefined,
     h2o2: undefined as number | undefined,
     so2: undefined as number | undefined,
+    color: undefined as string | undefined,
+    clarity: undefined as string | undefined,
   });
 
   // Results state
@@ -440,6 +442,36 @@ function BlendPageContent() {
                         type="number"
                         value={additionalTargets.h2o2 || ''}
                         onChange={(e) => setAdditionalTargets(prev => ({ ...prev, h2o2: e.target.value ? Number(e.target.value) : undefined }))}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">SO2</label>
+                      <input
+                        type="number"
+                        value={additionalTargets.so2 || ''}
+                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, so2: e.target.value ? Number(e.target.value) : undefined }))}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Color</label>
+                      <input
+                        type="text"
+                        value={additionalTargets.color || ''}
+                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, color: e.target.value || undefined }))}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        placeholder="Optional"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Clarity</label>
+                      <input
+                        type="text"
+                        value={additionalTargets.clarity || ''}
+                        onChange={(e) => setAdditionalTargets(prev => ({ ...prev, clarity: e.target.value || undefined }))}
                         className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                         placeholder="Optional"
                       />

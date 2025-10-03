@@ -15,15 +15,22 @@ export class ApiAuthError extends Error {
 
 // Get current user with role information from API routes
 export async function getCurrentUserFromApi() {
-  const { userId } = await auth();
+  const { userId, sessionClaims } = await auth();
   if (!userId) {
     throw new ApiAuthError("User not authenticated");
   }
 
+  // Log the user information for debugging
+  console.log('Clerk userId:', userId);
+  console.log('Clerk sessionClaims:', sessionClaims);
+  console.log('Clerk email:', sessionClaims?.email);
+
   // Get user role from Convex
   const userRole = await convex.query(api.users.getCurrentUserRole, {});
+  console.log('Convex userRole:', userRole);
+  
   if (!userRole) {
-    throw new ApiAuthError("User not found in database");
+    throw new ApiAuthError(`User not found in database or insufficient permissions. Clerk email: ${sessionClaims?.email}, Clerk userId: ${userId}`);
   }
 
   return {
@@ -78,4 +85,34 @@ export async function requireApiOrderAccess() {
 // Check if user can access client management in API routes
 export async function requireApiClientAccess() {
   return await requireApiRole(["admin", "super-admin"]);
+}
+
+// Debug function to check API authentication status
+export async function debugApiAuth() {
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return {
+        hasClerkAuth: false,
+        userId: null,
+        userRole: null,
+        error: "No Clerk authentication"
+      };
+    }
+
+    const userRole = await convex.query(api.users.getCurrentUserRole, {});
+    return {
+      hasClerkAuth: true,
+      userId,
+      userRole,
+      error: null
+    };
+  } catch (error) {
+    return {
+      hasClerkAuth: false,
+      userId: null,
+      userRole: null,
+      error: error instanceof Error ? error.message : "Unknown error"
+    };
+  }
 }

@@ -220,6 +220,9 @@ function OutsourceDetailPageContent() {
 
       const response = await fetch('/api/pdf/extract', {
         method: 'POST',
+        headers: {
+          'x-allow-external-ai': 'true',
+        },
         body: formData,
         signal: abortControllerRef.current.signal,
       });

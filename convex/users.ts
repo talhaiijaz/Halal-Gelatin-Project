@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { 
   getCurrentUser, 
+  getCurrentUserGraceful,
   requireSuperAdmin, 
   requireUserManagementAccess,
   validateRoleChange,
@@ -14,12 +15,8 @@ export const getCurrentUserRole = query({
   args: {},
   returns: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production"), v.null()),
   handler: async (ctx) => {
-    try {
-      const user = await getCurrentUser(ctx);
-      return user.role;
-    } catch {
-      return null;
-    }
+    const user = await getCurrentUserGraceful(ctx);
+    return user?.role ?? null;
   },
 });
 
@@ -34,12 +31,9 @@ export const isUserInRoles = query({
   },
   returns: v.boolean(),
   handler: async (ctx, args) => {
-    try {
-      const user = await getCurrentUser(ctx);
-      return args.roles.includes(user.role);
-    } catch {
-      return false;
-    }
+    const user = await getCurrentUserGraceful(ctx);
+    if (!user) return false;
+    return args.roles.includes(user.role);
   },
 });
 
@@ -147,7 +141,7 @@ export const getAllUsers = query({
     _creationTime: v.number(),
     email: v.string(),
     name: v.string(),
-        role: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production")),
+    role: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production")),
     createdAt: v.number(),
     lastLogin: v.optional(v.number()),
   })),
@@ -155,6 +149,50 @@ export const getAllUsers = query({
     // Require super-admin access to view all users
     await requireUserManagementAccess(ctx);
     return await ctx.db.query("users").collect();
+  },
+});
+
+// Debug function to check authentication status - for troubleshooting
+export const debugAuth = query({
+  args: {},
+  returns: v.object({
+    hasIdentity: v.boolean(),
+    email: v.optional(v.string()),
+    normalizedEmail: v.optional(v.string()),
+    userFound: v.boolean(),
+    userRole: v.optional(v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production"))),
+    allUserEmails: v.array(v.string()),
+  }),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    const hasIdentity = !!identity?.email;
+    const email = identity?.email;
+    const normalizedEmail = email?.toLowerCase();
+    
+    let userFound = false;
+    let userRole = null;
+    
+    if (email) {
+      try {
+        const user = await getCurrentUserGraceful(ctx);
+        userFound = !!user;
+        userRole = user?.role;
+      } catch {
+        userFound = false;
+      }
+    }
+    
+    const allUsers = await ctx.db.query("users").collect();
+    const allUserEmails = allUsers.map(u => u.email);
+    
+    return {
+      hasIdentity,
+      email,
+      normalizedEmail,
+      userFound,
+      userRole: userRole || undefined,
+      allUserEmails,
+    };
   },
 });
 
