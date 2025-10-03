@@ -65,6 +65,14 @@ export const checkUserAccess = mutation({
   },
   returns: v.union(v.id("users"), v.null()),
   handler: async (ctx, args) => {
+    // Require authenticated identity; will throw if unauthenticated
+    const current = await getCurrentUser(ctx);
+
+    // Ensure the provided email matches the authenticated user's email
+    if (current.email?.toLowerCase() !== args.email.toLowerCase()) {
+      return null;
+    }
+
     // Check if user exists in database
     const existingUser = await ctx.db
       .query("users")
@@ -74,7 +82,8 @@ export const checkUserAccess = mutation({
     if (existingUser) {
       // Update last login time
       await ctx.db.patch(existingUser._id, {
-        name: args.name, // Update name in case it changed in Clerk
+        // For safety, prefer the authenticated name rather than client-provided
+        name: args.name || existingUser.name,
         lastLogin: Date.now(),
       });
       return existingUser._id;

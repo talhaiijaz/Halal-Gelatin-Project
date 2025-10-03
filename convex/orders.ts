@@ -987,6 +987,8 @@ export const getDocumentUrl = query({
     storageId: v.id("_storage"),
   },
   handler: async (ctx, args) => {
+    // Require order access before issuing signed URL
+    await requireOrderAccess(ctx);
     return await ctx.storage.getUrl(args.storageId);
   },
 });

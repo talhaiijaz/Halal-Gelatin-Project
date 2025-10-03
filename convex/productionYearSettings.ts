@@ -1,7 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getFiscalYear, getNextFiscalYear, getCurrentFiscalYear, isValidFiscalYear } from "./fiscalYearUtils";
-import { requireProductionAccess } from "./authUtils";
+import { requireProductionAccess, requireSuperAdmin } from "./authUtils";
 
 // Get current production year settings
 export const getCurrentYearSettings = query({
@@ -43,8 +43,8 @@ export const initializeYearSettings = mutation({
     updatedAt: v.float64(),
   }),
   handler: async (ctx) => {
-    // Require production access
-    await requireProductionAccess(ctx);
+    // Restrict to super-admins for initialization
+    await requireSuperAdmin(ctx);
     
     const currentYear = new Date().getFullYear();
     const currentFiscalYear = getFiscalYear(currentYear);
@@ -76,8 +76,8 @@ export const setCurrentYear = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
-    // Require production access
-    await requireProductionAccess(ctx);
+    // Restrict to super-admins
+    await requireSuperAdmin(ctx);
     
     const fiscalYear = getFiscalYear(args.year);
     const settings = await ctx.db.query("productionYearSettings").first();
@@ -118,6 +118,8 @@ export const setCurrentFiscalYear = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
+    // Restrict to super-admins
+    await requireSuperAdmin(ctx);
     if (!isValidFiscalYear(args.fiscalYear)) {
       return {
         success: false,
@@ -164,6 +166,8 @@ export const addNewYear = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
+    // Restrict to super-admins
+    await requireSuperAdmin(ctx);
     const fiscalYear = getFiscalYear(args.year);
     const settings = await ctx.db.query("productionYearSettings").first();
     
@@ -214,6 +218,8 @@ export const addNewFiscalYear = mutation({
     message: v.string(),
   }),
   handler: async (ctx, args) => {
+    // Restrict to super-admins
+    await requireSuperAdmin(ctx);
     if (!isValidFiscalYear(args.fiscalYear)) {
       return {
         success: false,

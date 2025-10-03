@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size must be less than 10MB' }, { status: 400 });
     }
 
+    // Gate sending files to OpenAI behind explicit consent header/flag
+    const consent = request.headers.get('x-allow-external-ai') === 'true';
+    if (!consent) {
+      return NextResponse.json({ error: 'External AI processing not authorized' }, { status: 403 });
+    }
+
     // Convert file to buffer for AI SDK
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -101,21 +107,11 @@ Format as a structured table with clear column separators. Start with Batch numb
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('PDF extraction error:', error);
+    // Log full error server-side only
+    console.error('PDF extraction error');
     
-    // Provide more specific error information
-    let errorMessage = 'Failed to process PDF';
-    if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    
-    return NextResponse.json(
-      { 
-        error: errorMessage,
-        details: error instanceof Error ? error.stack : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : 'Failed to process PDF';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

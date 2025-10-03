@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
-import { requireProductionAccess, getCurrentUser } from "./authUtils";
+import { requireProductionAccess, getCurrentUser, requireSuperAdmin } from "./authUtils";
 
 // Get all outsource batches with pagination
 export const getAllOutsourceBatches = query({
@@ -72,6 +72,8 @@ export const getOutsourceBatchesByFiscalYear = query({
 export const getAvailableOutsourceBatches = query({
   args: { fiscalYear: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     const fiscalYear = args.fiscalYear || "2025-26";
     return await ctx.db
       .query("outsourceBatches")
@@ -86,6 +88,8 @@ export const getAvailableOutsourceBatches = query({
 export const getOutsourceBatchStats = query({
   args: { fiscalYear: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     const fiscalYear = args.fiscalYear || "2025-26";
     const batches = await ctx.db
       .query("outsourceBatches")
@@ -253,6 +257,8 @@ export const markOutsourceBatchAsUsed = mutation({
     usedInOrder: v.string(),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     const now = Date.now();
     return await ctx.db.patch(args.batchId, {
       isUsed: true,
@@ -267,6 +273,8 @@ export const markOutsourceBatchAsUsed = mutation({
 export const markOutsourceBatchAsAvailable = mutation({
   args: { batchId: v.id("outsourceBatches") },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     const now = Date.now();
     return await ctx.db.patch(args.batchId, {
       isUsed: false,
@@ -281,6 +289,8 @@ export const markOutsourceBatchAsAvailable = mutation({
 export const getNextOutsourceBatchNumber = query({
   args: { fiscalYear: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     const fiscalYear = args.fiscalYear || "2025-26";
     const batches = await ctx.db
       .query("outsourceBatches")
@@ -306,6 +316,8 @@ export const createOutsourceBatchesFromExtractedData = mutation({
     fileId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, args) => {
+    // Require production access
+    await requireProductionAccess(ctx);
     try {
       // Update processing state to "processing"
       if (args.processingId) {
@@ -337,9 +349,6 @@ export const createOutsourceBatchesFromExtractedData = mutation({
       const skippedBatches = [];
 
       console.log(`Processing ${lines.length} lines from extracted data`);
-      console.log('Raw extracted data:', args.extractedData);
-      console.log('First 5 lines:', lines.slice(0, 5));
-      console.log('Last 5 lines:', lines.slice(-5));
 
       for (const line of lines) {
         // Skip header lines, empty lines, and unwanted sections
@@ -354,7 +363,7 @@ export const createOutsourceBatchesFromExtractedData = mutation({
         // Parse the line data using pipe delimiter (|)
         const parts = line.split('|').map(part => part.trim());
         
-        console.log(`Processing line with ${parts.length} parts:`, parts);
+        // Processing line with parts
         
         if (parts.length >= 12) { // Expected format: Batch | Viscocity | Bloom | % age | PH | Conductivity | Moisture | H2O2 | SO2 | Color | Clarity | Odour
           // Helper function to parse numeric values, handling percentage signs
@@ -374,11 +383,11 @@ export const createOutsourceBatchesFromExtractedData = mutation({
           // Extract batch number from the data (parts[0] is now the Batch column)
           const extractedBatchNumber = parseNumeric(parts[0]); // Use Batch column as first column
           if (!extractedBatchNumber) {
-            console.warn(`Skipping row with invalid batch number: ${parts[0]}`);
+            // Skipping row with invalid batch number
             continue;
           }
           
-          console.log(`Processing batch number: ${extractedBatchNumber}`);
+          // Processing batch number
 
           // Check if batch number already exists across ALL files and years
           const existingBatch = await ctx.db
@@ -421,7 +430,7 @@ export const createOutsourceBatchesFromExtractedData = mutation({
             updatedAt: now,
           };
 
-          console.log(`Creating batch with data:`, batchData);
+          // Creating batch record
 
           const batchId = await ctx.db.insert("outsourceBatches", batchData);
           createdBatches.push(batchId);
@@ -472,6 +481,8 @@ export const createOutsourceBatchesFromExtractedData = mutation({
 export const getOutsourceFileUrl = mutation({
   args: { fileId: v.id("_storage") },
   handler: async (ctx, args) => {
+    // Require production access before issuing signed URL
+    await requireProductionAccess(ctx);
     return await ctx.storage.getUrl(args.fileId);
   },
 });
@@ -480,6 +491,8 @@ export const getOutsourceFileUrl = mutation({
 export const resetOutsourceBatchesForFiscalYear = mutation({
   args: { newFiscalYear: v.string() },
   handler: async (ctx, args) => {
+    // Restrict to super-admins
+    await requireSuperAdmin(ctx);
     const now = Date.now();
     
     // Get all active batches
