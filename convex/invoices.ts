@@ -264,12 +264,21 @@ export const list = query({
       });
     }
 
-    // Sort by factory departure date (earliest first), then by issue date, then by creation order for same dates
+    // Sort invoices with priority: non-delivered/paid first, then delivered/paid at bottom
     invoices.sort((a, b) => {
-      // Get factory departure dates from associated orders
+      // Get associated orders and check their status
       const aOrder = allOrders.find(o => o._id === a.orderId);
       const bOrder = allOrders.find(o => o._id === b.orderId);
       
+      // Check if invoices are delivered and paid (lowest priority)
+      const aIsDeliveredAndPaid = (aOrder?.status === "delivered" && a.status === "paid");
+      const bIsDeliveredAndPaid = (bOrder?.status === "delivered" && b.status === "paid");
+      
+      // Prioritize non-delivered/paid invoices
+      if (aIsDeliveredAndPaid && !bIsDeliveredAndPaid) return 1; // a goes to bottom
+      if (!aIsDeliveredAndPaid && bIsDeliveredAndPaid) return -1; // b goes to bottom
+      
+      // For invoices in the same priority group, sort by factory departure date (earliest first)
       const aFactoryDate = aOrder?.factoryDepartureDate;
       const bFactoryDate = bOrder?.factoryDepartureDate;
       

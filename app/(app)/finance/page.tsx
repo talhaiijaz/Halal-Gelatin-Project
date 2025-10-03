@@ -255,8 +255,17 @@ function FinancePageContent() {
       return true;
     });
     
-    // Sort filtered invoices by factory departure date (earliest first)
+    // Sort filtered invoices with priority: non-delivered/paid first, then delivered/paid at bottom
     const sortedFilteredInvoices = filteredInvoices.sort((a: any, b: any) => {
+      // Check if invoices are delivered and paid (lowest priority)
+      const aIsDeliveredAndPaid = (a.order?.status === "delivered" && a.status === "paid");
+      const bIsDeliveredAndPaid = (b.order?.status === "delivered" && b.status === "paid");
+      
+      // Prioritize non-delivered/paid invoices
+      if (aIsDeliveredAndPaid && !bIsDeliveredAndPaid) return 1; // a goes to bottom
+      if (!aIsDeliveredAndPaid && bIsDeliveredAndPaid) return -1; // b goes to bottom
+      
+      // For invoices in the same priority group, sort by factory departure date (earliest first)
       const aFactoryDate = (a.order as any)?.factoryDepartureDate;
       const bFactoryDate = (b.order as any)?.factoryDepartureDate;
       
