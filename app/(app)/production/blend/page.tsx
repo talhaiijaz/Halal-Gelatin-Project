@@ -56,6 +56,7 @@ function BlendPageContent() {
   const [targetBloomMin, setTargetBloomMin] = useState<number>(240);
   const [targetBloomMax, setTargetBloomMax] = useState<number>(260);
   const [targetMeanBloom, setTargetMeanBloom] = useState<number | undefined>(undefined);
+  const [bloomSelectionMode, setBloomSelectionMode] = useState<'target-range' | 'high-low' | 'random-average'>('random-average');
   const [targetMesh, setTargetMesh] = useState<number>(20);
   const [targetBags, setTargetBags] = useState<number>(100);
   const [includeOutsourceBatches, setIncludeOutsourceBatches] = useState<boolean>(false);
@@ -150,6 +151,7 @@ function BlendPageContent() {
           targetBloomMin,
           targetBloomMax,
           targetMeanBloom,
+          bloomSelectionMode,
           targetBags,
           includeOutsourceBatches,
           fiscalYear: currentFiscalYear,
@@ -198,6 +200,7 @@ function BlendPageContent() {
           targetBloomMin,
           targetBloomMax,
           targetMeanBloom,
+          bloomSelectionMode,
           targetMesh,
           lotNumber,
           additionalTargets: showAdvanced && hasEnabledTargets() ? additionalTargets : undefined,
@@ -271,6 +274,7 @@ function BlendPageContent() {
                         type="number"
                         value={targetBloomMin}
                         onChange={(e) => setTargetBloomMin(Number(e.target.value))}
+                        step={10}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Min"
                       />
@@ -279,6 +283,7 @@ function BlendPageContent() {
                         type="number"
                         value={targetBloomMax}
                         onChange={(e) => setTargetBloomMax(Number(e.target.value))}
+                        step={10}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Max"
                       />
@@ -297,6 +302,56 @@ function BlendPageContent() {
                       placeholder="e.g., 255"
                     />
                     <p className="text-xs text-gray-500 mt-2">Preferred average bloom (±2 tolerance)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Bloom Selection Mode
+                    </label>
+                    <div className="space-y-3">
+                      <label className="flex items-start">
+                        <input
+                          type="radio"
+                          name="bloomMode"
+                          value="random-average"
+                          checked={bloomSelectionMode === 'random-average'}
+                          onChange={(e) => setBloomSelectionMode(e.target.value as 'target-range' | 'high-low' | 'random-average')}
+                          className="mr-3 mt-1"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Average Random Select Mode</div>
+                          <div className="text-xs text-gray-500">Randomly select any batches from available inventory, ensuring the final average bloom falls within the target range. Most flexible option.</div>
+                        </div>
+                      </label>
+                      <label className="flex items-start">
+                        <input
+                          type="radio"
+                          name="bloomMode"
+                          value="target-range"
+                          checked={bloomSelectionMode === 'target-range'}
+                          onChange={(e) => setBloomSelectionMode(e.target.value as 'target-range' | 'high-low' | 'random-average')}
+                          className="mr-3 mt-1"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">Target Bloom Range Mode</div>
+                          <div className="text-xs text-gray-500">Select only batches that fall within the specified bloom range ({targetBloomMin}-{targetBloomMax}). Most conservative option with consistent quality.</div>
+                        </div>
+                      </label>
+                      <label className="flex items-start">
+                        <input
+                          type="radio"
+                          name="bloomMode"
+                          value="high-low"
+                          checked={bloomSelectionMode === 'high-low'}
+                          onChange={(e) => setBloomSelectionMode(e.target.value as 'target-range' | 'high-low' | 'random-average')}
+                          className="mr-3 mt-1"
+                        />
+                        <div>
+                          <div className="text-sm font-medium text-gray-700">High and Low Mode</div>
+                          <div className="text-xs text-gray-500">Mix batches lower than {targetBloomMin} and higher than {targetBloomMax} to achieve the target average. Requires both low and high batches to be available.</div>
+                        </div>
+                      </label>
+                    </div>
                   </div>
 
                   <div>
@@ -388,6 +443,7 @@ function BlendPageContent() {
                       type="number"
                       value={targetMesh}
                       onChange={(e) => setTargetMesh(Number(e.target.value))}
+                      step={5}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="20"
                     />
@@ -739,22 +795,7 @@ function BlendPageContent() {
               )}
             </div>
 
-            {/* Tips */}
-            <div className="bg-orange-50 rounded-lg border border-orange-200 p-6">
-              <h3 className="font-semibold text-orange-900 mb-3 flex items-center gap-2">
-                <AlertCircle className="h-5 w-5" />
-                💡 Tips
-              </h3>
-              <div className="space-y-2 text-sm text-orange-800">
-                <p>• Enter your target bloom range (e.g., 240-260)</p>
-                <p>• Optionally set target mean bloom (e.g., 255) for precise control</p>
-                <p>• Set target bags (default: 100, must be multiple of 10)</p>
-                <p>• System automatically selects optimal batches (10 bags each)</p>
-                <p>• Mesh size is for PDF documentation only</p>
-                <p>• PDFs can be downloaded from the Blends page</p>
-                <p>• Used batches will be marked in Production Detail</p>
-              </div>
-            </div>
+            
 
             {/* Target Validation */}
             {targetBloomMin && targetBloomMax && (

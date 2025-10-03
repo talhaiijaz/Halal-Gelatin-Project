@@ -520,6 +520,7 @@ export default defineSchema({
     targetBloomMin: v.optional(v.number()), // Target bloom minimum
     targetBloomMax: v.optional(v.number()), // Target bloom maximum
     targetMeanBloom: v.optional(v.number()), // Target mean bloom (preferred average)
+    bloomSelectionMode: v.optional(v.union(v.literal("target-range"), v.literal("high-low"), v.literal("random-average"))), // Bloom selection strategy
     targetMesh: v.optional(v.number()), // Target mesh size
     // Additional target parameters (optional)
     targetViscosity: v.optional(v.string()),

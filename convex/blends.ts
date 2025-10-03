@@ -95,6 +95,7 @@ export const optimizeBatchSelection = query({
     targetBloomMin: v.number(),
     targetBloomMax: v.number(),
     targetMeanBloom: v.optional(v.number()), // Preferred mean bloom
+    bloomSelectionMode: v.optional(v.union(v.literal("target-range"), v.literal("high-low"), v.literal("random-average"))), // Bloom selection strategy
     targetBags: v.optional(v.number()), // Desired number of bags (must be multiple of 10)
     includeOutsourceBatches: v.optional(v.boolean()), // Include outsource batches in optimization
     onlyOutsourceBatches: v.optional(v.boolean()), // Use only outsource batches (ignore production)
@@ -206,7 +207,35 @@ export const optimizeBatchSelection = query({
       targetBloom = args.targetBloomMax;
     }
     
-    const batchesWithBloom = availableBatches.filter((b: any) => b.bloom !== undefined);
+    // Filter batches by bloom range based on selection mode
+    const mode = args.bloomSelectionMode || 'random-average';
+    let batchesWithBloom: any[] = [];
+    
+    if (mode === 'target-range') {
+      // Target Bloom Range Mode: only include batches within the bloom range
+      batchesWithBloom = availableBatches.filter(batch => {
+        const bloom = batch.bloom;
+        return bloom !== undefined && bloom !== null && !isNaN(bloom) && 
+               bloom >= args.targetBloomMin && bloom <= args.targetBloomMax;
+      });
+    } else if (mode === 'high-low') {
+      // High and Low Mode: only include batches outside the bloom range
+      batchesWithBloom = availableBatches.filter(batch => {
+        const bloom = batch.bloom;
+        return bloom !== undefined && bloom !== null && !isNaN(bloom) && 
+               (bloom < args.targetBloomMin || bloom > args.targetBloomMax);
+      });
+    } else {
+      // Random Average Mode: include all batches with valid bloom values
+      batchesWithBloom = availableBatches.filter(batch => {
+        const bloom = batch.bloom;
+        return bloom !== undefined && bloom !== null && !isNaN(bloom);
+      });
+    }
+
+    if (batchesWithBloom.length === 0) {
+      return { selectedBatches: [], message: "No batches found with valid bloom values for the selected mode" };
+    }
     
     // Hierarchical optimization: Bloom first, then other targets
     const selected: any[] = [];
@@ -255,99 +284,252 @@ export const optimizeBatchSelection = query({
         }
       }
     }
-    while (selected.length < batchesNeeded && remaining.length > 0) {
-      let bestIdx = 0;
-      let bestScore = Number.POSITIVE_INFINITY;
+    // Helper function for random selection
+    const shuffleArray = (array: any[]) => {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+
+    if (mode === 'random-average') {
+      // Random Average Mode: Use weighted random selection with target range validation
+      const shuffled = shuffleArray([...remaining]);
+      const maxAttempts = 1000; // Prevent infinite loops
+      let attempts = 0;
       
-      for (let i = 0; i < remaining.length; i++) {
-        const candidate = remaining[i];
+      while (selected.length < batchesNeeded && shuffled.length > 0 && attempts < maxAttempts) {
+        attempts++;
+        
+        // Select a random candidate
+        const randomIndex = Math.floor(Math.random() * shuffled.length);
+        const candidate = shuffled.splice(randomIndex, 1)[0];
+        
+        // Calculate what the average would be if we add this candidate
         const nextCountBatches = selected.length + 1;
         const nextBags = nextCountBatches * 10;
         const nextAvg = (sum + (candidate.bloom || 0) * 10) / nextBags;
         
-        // Primary score: Bloom range compliance (MUST be met)
-        const withinBloomRange = nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax;
-        let score = Math.abs(targetBloom - nextAvg);
+        // Only add if the new average would be within target range
+        if (nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax) {
+          selected.push(candidate);
+          sum += (candidate.bloom || 0) * 10;
+          attrSums.viscosity += (candidate.viscosity ?? 0) * 10;
+          attrSums.percentage += (candidate.percentage ?? 0) * 10;
+          attrSums.ph += (candidate.ph ?? 0) * 10;
+          attrSums.conductivity += (candidate.conductivity ?? 0) * 10;
+          attrSums.moisture += (candidate.moisture ?? 0) * 10;
+          attrSums.h2o2 += (candidate.h2o2 ?? 0) * 10;
+          attrSums.so2 += (candidate.so2 ?? 0) * 10;
+          
+          // Track field values for chosen batches
+          if (candidate.color) stringFieldValues.color.push(candidate.color);
+          if (candidate.odour) stringFieldValues.odour.push(candidate.odour);
+          if (candidate.clarity) attrSums.clarity += (candidate.clarity ?? 0) * 10;
+          
+          // Reset attempts counter when we successfully add a batch
+          attempts = 0;
+        }
+      }
+      
+      // If we couldn't find enough batches within range, try a more flexible approach
+      if (selected.length < batchesNeeded) {
+        // Reset and try with a more permissive approach
+        selected.length = 0;
+        sum = 0;
+        attrSums.viscosity = 0;
+        attrSums.percentage = 0;
+        attrSums.ph = 0;
+        attrSums.conductivity = 0;
+        attrSums.moisture = 0;
+        attrSums.h2o2 = 0;
+        attrSums.so2 = 0;
+        stringFieldValues.color = [];
+        stringFieldValues.odour = [];
         
-        // If bloom is outside range, heavily penalize this candidate
-        if (!withinBloomRange) {
-          score += 1000; // Heavy penalty for violating bloom range
+        const reshuffled = shuffleArray([...remaining]);
+        
+        // Try to find a combination that works
+        for (let i = 0; i < Math.min(batchesNeeded, reshuffled.length); i++) {
+          const candidate = reshuffled[i];
+          selected.push(candidate);
+          sum += (candidate.bloom || 0) * 10;
+          attrSums.viscosity += (candidate.viscosity ?? 0) * 10;
+          attrSums.percentage += (candidate.percentage ?? 0) * 10;
+          attrSums.ph += (candidate.ph ?? 0) * 10;
+          attrSums.conductivity += (candidate.conductivity ?? 0) * 10;
+          attrSums.moisture += (candidate.moisture ?? 0) * 10;
+          attrSums.h2o2 += (candidate.h2o2 ?? 0) * 10;
+          attrSums.so2 += (candidate.so2 ?? 0) * 10;
+          
+          // Track field values for chosen batches
+          if (candidate.color) stringFieldValues.color.push(candidate.color);
+          if (candidate.odour) stringFieldValues.odour.push(candidate.odour);
+          if (candidate.clarity) attrSums.clarity += (candidate.clarity ?? 0) * 10;
+        }
+      }
+    } else if (mode === 'high-low') {
+      // High and Low Mode: Random selection from low and high batches
+      const lowBatches = remaining.filter(b => (b.bloom || 0) < args.targetBloomMin);
+      const highBatches = remaining.filter(b => (b.bloom || 0) > args.targetBloomMax);
+      
+      if (lowBatches.length === 0 || highBatches.length === 0) {
+        return { selectedBatches: [], message: "High and Low Mode requires both low (<240) and high (>260) batches to be available" };
+      }
+      
+      // Shuffle both arrays for random selection
+      const shuffledLow = shuffleArray(lowBatches);
+      const shuffledHigh = shuffleArray(highBatches);
+      
+      let lowIndex = 0;
+      let highIndex = 0;
+      
+      // First, try to create a balanced mix
+      while (selected.length < batchesNeeded && lowIndex < shuffledLow.length && highIndex < shuffledHigh.length) {
+        // Alternate between low and high batches
+        const candidate = selected.length % 2 === 0 ? shuffledLow[lowIndex++] : shuffledHigh[highIndex++];
+        
+        selected.push(candidate);
+        sum += (candidate.bloom || 0) * 10;
+        attrSums.viscosity += (candidate.viscosity ?? 0) * 10;
+        attrSums.percentage += (candidate.percentage ?? 0) * 10;
+        attrSums.ph += (candidate.ph ?? 0) * 10;
+        attrSums.conductivity += (candidate.conductivity ?? 0) * 10;
+        attrSums.moisture += (candidate.moisture ?? 0) * 10;
+        attrSums.h2o2 += (candidate.h2o2 ?? 0) * 10;
+        attrSums.so2 += (candidate.so2 ?? 0) * 10;
+        
+        // Track field values for chosen batches
+        if (candidate.color) stringFieldValues.color.push(candidate.color);
+        if (candidate.odour) stringFieldValues.odour.push(candidate.odour);
+        if (candidate.clarity) attrSums.clarity += (candidate.clarity ?? 0) * 10;
+      }
+      
+      // If we need more batches, fill with remaining low or high batches
+      while (selected.length < batchesNeeded) {
+        let candidate;
+        if (lowIndex < shuffledLow.length) {
+          candidate = shuffledLow[lowIndex++];
+        } else if (highIndex < shuffledHigh.length) {
+          candidate = shuffledHigh[highIndex++];
+        } else {
+          break; // No more batches available
         }
         
-        // Secondary optimization: Additional targets (only if bloom range is satisfied)
-        if (args.additionalTargets && withinBloomRange) {
-          const targets = args.additionalTargets as any;
-          let additionalScore = 0;
+        selected.push(candidate);
+        sum += (candidate.bloom || 0) * 10;
+        attrSums.viscosity += (candidate.viscosity ?? 0) * 10;
+        attrSums.percentage += (candidate.percentage ?? 0) * 10;
+        attrSums.ph += (candidate.ph ?? 0) * 10;
+        attrSums.conductivity += (candidate.conductivity ?? 0) * 10;
+        attrSums.moisture += (candidate.moisture ?? 0) * 10;
+        attrSums.h2o2 += (candidate.h2o2 ?? 0) * 10;
+        attrSums.so2 += (candidate.so2 ?? 0) * 10;
+        
+        // Track field values for chosen batches
+        if (candidate.color) stringFieldValues.color.push(candidate.color);
+        if (candidate.odour) stringFieldValues.odour.push(candidate.odour);
+        if (candidate.clarity) attrSums.clarity += (candidate.clarity ?? 0) * 10;
+      }
+    } else {
+      // Target Bloom Range Mode: Original optimization logic
+      while (selected.length < batchesNeeded && remaining.length > 0) {
+        let bestIdx = 0;
+        let bestScore = Number.POSITIVE_INFINITY;
+        
+        for (let i = 0; i < remaining.length; i++) {
+          const candidate = remaining[i];
+          const nextCountBatches = selected.length + 1;
+          const nextBags = nextCountBatches * 10;
+          const nextAvg = (sum + (candidate.bloom || 0) * 10) / nextBags;
           
-          // Apply hierarchical weighting (higher priority = lower weight multiplier)
-          for (let h = 0; h < targetHierarchy.length; h++) {
-            const key = targetHierarchy[h];
-            const targetConfig = targets[key];
+          // Primary score: Bloom range compliance (MUST be met)
+          const withinBloomRange = nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax;
+          let score = Math.abs(targetBloom - nextAvg);
+          
+          // Target range mode: penalize any batch outside the bloom range
+          const candidateBloom = candidate.bloom || 0;
+          if (candidateBloom < args.targetBloomMin || candidateBloom > args.targetBloomMax) {
+            score += 1000; // Heavy penalty for violating bloom range
+          }
+          
+          // Secondary optimization: Additional targets (only if bloom range is satisfied)
+          if (args.additionalTargets && withinBloomRange) {
+            const targets = args.additionalTargets as any;
+            let additionalScore = 0;
             
-            if (targetConfig && targetConfig.enabled) {
-              const { min, max } = targetConfig;
+            // Apply hierarchical weighting (higher priority = lower weight multiplier)
+            for (let h = 0; h < targetHierarchy.length; h++) {
+              const key = targetHierarchy[h];
+              const targetConfig = targets[key];
               
-              // Handle string-based fields (color, odour) - exact match or averaging
-              if (key === 'color' || key === 'odour') {
-                const candidateValue = candidate[key];
+              if (targetConfig && targetConfig.enabled) {
+                const { min, max } = targetConfig;
                 
-                // If we have established values, prefer matching them
-                if (stringFieldValues[key].length > 0) {
-                  const establishedValues = stringFieldValues[key];
-                  const allMatch = establishedValues.every(val => val === candidateValue);
-                  if (!allMatch) {
-                    additionalScore += 100; // Heavy penalty for mismatch
+                // Handle string-based fields (color, odour) - exact match or averaging
+                if (key === 'color' || key === 'odour') {
+                  const candidateValue = candidate[key];
+                  
+                  // If we have established values, prefer matching them
+                  if (stringFieldValues[key].length > 0) {
+                    const establishedValues = stringFieldValues[key];
+                    const allMatch = establishedValues.every(val => val === candidateValue);
+                    if (!allMatch) {
+                      additionalScore += 100; // Heavy penalty for mismatch
+                    }
+                  } else {
+                    // First batch - check if value is within range (for string fields, this means exact match)
+                    if (candidateValue !== min && candidateValue !== max) {
+                      additionalScore += 50; // Moderate penalty for mismatch
+                    }
                   }
                 } else {
-                  // First batch - check if value is within range (for string fields, this means exact match)
-                  if (candidateValue !== min && candidateValue !== max) {
-                    additionalScore += 50; // Moderate penalty for mismatch
-                  }
-                }
-              } else {
-                // Handle numeric fields - check if adding this candidate keeps average within range
-                const currentSum = attrSums[key] || 0;
-                const candidateValue = candidate[key] || 0;
-                const nextSum = currentSum + (candidateValue * 10);
-                const nextAverage = nextSum / nextBags;
-                
-                // Check if the new average would be within range
-                if (min !== undefined && max !== undefined) {
-                  if (nextAverage < min || nextAverage > max) {
-                    // Calculate how far outside the range
-                    const deviation = nextAverage < min ? (min - nextAverage) / Math.max(min, 1) : (nextAverage - max) / Math.max(max, 1);
-                    const weight = 1.0 - (h * 0.1);
-                    additionalScore += deviation * weight * 10; // Scale up penalty for range violations
+                  // Handle numeric fields - check if adding this candidate keeps average within range
+                  const currentSum = attrSums[key] || 0;
+                  const candidateValue = candidate[key] || 0;
+                  const nextSum = currentSum + (candidateValue * 10);
+                  const nextAverage = nextSum / nextBags;
+                  
+                  // Check if the new average would be within range
+                  if (min !== undefined && max !== undefined) {
+                    if (nextAverage < min || nextAverage > max) {
+                      // Calculate how far outside the range
+                      const deviation = nextAverage < min ? (min - nextAverage) / Math.max(min, 1) : (nextAverage - max) / Math.max(max, 1);
+                      const weight = 1.0 - (h * 0.1);
+                      additionalScore += deviation * weight * 10; // Scale up penalty for range violations
+                    }
                   }
                 }
               }
             }
+            
+            score += additionalScore * 0.1; // Small weight for additional targets
           }
           
-          score += additionalScore * 0.1; // Small weight for additional targets
+          if (score < bestScore) {
+            bestScore = score;
+            bestIdx = i;
+          }
         }
         
-        if (score < bestScore) {
-          bestScore = score;
-          bestIdx = i;
-        }
+        const chosen = remaining.splice(bestIdx, 1)[0];
+        selected.push(chosen);
+        sum += (chosen.bloom || 0) * 10;
+        attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
+        attrSums.percentage += (chosen.percentage ?? 0) * 10;
+        attrSums.ph += (chosen.ph ?? 0) * 10;
+        attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
+        attrSums.moisture += (chosen.moisture ?? 0) * 10;
+        attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
+        attrSums.so2 += (chosen.so2 ?? 0) * 10;
+        
+        // Track field values for chosen batches
+        if (chosen.color) stringFieldValues.color.push(chosen.color);
+        if (chosen.odour) stringFieldValues.odour.push(chosen.odour);
+        if (chosen.clarity) attrSums.clarity += (chosen.clarity ?? 0) * 10;
       }
-      
-      const chosen = remaining.splice(bestIdx, 1)[0];
-      selected.push(chosen);
-      sum += (chosen.bloom || 0) * 10;
-      attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
-      attrSums.percentage += (chosen.percentage ?? 0) * 10;
-      attrSums.ph += (chosen.ph ?? 0) * 10;
-      attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
-      attrSums.moisture += (chosen.moisture ?? 0) * 10;
-      attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
-      attrSums.so2 += (chosen.so2 ?? 0) * 10;
-      
-      // Track field values for chosen batches
-      if (chosen.color) stringFieldValues.color.push(chosen.color);
-      if (chosen.odour) stringFieldValues.odour.push(chosen.odour);
-      if (chosen.clarity) attrSums.clarity += (chosen.clarity ?? 0) * 10;
     }
 
     // Select optimal batches
@@ -460,7 +642,9 @@ export const optimizeBatchSelection = query({
     if (!withinRange(averageBloom)) {
       warnings.push(`⚠️ Bloom average (${averageBloom}) is outside target range (${args.targetBloomMin}-${args.targetBloomMax})`);
     } else {
-      status.push(`✅ Bloom average (${averageBloom}) meets target range (${args.targetBloomMin}-${args.targetBloomMax})`);
+      const modeText = mode === 'target-range' ? 'Target Range Mode' : 
+                      mode === 'high-low' ? 'High & Low Mode' : 'Random Average Mode';
+      status.push(`✅ Bloom average (${averageBloom}) meets target range (${args.targetBloomMin}-${args.targetBloomMax}) [${modeText}]`);
     }
     
     // Check additional targets with hierarchy awareness
@@ -581,6 +765,7 @@ export const createBlend = mutation({
     targetBloomMin: v.number(),
     targetBloomMax: v.number(),
     targetMeanBloom: v.optional(v.number()),
+    bloomSelectionMode: v.optional(v.union(v.literal("target-range"), v.literal("high-low"), v.literal("random-average"))), // Bloom selection strategy
     lotNumber: v.string(),
     targetMesh: v.optional(v.number()),
     additionalTargets: v.optional(v.object({
@@ -689,6 +874,7 @@ export const createBlend = mutation({
       targetBloomMin: args.targetBloomMin,
       targetBloomMax: args.targetBloomMax,
       targetMeanBloom: args.targetMeanBloom,
+      bloomSelectionMode: args.bloomSelectionMode,
       targetMesh: args.targetMesh,
       targetViscosity: args.additionalTargets?.viscosity?.enabled ? `${args.additionalTargets.viscosity.min}-${args.additionalTargets.viscosity.max}` : undefined,
       targetPercentage: args.additionalTargets?.percentage?.enabled ? `${args.additionalTargets.percentage.min}-${args.additionalTargets.percentage.max}` : undefined,
