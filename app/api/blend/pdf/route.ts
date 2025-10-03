@@ -5,6 +5,7 @@ import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import fs from 'fs';
 import path from 'path';
 import { requireApiProductionAccess } from '@/app/utils/apiAuth';
+import { auth } from '@clerk/nextjs/server';
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -12,6 +13,21 @@ export async function POST(request: NextRequest) {
   try {
     // Check authentication and authorization
     await requireApiProductionAccess();
+    
+    // Get the JWT token from Clerk
+    const { getToken } = await auth();
+    const token = await getToken({ template: 'convex' });
+    
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication token not found' },
+        { status: 401 }
+      );
+    }
+    
+    // Create an authenticated Convex client
+    const authenticatedConvex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+    authenticatedConvex.setAuth(token);
 
     const body = await request.json();
     const { blendId } = body;
@@ -24,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get blend data
-    const blend = await convex.query(api.blends.getBlendById, { blendId });
+    const blend = await authenticatedConvex.query(api.blends.getBlendById, { blendId });
     
     if (!blend) {
       return NextResponse.json(

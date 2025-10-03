@@ -1,14 +1,15 @@
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { NextRequest, NextResponse } from 'next/server';
+import { requireApiProductionAccess } from '@/app/utils/apiAuth';
 
 // Allow longer processing time for PDF extraction
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentication removed for production upload - will be implemented later
-    console.log('PDF extraction API called - auth bypassed');
+    // Check authentication and authorization
+    await requireApiProductionAccess();
 
     const formData = await request.formData();
     const file = (formData as any).get('file') as File | null;

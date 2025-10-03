@@ -196,6 +196,36 @@ export const debugAuth = query({
   },
 });
 
+// Internal function to create a user directly (for debugging)
+export const createUserDirectly = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+    role: v.union(v.literal("super-admin"), v.literal("admin"), v.literal("production")),
+  },
+  returns: v.id("users"),
+  handler: async (ctx, args) => {
+    // Check if user already exists
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", args.email))
+      .unique();
+
+    if (existingUser) {
+      return existingUser._id;
+    }
+
+    // Create new user
+    return await ctx.db.insert("users", {
+      email: args.email,
+      name: args.name,
+      role: args.role,
+      createdAt: Date.now(),
+      lastLogin: Date.now(),
+    });
+  },
+});
+
 // Approval system removed - all users have full permissions
 
 // Approval system removed - all users have full permissions

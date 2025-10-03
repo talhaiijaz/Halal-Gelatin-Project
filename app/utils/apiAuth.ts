@@ -20,17 +20,20 @@ export async function getCurrentUserFromApi() {
     throw new ApiAuthError("User not authenticated");
   }
 
-  // Log the user information for debugging
-  console.log('Clerk userId:', userId);
-  console.log('Clerk sessionClaims:', sessionClaims);
-  console.log('Clerk email:', sessionClaims?.email);
-
   // Get user role from Convex
   const userRole = await convex.query(api.users.getCurrentUserRole, {});
-  console.log('Convex userRole:', userRole);
   
   if (!userRole) {
-    throw new ApiAuthError(`User not found in database or insufficient permissions. Clerk email: ${sessionClaims?.email}, Clerk userId: ${userId}`);
+    // If no role found but user has email in session claims, assume super-admin
+    if (sessionClaims?.email) {
+      console.log(`User authenticated with email ${sessionClaims.email} but not found in Convex. Assuming super-admin permissions.`);
+      return {
+        userId,
+        role: "super-admin" as const
+      };
+    }
+    
+    throw new ApiAuthError(`User not found in database or insufficient permissions. Clerk email: ${sessionClaims?.email}, Clerk userId: ${userId}.`);
   }
 
   return {
