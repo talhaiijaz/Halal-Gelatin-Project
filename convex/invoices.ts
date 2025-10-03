@@ -233,9 +233,11 @@ export const list = query({
       invoices = invoices.filter(i => i.issueDate <= args.endDate!);
     }
 
+    // Get all orders for sorting and fiscal year filtering
+    const allOrders = await ctx.db.query("orders").collect();
+
     if (args.fiscalYear) {
       // Filter invoices by the fiscal year of their associated order
-      const allOrders = await ctx.db.query("orders").collect();
       invoices = invoices.filter(invoice => {
         const order = allOrders.find(o => o._id === invoice.orderId);
         return order && order.fiscalYear === args.fiscalYear;
@@ -262,10 +264,29 @@ export const list = query({
       });
     }
 
-    // Sort by issue date (newest first), then by creation order for same dates
+    // Sort by factory departure date (earliest first), then by issue date, then by creation order for same dates
     invoices.sort((a, b) => {
-      const dateDiff = b.issueDate - a.issueDate;
+      // Get factory departure dates from associated orders
+      const aOrder = allOrders.find(o => o._id === a.orderId);
+      const bOrder = allOrders.find(o => o._id === b.orderId);
+      
+      const aFactoryDate = aOrder?.factoryDepartureDate;
+      const bFactoryDate = bOrder?.factoryDepartureDate;
+      
+      // If both have factory departure dates, sort by them (earliest first)
+      if (aFactoryDate && bFactoryDate) {
+        const factoryDateDiff = aFactoryDate - bFactoryDate;
+        if (factoryDateDiff !== 0) return factoryDateDiff;
+      }
+      
+      // If only one has factory departure date, prioritize it
+      if (aFactoryDate && !bFactoryDate) return -1;
+      if (!aFactoryDate && bFactoryDate) return 1;
+      
+      // If neither has factory departure date, fall back to issue date (earliest first)
+      const dateDiff = a.issueDate - b.issueDate;
       if (dateDiff !== 0) return dateDiff;
+      
       // Same date: preserve entry order (oldest first)
       return a.createdAt - b.createdAt;
     });

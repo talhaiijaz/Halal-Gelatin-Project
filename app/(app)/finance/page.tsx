@@ -255,9 +255,23 @@ function FinancePageContent() {
       return true;
     });
     
-    // Sort filtered invoices
+    // Sort filtered invoices by factory departure date (earliest first)
     const sortedFilteredInvoices = filteredInvoices.sort((a: any, b: any) => {
-      return b.issueDate - a.issueDate;
+      const aFactoryDate = (a.order as any)?.factoryDepartureDate;
+      const bFactoryDate = (b.order as any)?.factoryDepartureDate;
+      
+      // If both have factory departure dates, sort by them (earliest first)
+      if (aFactoryDate && bFactoryDate) {
+        const factoryDateDiff = aFactoryDate - bFactoryDate;
+        if (factoryDateDiff !== 0) return factoryDateDiff;
+      }
+      
+      // If only one has factory departure date, prioritize it
+      if (aFactoryDate && !bFactoryDate) return -1;
+      if (!aFactoryDate && bFactoryDate) return 1;
+      
+      // If neither has factory departure date, fall back to issue date (earliest first)
+      return a.issueDate - b.issueDate;
     });
     
     // Apply client-side pagination
@@ -277,10 +291,8 @@ function FinancePageContent() {
   } else {
     // When Pakistan filter is not active, use regular server-side pagination
     const regularInvoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
-    const sortedInvoices = regularInvoices?.sort((a: any, b: any) => {
-      return b.issueDate - a.issueDate;
-    });
-    baseInvoices = sortedInvoices || [];
+    // Note: Server-side sorting is already handled by convex/invoices.ts
+    baseInvoices = regularInvoices || [];
     
     // Use server-side pagination info
     paginationInfo = {
@@ -846,8 +858,13 @@ function FinancePageContent() {
                     <div className={`text-xs ${shouldHighlightYellow || shouldHighlightRed ? 'text-gray-700' : 'text-gray-600'}`}>{formatCurrency(invoice.totalPaid, invoice.currency as SupportedCurrency)}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-500">Issue Date</div>
-                    <div className={`text-sm ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>{formatDateForDisplay(invoice.issueDate)}</div>
+                    <div className="text-xs text-gray-500">Factory Departure Date</div>
+                    <div className={`text-sm ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
+                      {invoice.order?.factoryDepartureDate 
+                        ? formatDateForDisplay(invoice.order.factoryDepartureDate)
+                        : formatDateForDisplay(invoice.issueDate)
+                      }
+                    </div>
                     {(invoice.order?.status === "shipped" || invoice.order?.status === "delivered") && invoice.outstandingBalance > 0 && (
                       <div className="text-xs text-red-600 font-medium">Receivables: {formatCurrency(invoice.outstandingBalance, invoice.currency as SupportedCurrency)}</div>
                     )}
@@ -872,7 +889,7 @@ function FinancePageContent() {
                       Client
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[16%]">
-                      Issue Date
+                      Factory Departure Date
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[16%]">
                       Amount
@@ -954,7 +971,10 @@ function FinancePageContent() {
                         </td>
                         <td className="px-4 py-4">
                           <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
-                            {formatDateForDisplay(invoice.issueDate)}
+                            {invoice.order?.factoryDepartureDate 
+                              ? formatDateForDisplay(invoice.order.factoryDepartureDate)
+                              : formatDateForDisplay(invoice.issueDate)
+                            }
                           </div>
                         </td>
                         <td className="px-4 py-4">
