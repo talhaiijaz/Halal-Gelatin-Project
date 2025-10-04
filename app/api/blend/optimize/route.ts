@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       fiscalYear,
       additionalTargets,
       preSelectedBatchIds,
+      heldBatchIds,
     } = body;
 
     if (!targetBloomMin || !targetBloomMax) {
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
         fiscalYear,
         additionalTargets,
         preSelectedBatchIds,
+        heldBatchIds,
       });
 
     return NextResponse.json(result);

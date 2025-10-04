@@ -101,6 +101,7 @@ export const optimizeBatchSelection = query({
     onlyOutsourceBatches: v.optional(v.boolean()), // Use only outsource batches (ignore production)
     fiscalYear: v.optional(v.string()),
     preSelectedBatchIds: v.optional(v.array(v.union(v.id("productionBatches"), v.id("outsourceBatches")))),
+    heldBatchIds: v.optional(v.array(v.union(v.id("productionBatches"), v.id("outsourceBatches")))),
     additionalTargets: v.optional(v.object({
       viscosity: v.optional(v.object({
         enabled: v.boolean(),
@@ -207,27 +208,38 @@ export const optimizeBatchSelection = query({
       targetBloom = args.targetBloomMax;
     }
     
+    // Filter out held batches first
+    let availableBatchesForOptimization = availableBatches;
+    if (args.heldBatchIds && args.heldBatchIds.length > 0) {
+      console.log('Held batch IDs:', args.heldBatchIds);
+      console.log('Available batches before filtering:', availableBatches.length);
+      availableBatchesForOptimization = availableBatches.filter(batch => 
+        !args.heldBatchIds!.includes(batch._id)
+      );
+      console.log('Available batches after filtering:', availableBatchesForOptimization.length);
+    }
+    
     // Filter batches by bloom range based on selection mode
     const mode = args.bloomSelectionMode || 'random-average';
     let batchesWithBloom: any[] = [];
     
     if (mode === 'target-range') {
       // Target Bloom Range Mode: only include batches within the bloom range
-      batchesWithBloom = availableBatches.filter(batch => {
+      batchesWithBloom = availableBatchesForOptimization.filter(batch => {
         const bloom = batch.bloom;
         return bloom !== undefined && bloom !== null && !isNaN(bloom) && 
                bloom >= args.targetBloomMin && bloom <= args.targetBloomMax;
       });
     } else if (mode === 'high-low') {
       // High and Low Mode: only include batches outside the bloom range
-      batchesWithBloom = availableBatches.filter(batch => {
+      batchesWithBloom = availableBatchesForOptimization.filter(batch => {
         const bloom = batch.bloom;
         return bloom !== undefined && bloom !== null && !isNaN(bloom) && 
                (bloom < args.targetBloomMin || bloom > args.targetBloomMax);
       });
     } else {
       // Random Average Mode: include all batches with valid bloom values
-      batchesWithBloom = availableBatches.filter(batch => {
+      batchesWithBloom = availableBatchesForOptimization.filter(batch => {
         const bloom = batch.bloom;
         return bloom !== undefined && bloom !== null && !isNaN(bloom);
       });
@@ -270,7 +282,7 @@ export const optimizeBatchSelection = query({
     if (args.preSelectedBatchIds && args.preSelectedBatchIds.length > 0) {
       for (const id of args.preSelectedBatchIds) {
         // Check all available batches first, not just batchesWithBloom
-        const batch = availableBatches.find((b) => b._id === id);
+        const batch = availableBatchesForOptimization.find((b) => b._id === id);
         if (batch) {
           const batchBloom = batch.bloom || 0;
           let isCompatible = false;
@@ -768,6 +780,12 @@ export const optimizeBatchSelection = query({
     if (incompatibleManualBatches.length > 0) {
       const incompatibleWarning = `⚠️ ${incompatibleManualBatches.length} manually selected batch(es) are incompatible with the selected mode: ${incompatibleManualBatches.join('; ')}`;
       finalWarning = finalWarning ? `${finalWarning}; ${incompatibleWarning}` : incompatibleWarning;
+    }
+    
+    // Add information about held batches
+    if (args.heldBatchIds && args.heldBatchIds.length > 0) {
+      const heldBatchInfo = `ℹ️ ${args.heldBatchIds.length} batch(es) were held and excluded from this optimization`;
+      finalWarning = finalWarning ? `${finalWarning}; ${heldBatchInfo}` : heldBatchInfo;
     }
 
     return {

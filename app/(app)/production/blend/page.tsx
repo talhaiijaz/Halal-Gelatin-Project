@@ -85,6 +85,7 @@ function BlendPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [notes, setNotes] = useState('');
   const [preSelectedBatchIds, setPreSelectedBatchIds] = useState<Set<string>>(new Set());
+  const [heldBatchIds, setHeldBatchIds] = useState<Set<string>>(new Set());
 
   // Get available batches for reference
   const availableBatches = useQuery(api.blends.getAvailableBatches, {
@@ -158,6 +159,7 @@ function BlendPageContent() {
           fiscalYear: currentFiscalYear,
           additionalTargets: showAdvanced && hasEnabledTargets() ? additionalTargets : undefined,
           preSelectedBatchIds: preSelectedBatchIds.size > 0 ? Array.from(preSelectedBatchIds) : undefined,
+          heldBatchIds: heldBatchIds.size > 0 ? Array.from(heldBatchIds) : undefined,
           onlyOutsourceBatches,
         }),
       });
@@ -169,6 +171,7 @@ function BlendPageContent() {
         // No additional frontend validation needed
         
         setOptimizationResult(result);
+        setHeldBatchIds(new Set()); // Clear held batches after optimization
         toast.success(result.message);
       } else {
         toast.error(result.error || 'Failed to optimize batch selection');
@@ -635,9 +638,39 @@ function BlendPageContent() {
                             <span className="font-medium">10</span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Selected
-                            </span>
+                            {preSelectedBatchIds.has(batch.batchId) ? (
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                Manual
+                              </span>
+                            ) : heldBatchIds.has(batch.batchId) ? (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  Held
+                                </span>
+                                <button
+                                  onClick={() => setHeldBatchIds(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(batch.batchId);
+                                    return newSet;
+                                  })}
+                                  className="text-xs text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  Remove Hold
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  Selected
+                                </span>
+                                <button
+                                  onClick={() => setHeldBatchIds(prev => new Set(prev).add(batch.batchId))}
+                                  className="text-xs text-orange-600 hover:text-orange-800 underline"
+                                >
+                                  Hold
+                                </button>
+                              </div>
+                            )}
                           </td>
                         </tr>
                       ))}
