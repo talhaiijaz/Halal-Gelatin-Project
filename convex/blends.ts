@@ -279,10 +279,14 @@ export const optimizeBatchSelection = query({
     let preSelectedCount = 0;
     let incompatibleManualBatches: string[] = [];
     
+    console.log('Manual batch processing - preSelectedBatchIds:', args.preSelectedBatchIds);
+    console.log('Available batches for optimization:', availableBatchesForOptimization.length);
+    
     if (args.preSelectedBatchIds && args.preSelectedBatchIds.length > 0) {
       for (const id of args.preSelectedBatchIds) {
         // Check all available batches first, not just batchesWithBloom
         const batch = availableBatchesForOptimization.find((b) => b._id === id);
+        console.log(`Processing manual batch ${id}:`, batch ? `Batch #${batch.batchNumber}, bloom: ${batch.bloom}` : 'Not found');
         if (batch) {
           const batchBloom = batch.bloom || 0;
           let isCompatible = false;
@@ -291,41 +295,49 @@ export const optimizeBatchSelection = query({
           if (mode === 'target-range') {
             // Target Range Mode: batch must be within target range
             isCompatible = batchBloom >= args.targetBloomMin && batchBloom <= args.targetBloomMax;
+            console.log(`Target range mode: Batch #${batch.batchNumber} bloom ${batchBloom} vs range ${args.targetBloomMin}-${args.targetBloomMax}, compatible: ${isCompatible}`);
             if (!isCompatible) {
               incompatibleManualBatches.push(`Batch #${batch.batchNumber} (bloom: ${batchBloom}) is outside target range (${args.targetBloomMin}-${args.targetBloomMax})`);
             }
           } else if (mode === 'high-low') {
             // High-Low Mode: batch must be outside target range
             isCompatible = batchBloom < args.targetBloomMin || batchBloom > args.targetBloomMax;
+            console.log(`High-low mode: Batch #${batch.batchNumber} bloom ${batchBloom} vs range ${args.targetBloomMin}-${args.targetBloomMax}, compatible: ${isCompatible}`);
             if (!isCompatible) {
               incompatibleManualBatches.push(`Batch #${batch.batchNumber} (bloom: ${batchBloom}) is within range (${args.targetBloomMin}-${args.targetBloomMax}); High-Low mode requires batches <${args.targetBloomMin} or >${args.targetBloomMax}`);
             }
           } else {
             // Average Random Mode: any batch is compatible
             isCompatible = true;
+            console.log(`Average random mode: Batch #${batch.batchNumber} bloom ${batchBloom}, compatible: ${isCompatible}`);
           }
           
           if (isCompatible) {
-            // Check if batch is in the mode-filtered batches
+            // Add compatible manual batch directly (don't check remaining array)
+            console.log(`Adding compatible manual batch: Batch #${batch.batchNumber}, bloom: ${batch.bloom}`);
+            selected.push(batch);
+            sum += (batch.bloom || 0) * 10;
+            attrSums.viscosity += (batch.viscosity ?? 0) * 10;
+            attrSums.percentage += (batch.percentage ?? 0) * 10;
+            attrSums.ph += (batch.ph ?? 0) * 10;
+            attrSums.conductivity += (batch.conductivity ?? 0) * 10;
+            attrSums.moisture += (batch.moisture ?? 0) * 10;
+            attrSums.h2o2 += (batch.h2o2 ?? 0) * 10;
+            attrSums.so2 += (batch.so2 ?? 0) * 10;
+            
+            // Track string field values for pre-selected batches
+            if (batch.color) stringFieldValues.color.push(batch.color);
+            if (batch.odour) stringFieldValues.odour.push(batch.odour);
+            if (batch.clarity) attrSums.clarity += (batch.clarity ?? 0) * 10;
+            preSelectedCount++;
+            
+            // Remove from remaining array to avoid double-selection
             const idx = remaining.findIndex((b) => b._id === id);
             if (idx !== -1) {
-              const chosen = remaining.splice(idx, 1)[0];
-              selected.push(chosen);
-              sum += (chosen.bloom || 0) * 10;
-              attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
-              attrSums.percentage += (chosen.percentage ?? 0) * 10;
-              attrSums.ph += (chosen.ph ?? 0) * 10;
-              attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
-              attrSums.moisture += (chosen.moisture ?? 0) * 10;
-              attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
-              attrSums.so2 += (chosen.so2 ?? 0) * 10;
-              
-              // Track string field values for pre-selected batches
-              if (chosen.color) stringFieldValues.color.push(chosen.color);
-              if (chosen.odour) stringFieldValues.odour.push(chosen.odour);
-              if (chosen.clarity) attrSums.clarity += (chosen.clarity ?? 0) * 10;
-              preSelectedCount++;
+              remaining.splice(idx, 1);
             }
+          } else {
+            console.log(`Manual batch incompatible: Batch #${batch.batchNumber}, bloom: ${batch.bloom}`);
           }
         }
       }
