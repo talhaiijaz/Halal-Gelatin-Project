@@ -13,6 +13,7 @@ import {
   Package,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Info,
   Plus,
   Minus
@@ -156,7 +157,7 @@ function BlendPageContent() {
           includeOutsourceBatches,
           fiscalYear: currentFiscalYear,
           additionalTargets: showAdvanced && hasEnabledTargets() ? additionalTargets : undefined,
-          preSelectedBatchIds: Array.from(preSelectedBatchIds),
+          preSelectedBatchIds: preSelectedBatchIds.size > 0 ? Array.from(preSelectedBatchIds) : undefined,
           onlyOutsourceBatches,
         }),
       });
@@ -164,6 +165,9 @@ function BlendPageContent() {
       const result = await response.json();
       
       if (response.ok) {
+        // Backend now handles all manual batch validation and warnings
+        // No additional frontend validation needed
+        
         setOptimizationResult(result);
         toast.success(result.message);
       } else {
@@ -217,6 +221,7 @@ function BlendPageContent() {
         // Reset form
         setOptimizationResult(null);
         setNotes('');
+        setPreSelectedBatchIds(new Set()); // Reset manually selected batches
         // You could redirect to a blend details page here
       } else {
         toast.error(result.error || 'Failed to save blend');
@@ -560,7 +565,7 @@ function BlendPageContent() {
                     {optimizationResult.warning && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <div className="flex items-start">
-                          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
                           <div>
                             <h4 className="text-sm font-medium text-red-800">Optimization Warnings</h4>
                             <p className="text-sm text-red-700 mt-1">{optimizationResult.warning}</p>
@@ -619,7 +624,9 @@ function BlendPageContent() {
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {optimizationResult.selectedBatches.map((batch, index) => (
+                      {optimizationResult.selectedBatches
+                        .sort((a, b) => a.batchNumber - b.batchNumber)
+                        .map((batch, index) => (
                         <tr key={batch.batchId}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{index + 1}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{batch.batchNumber}{batch.isOutsource ? ' (O)' : ''}</td>

@@ -569,4 +569,14 @@ export default defineSchema({
     .index("by_date", ["date"])
     .index("by_status", ["status"])
     .index("by_fiscal_year", ["fiscalYear"]),
+
+  // Client Portal Users table - maps login emails to clients
+  clientPortalUsers: defineTable({
+    loginEmail: v.string(), // Email used for Clerk authentication
+    clientId: v.id("clients"), // Maps to the actual client
+    isActive: v.boolean(), // Can disable access without deleting
+    createdAt: v.number(),
+  })
+    .index("by_login_email", ["loginEmail"])
+    .index("by_client", ["clientId"]),
 });

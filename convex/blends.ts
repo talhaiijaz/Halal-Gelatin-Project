@@ -236,6 +236,8 @@ export const optimizeBatchSelection = query({
     if (batchesWithBloom.length === 0) {
       return { selectedBatches: [], message: "No batches found with valid bloom values for the selected mode" };
     }
+
+    // Note: Manual batch validation is handled on the frontend to avoid duplicate warnings
     
     // Hierarchical optimization: Bloom first, then other targets
     const selected: any[] = [];
@@ -261,29 +263,91 @@ export const optimizeBatchSelection = query({
       odour: []
     };
 
-    // Seed with user pre-selected batches (if provided)
+    // PRIORITY 1: Validate and include compatible manual batches
+    let preSelectedCount = 0;
+    let incompatibleManualBatches: string[] = [];
+    
     if (args.preSelectedBatchIds && args.preSelectedBatchIds.length > 0) {
       for (const id of args.preSelectedBatchIds) {
-        const idx = remaining.findIndex((b) => b._id === id);
-        if (idx !== -1) {
-          const chosen = remaining.splice(idx, 1)[0];
-          selected.push(chosen);
-          sum += (chosen.bloom || 0) * 10;
-          attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
-          attrSums.percentage += (chosen.percentage ?? 0) * 10;
-          attrSums.ph += (chosen.ph ?? 0) * 10;
-          attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
-          attrSums.moisture += (chosen.moisture ?? 0) * 10;
-          attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
-          attrSums.so2 += (chosen.so2 ?? 0) * 10;
+        // Check all available batches first, not just batchesWithBloom
+        const batch = availableBatches.find((b) => b._id === id);
+        if (batch) {
+          const batchBloom = batch.bloom || 0;
+          let isCompatible = false;
           
-          // Track string field values for pre-selected batches
-          if (chosen.color) stringFieldValues.color.push(chosen.color);
-          if (chosen.odour) stringFieldValues.odour.push(chosen.odour);
-          if (chosen.clarity) attrSums.clarity += (chosen.clarity ?? 0) * 10;
+          // Check compatibility based on mode
+          if (mode === 'target-range') {
+            // Target Range Mode: batch must be within target range
+            isCompatible = batchBloom >= args.targetBloomMin && batchBloom <= args.targetBloomMax;
+            if (!isCompatible) {
+              incompatibleManualBatches.push(`Batch #${batch.batchNumber} (bloom: ${batchBloom}) is outside target range (${args.targetBloomMin}-${args.targetBloomMax})`);
+            }
+          } else if (mode === 'high-low') {
+            // High-Low Mode: batch must be outside target range
+            isCompatible = batchBloom < args.targetBloomMin || batchBloom > args.targetBloomMax;
+            if (!isCompatible) {
+              incompatibleManualBatches.push(`Batch #${batch.batchNumber} (bloom: ${batchBloom}) is within range (${args.targetBloomMin}-${args.targetBloomMax}); High-Low mode requires batches <${args.targetBloomMin} or >${args.targetBloomMax}`);
+            }
+          } else {
+            // Average Random Mode: any batch is compatible
+            isCompatible = true;
+          }
+          
+          if (isCompatible) {
+            // Check if batch is in the mode-filtered batches
+            const idx = remaining.findIndex((b) => b._id === id);
+            if (idx !== -1) {
+              const chosen = remaining.splice(idx, 1)[0];
+              selected.push(chosen);
+              sum += (chosen.bloom || 0) * 10;
+              attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
+              attrSums.percentage += (chosen.percentage ?? 0) * 10;
+              attrSums.ph += (chosen.ph ?? 0) * 10;
+              attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
+              attrSums.moisture += (chosen.moisture ?? 0) * 10;
+              attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
+              attrSums.so2 += (chosen.so2 ?? 0) * 10;
+              
+              // Track string field values for pre-selected batches
+              if (chosen.color) stringFieldValues.color.push(chosen.color);
+              if (chosen.odour) stringFieldValues.odour.push(chosen.odour);
+              if (chosen.clarity) attrSums.clarity += (chosen.clarity ?? 0) * 10;
+              preSelectedCount++;
+            }
+          }
         }
       }
     }
+    
+    // PRIORITY 2: Check if current selection can achieve target bloom range
+    const currentAvg = selected.length > 0 ? sum / (selected.length * 10) : 0;
+    const canAchieveTarget = selected.length === 0 || 
+      (currentAvg >= args.targetBloomMin && currentAvg <= args.targetBloomMax) ||
+      remaining.length > 0; // Can add more batches to adjust average
+    
+    // If manual selections prevent reaching target, replace them with compatible batches
+    if (!canAchieveTarget && preSelectedCount > 0) {
+      // Reset and try without manual selections
+      selected.length = 0;
+      sum = 0;
+      preSelectedCount = 0;
+      attrSums.viscosity = 0;
+      attrSums.percentage = 0;
+      attrSums.ph = 0;
+      attrSums.conductivity = 0;
+      attrSums.moisture = 0;
+      attrSums.h2o2 = 0;
+      attrSums.so2 = 0;
+      stringFieldValues.color = [];
+      stringFieldValues.odour = [];
+      stringFieldValues.clarity = [];
+      
+      // Add warning about replacing manual selections
+      incompatibleManualBatches.push(`Manual selections were replaced to achieve target bloom range (${args.targetBloomMin}-${args.targetBloomMax})`);
+    }
+    
+    // Adjust batches needed based on current pre-selected batches
+    const remainingBatchesNeeded = Math.max(0, batchesNeeded - preSelectedCount);
     // Helper function for random selection
     const shuffleArray = (array: any[]) => {
       const shuffled = [...array];
@@ -300,7 +364,7 @@ export const optimizeBatchSelection = query({
       const maxAttempts = 1000; // Prevent infinite loops
       let attempts = 0;
       
-      while (selected.length < batchesNeeded && shuffled.length > 0 && attempts < maxAttempts) {
+      while (selected.length < preSelectedCount + remainingBatchesNeeded && shuffled.length > 0 && attempts < maxAttempts) {
         attempts++;
         
         // Select a random candidate
@@ -335,7 +399,7 @@ export const optimizeBatchSelection = query({
       }
       
       // If we couldn't find enough batches within range, try a more flexible approach
-      if (selected.length < batchesNeeded) {
+      if (selected.length < preSelectedCount + remainingBatchesNeeded) {
         // Reset and try with a more permissive approach
         selected.length = 0;
         sum = 0;
@@ -352,7 +416,7 @@ export const optimizeBatchSelection = query({
         const reshuffled = shuffleArray([...remaining]);
         
         // Try to find a combination that works
-        for (let i = 0; i < Math.min(batchesNeeded, reshuffled.length); i++) {
+        for (let i = 0; i < Math.min(preSelectedCount + remainingBatchesNeeded, reshuffled.length); i++) {
           const candidate = reshuffled[i];
           selected.push(candidate);
           sum += (candidate.bloom || 0) * 10;
@@ -387,7 +451,7 @@ export const optimizeBatchSelection = query({
       let highIndex = 0;
       
       // First, try to create a balanced mix
-      while (selected.length < batchesNeeded && lowIndex < shuffledLow.length && highIndex < shuffledHigh.length) {
+      while (selected.length < preSelectedCount + remainingBatchesNeeded && lowIndex < shuffledLow.length && highIndex < shuffledHigh.length) {
         // Alternate between low and high batches
         const candidate = selected.length % 2 === 0 ? shuffledLow[lowIndex++] : shuffledHigh[highIndex++];
         
@@ -408,7 +472,7 @@ export const optimizeBatchSelection = query({
       }
       
       // If we need more batches, fill with remaining low or high batches
-      while (selected.length < batchesNeeded) {
+      while (selected.length < preSelectedCount + remainingBatchesNeeded) {
         let candidate;
         if (lowIndex < shuffledLow.length) {
           candidate = shuffledLow[lowIndex++];
@@ -435,34 +499,34 @@ export const optimizeBatchSelection = query({
       }
     } else {
       // Target Bloom Range Mode: Original optimization logic
-      while (selected.length < batchesNeeded && remaining.length > 0) {
-        let bestIdx = 0;
-        let bestScore = Number.POSITIVE_INFINITY;
+    while (selected.length < preSelectedCount + remainingBatchesNeeded && remaining.length > 0) {
+      let bestIdx = 0;
+      let bestScore = Number.POSITIVE_INFINITY;
+      
+      for (let i = 0; i < remaining.length; i++) {
+        const candidate = remaining[i];
+        const nextCountBatches = selected.length + 1;
+        const nextBags = nextCountBatches * 10;
+        const nextAvg = (sum + (candidate.bloom || 0) * 10) / nextBags;
         
-        for (let i = 0; i < remaining.length; i++) {
-          const candidate = remaining[i];
-          const nextCountBatches = selected.length + 1;
-          const nextBags = nextCountBatches * 10;
-          const nextAvg = (sum + (candidate.bloom || 0) * 10) / nextBags;
-          
-          // Primary score: Bloom range compliance (MUST be met)
-          const withinBloomRange = nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax;
-          let score = Math.abs(targetBloom - nextAvg);
-          
+        // Primary score: Bloom range compliance (MUST be met)
+        const withinBloomRange = nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax;
+        let score = Math.abs(targetBloom - nextAvg);
+        
           // Target range mode: penalize any batch outside the bloom range
           const candidateBloom = candidate.bloom || 0;
           if (candidateBloom < args.targetBloomMin || candidateBloom > args.targetBloomMax) {
-            score += 1000; // Heavy penalty for violating bloom range
-          }
+          score += 1000; // Heavy penalty for violating bloom range
+        }
+        
+        // Secondary optimization: Additional targets (only if bloom range is satisfied)
+        if (args.additionalTargets && withinBloomRange) {
+          const targets = args.additionalTargets as any;
+          let additionalScore = 0;
           
-          // Secondary optimization: Additional targets (only if bloom range is satisfied)
-          if (args.additionalTargets && withinBloomRange) {
-            const targets = args.additionalTargets as any;
-            let additionalScore = 0;
-            
-            // Apply hierarchical weighting (higher priority = lower weight multiplier)
-            for (let h = 0; h < targetHierarchy.length; h++) {
-              const key = targetHierarchy[h];
+          // Apply hierarchical weighting (higher priority = lower weight multiplier)
+          for (let h = 0; h < targetHierarchy.length; h++) {
+            const key = targetHierarchy[h];
               const targetConfig = targets[key];
               
               if (targetConfig && targetConfig.enabled) {
@@ -497,33 +561,33 @@ export const optimizeBatchSelection = query({
                     if (nextAverage < min || nextAverage > max) {
                       // Calculate how far outside the range
                       const deviation = nextAverage < min ? (min - nextAverage) / Math.max(min, 1) : (nextAverage - max) / Math.max(max, 1);
-                      const weight = 1.0 - (h * 0.1);
+              const weight = 1.0 - (h * 0.1);
                       additionalScore += deviation * weight * 10; // Scale up penalty for range violations
                     }
                   }
                 }
-              }
             }
-            
-            score += additionalScore * 0.1; // Small weight for additional targets
           }
           
-          if (score < bestScore) {
-            bestScore = score;
-            bestIdx = i;
-          }
+          score += additionalScore * 0.1; // Small weight for additional targets
         }
         
-        const chosen = remaining.splice(bestIdx, 1)[0];
-        selected.push(chosen);
-        sum += (chosen.bloom || 0) * 10;
-        attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
-        attrSums.percentage += (chosen.percentage ?? 0) * 10;
-        attrSums.ph += (chosen.ph ?? 0) * 10;
-        attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
-        attrSums.moisture += (chosen.moisture ?? 0) * 10;
-        attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
-        attrSums.so2 += (chosen.so2 ?? 0) * 10;
+        if (score < bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+      
+      const chosen = remaining.splice(bestIdx, 1)[0];
+      selected.push(chosen);
+      sum += (chosen.bloom || 0) * 10;
+      attrSums.viscosity += (chosen.viscosity ?? 0) * 10;
+      attrSums.percentage += (chosen.percentage ?? 0) * 10;
+      attrSums.ph += (chosen.ph ?? 0) * 10;
+      attrSums.conductivity += (chosen.conductivity ?? 0) * 10;
+      attrSums.moisture += (chosen.moisture ?? 0) * 10;
+      attrSums.h2o2 += (chosen.h2o2 ?? 0) * 10;
+      attrSums.so2 += (chosen.so2 ?? 0) * 10;
         
         // Track field values for chosen batches
         if (chosen.color) stringFieldValues.color.push(chosen.color);
@@ -666,7 +730,7 @@ export const optimizeBatchSelection = query({
             
             if (batchValues.length === 0) {
               warnings.push(`⚠️ ${key}: No data available (target range: ${min}-${max})`);
-            } else {
+          } else {
               // Check if all values match the target range (exact match for strings)
               const allMatchMin = batchValues.every(val => val === min);
               const allMatchMax = batchValues.every(val => val === max);
@@ -699,6 +763,13 @@ export const optimizeBatchSelection = query({
     const warning = warnings.length > 0 ? warnings.join('; ') : undefined;
     const optimizationStatus = status.length > 0 ? status.join('; ') : undefined;
 
+    // Add warnings about incompatible manual batches
+    let finalWarning = warning;
+    if (incompatibleManualBatches.length > 0) {
+      const incompatibleWarning = `⚠️ ${incompatibleManualBatches.length} manually selected batch(es) are incompatible with the selected mode: ${incompatibleManualBatches.join('; ')}`;
+      finalWarning = finalWarning ? `${finalWarning}; ${incompatibleWarning}` : incompatibleWarning;
+    }
+
     return {
       selectedBatches: sortedSelectedBatches,
       totalBags,
@@ -706,8 +777,10 @@ export const optimizeBatchSelection = query({
       averageBloom,
       averageViscosity,
       ct3AverageBloom: averageBloom, // Same as average for now
-      message: `Selected ${selectedBatches.length} batches (10 bags each) for ${totalBags} bags`,
-      warning,
+      message: preSelectedCount > 0 
+        ? `Selected ${selectedBatches.length} batches (${preSelectedCount} user-selected + ${selectedBatches.length - preSelectedCount} optimized) for ${totalBags} bags`
+        : `Selected ${selectedBatches.length} batches (10 bags each) for ${totalBags} bags`,
+      warning: finalWarning,
       optimizationStatus,
     };
   },
