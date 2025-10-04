@@ -132,7 +132,7 @@ function ClientDetailPageContent() {
           <div className="flex items-center mb-4">
             <Skeleton width={100} height={40} />
           </div>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <Skeleton width={200} height={32} />
               <Skeleton width={150} height={16} className="mt-2" />
@@ -188,8 +188,8 @@ function ClientDetailPageContent() {
           </Link>
         </div>
         
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4 flex-1 min-w-0">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 flex-1 min-w-0">
             {/* Client Profile Picture */}
             <div className="flex-shrink-0">
               {client.profilePictureId ? (
@@ -238,10 +238,10 @@ function ClientDetailPageContent() {
             </div>
           </div>
           
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 flex-shrink-0 w-full sm:w-auto">
             <button
               onClick={() => setIsEditClientOpen(true)}
-              className="flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+              className="flex items-center justify-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors w-full sm:w-auto"
             >
               <Edit className="h-4 w-4 mr-2" />
               Edit Client
@@ -249,7 +249,7 @@ function ClientDetailPageContent() {
             
             <button
               onClick={handleStatusToggle}
-              className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
+              className={`flex items-center justify-center px-4 py-2 rounded-lg transition-colors w-full sm:w-auto ${
                 client.status === 'active'
                   ? 'bg-red-100 text-red-700 hover:bg-red-200'
                   : 'bg-green-100 text-green-700 hover:bg-green-200'
@@ -359,7 +359,7 @@ function ClientDetailPageContent() {
           <div className="card p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h2>
             
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <Package className="h-6 w-6 text-blue-600 mx-auto mb-1" />
                 <div className="text-lg font-semibold text-gray-900">{allOrders?.length || 0}</div>
@@ -437,12 +437,12 @@ function ClientDetailPageContent() {
 
           {/* Upcoming Orders */}
           <div className="card p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <Package className="h-5 w-5 mr-2" />
                 Upcoming Orders
               </h2>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
                 <Link
                   href={`/orders?search=${encodeURIComponent(client?.name || "")}`}
                   className="flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
@@ -464,12 +464,12 @@ function ClientDetailPageContent() {
               <div>
                 <div className="space-y-3">
                   {recentOrders.map((order: any) => (
-                    <div 
-                      key={order._id} 
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                  <div 
+                    key={order._id}
+                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
                       onClick={() => setSelectedOrderId(order._id)}
                     >
-                      <div className="flex items-center space-x-3">
+                      <div className="flex flex-wrap items-center gap-3">
                         <span className="text-lg">{getStatusIcon(order.status)}</span>
                         <div>
                           <p className="text-sm font-medium text-gray-900">
@@ -534,7 +534,7 @@ function ClientDetailPageContent() {
 
           {/* Standalone Invoices */}
           <div className="card p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <FileText className="h-5 w-5 mr-2" />
                 Standalone Invoices
@@ -553,10 +553,10 @@ function ClientDetailPageContent() {
                 {standaloneInvoices.map((invoice: any) => (
                   <div 
                     key={invoice._id} 
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                    className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
                     onClick={() => setSelectedStandaloneInvoiceId(invoice._id)}
                   >
-                    <div className="flex items-center space-x-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <FileText className="h-5 w-5 text-gray-400" />
                       <div>
                         <p className="text-sm font-medium text-gray-900">

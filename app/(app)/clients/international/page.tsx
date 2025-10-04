@@ -644,7 +644,7 @@ function InternationalClientsPageContent() {
                         {outstandingEntries.length === 0 ? (
                           <p className="text-sm font-semibold text-gray-900">—</p>
                         ) : (
-                          outstandingEntries.map(([currency, amount]: [string, number]) => (
+                          outstandingEntries.map(([currency, amount]) => (
                             <p key={currency} className="text-sm font-semibold text-gray-900">
                               {formatCurrency(amount, currency as SupportedCurrency)}
                             </p>

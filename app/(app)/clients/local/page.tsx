@@ -577,7 +577,7 @@ function LocalClientsPageContent() {
                     <div className="text-right">
                       <p className="text-xs uppercase tracking-wide text-gray-500">Receivables</p>
                       <p className="text-sm font-semibold text-gray-900">
-                        {formatCurrency(client.totalOutstandingAmount || 0)}
+                        {formatCurrency(client.outstandingAmount || 0)}
                       </p>
                     </div>
                   </div>

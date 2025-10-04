@@ -56,6 +56,10 @@ function OrdersPageContent() {
   
   // Get invoice IDs for batch transfer status check (from orders that have invoices)
   const ordersList = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
+  const totalCount = Array.isArray(ordersData)
+    ? ordersList.length
+    : ordersData?.totalCount ?? ordersList.length;
+  const totalPages = totalCount > 0 ? Math.ceil(totalCount / ordersPagination.pageSize) : 0;
   const invoiceIds = ordersList
     ?.filter(order => order.invoice?._id)
     ?.map(order => order.invoice!._id) || [];
@@ -208,17 +212,17 @@ function OrdersPageContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
           <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
           <p className="text-gray-600 mt-2">
             Manage and track all customer orders
           </p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-3 sm:gap-0 w-full sm:w-auto">
           <button
             onClick={exportToCSV}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            className="inline-flex w-full sm:w-auto items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
           >
             <Download className="h-4 w-4 mr-2" />
             Export CSV
@@ -226,7 +230,7 @@ function OrdersPageContent() {
           <button
             onClick={() => setIsCreateModalOpen(true)}
             disabled={(bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)}
-            className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+            className={`inline-flex w-full sm:w-auto items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
               (bankValidation && !bankValidation.allHaveCountries) || (orderValidation && !orderValidation.allHaveBanks)
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-orange-600 hover:bg-orange-700"
@@ -405,7 +409,7 @@ function OrdersPageContent() {
                     <span className="ml-1 capitalize">{order.status.replace("_", " ")}</span>
                   </span>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <div className="text-xs text-gray-500">Amount</div>
                     <div className={`text-sm font-medium ${getOrderTextHighlightClassesWithRed(shouldHighlightYellow, shouldHighlightRed)}`}>
@@ -594,15 +598,18 @@ function OrdersPageContent() {
             </tbody>
           </table>
         </div>
-        {ordersData && (Array.isArray(ordersData) ? ordersData : ordersData?.page || []).length > 0 && (
+      </div>
+
+      {ordersData && ordersList.length > 0 && totalPages > 1 && (
+        <div className="mt-6">
           <Pagination
             currentPage={ordersPagination.currentPage}
-            totalPages={Math.ceil((!Array.isArray(ordersData) ? ordersData.totalCount || 0 : 0) / ordersPagination.pageSize)}
+            totalPages={totalPages}
             onPageChange={ordersPagination.goToPage}
             isLoading={!ordersData}
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Create Order Modal */}
       <CreateOrderModal
