@@ -716,47 +716,116 @@ function DashboardPageContent() {
                         <p className="text-gray-600">No pending orders found.</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
-                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                {showUsdView ? 'Amount (USD)' : 'Amount'}
-                              </th>
-                              {!showUsdView && <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
-                              <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                             {pendingOrdersDetails.map((row: any) => (
-                              <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      <div className="space-y-4">
+                        <div className="lg:hidden space-y-3">
+                          {pendingOrdersDetails.map((row: any) => (
+                            <div
+                              key={String(row.orderId)}
+                              className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white"
+                            >
+                              <div className="stack-between sm:items-start">
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">Invoice {row.invoiceNumber || '—'}</p>
+                                  <p className="text-xs text-gray-500 truncate max-w-[220px]" title={row.clientName || '—'}>
+                                    {row.clientName || '—'}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                                     row.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
-                                  }`}>
-                                    {row.status}
+                                  }`}
+                                >
+                                  {row.status}
+                                </span>
+                              </div>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Quantity</span>
+                                  <span className="font-medium text-gray-900">{row.totalQuantity.toLocaleString()} kg</span>
+                                </div>
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Amount</span>
+                                  <span className="font-semibold text-gray-900">
+                                    {showUsdView
+                                      ? formatCurrency(row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency), 'USD')
+                                      : formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}
                                   </span>
-                                </td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                  {showUsdView ? formatCurrency(row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency), 'USD') : formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}
-                                </td>
-                                {!showUsdView && <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
-                                <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                                </div>
+                                {!showUsdView && (
+                                  <div className="flex justify-between text-gray-500">
+                                    <span>Currency</span>
+                                    <span>{row.currency}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Fac. Departure</span>
+                                  <span>{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="hidden lg:block">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty (kg)</th>
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    {showUsdView ? 'Amount (USD)' : 'Amount'}
+                                  </th>
+                                  {!showUsdView && (
+                                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                  )}
+                                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fac. Dep. Date</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {pendingOrdersDetails.map((row: any) => (
+                                  <tr key={String(row.orderId)} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                        row.status === 'pending' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'
+                                      }`}>
+                                        {row.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.totalQuantity.toLocaleString()}</td>
+                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                      {showUsdView ? formatCurrency(row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency), 'USD') : formatCurrency(row.totalAmount, row.currency as SupportedCurrency)}
+                                    </td>
+                                    {!showUsdView && <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
+                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.factoryDepartureDate ? formatDateForDisplay(row.factoryDepartureDate) : '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {showUsdView && (
+                            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                                <span className="text-lg font-bold text-gray-900">
+                                  {formatCurrency(
+                                    pendingOrdersDetails.reduce((sum: number, row: any) => sum + (row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency)), 0),
+                                    'USD'
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {showUsdView && (
-                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                          <div className="lg:hidden bg-gray-50 px-4 py-4 border border-gray-200 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-700">Total USD</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
                                   pendingOrdersDetails.reduce((sum: number, row: any) => sum + (row.totalAmountUSD || convertToUsd(row.totalAmount, row.currency)), 0),
@@ -783,41 +852,96 @@ function DashboardPageContent() {
                         <p className="text-gray-600">No advance payments found.</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                {showUsdView ? 'Advance Paid (USD)' : 'Advance Paid'}
-                              </th>
-                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {advanceDetails.map((row: any) => (
-                              <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                                  {showUsdView ? formatCurrency(row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency), 'USD') : formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}
-                                </td>
-                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="space-y-4">
+                        <div className="lg:hidden space-y-3">
+                          {advanceDetails.map((row: any) => (
+                            <div key={String(row.invoiceId)} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white">
+                              <div className="space-y-1">
+                                <p className="text-sm font-semibold text-gray-900">Invoice {row.invoiceNumber || '—'}</p>
+                                <p className="text-xs text-gray-500" title={row.clientName || '—'}>{row.clientName || '—'}</p>
+                              </div>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Advance Paid</span>
+                                  <span className="font-semibold text-green-600">
+                                    {showUsdView
+                                      ? formatCurrency(row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency), 'USD')
+                                      : formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}
+                                  </span>
+                                </div>
+                                {!showUsdView && (
+                                  <div className="flex justify-between text-gray-500">
+                                    <span>Currency</span>
+                                    <span>{row.currency}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Issue Date</span>
+                                  <span>{new Date(row.issueDate).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Due Date</span>
+                                  <span>{new Date(row.dueDate).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="hidden lg:block">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    {showUsdView ? 'Advance Paid (USD)' : 'Advance Paid'}
+                                  </th>
+                                  {!showUsdView && (
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                  )}
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {advanceDetails.map((row: any) => (
+                                  <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                      {showUsdView ? formatCurrency(row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency), 'USD') : formatCurrency(row.advancePaid, row.currency as SupportedCurrency)}
+                                    </td>
+                                    {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {showUsdView && (
+                            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                                <span className="text-lg font-bold text-gray-900">
+                                  {formatCurrency(
+                                    advanceDetails.reduce((sum: number, row: any) => sum + (row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency)), 0),
+                                    'USD'
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {showUsdView && (
-                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                          <div className="lg:hidden bg-gray-50 px-4 py-4 border border-gray-200 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-700">Total USD</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
                                   advanceDetails.reduce((sum: number, row: any) => sum + (row.advancePaidUSD || convertToUsd(row.advancePaid, row.currency)), 0),
@@ -844,41 +968,96 @@ function DashboardPageContent() {
                         <p className="text-gray-600">No receivables found.</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                {showUsdView ? 'Outstanding (USD)' : 'Outstanding'}
-                              </th>
-                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {receivablesDetails.map((row: any) => (
-                              <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
-                                  {showUsdView ? formatCurrency(row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency), 'USD') : formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}
-                                </td>
-                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="space-y-4">
+                        <div className="lg:hidden space-y-3">
+                          {receivablesDetails.map((row: any) => (
+                            <div key={String(row.invoiceId)} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white">
+                              <div className="space-y-1">
+                                <p className="text-sm font-semibold text-gray-900">Invoice {row.invoiceNumber || '—'}</p>
+                                <p className="text-xs text-gray-500" title={row.clientName || '—'}>{row.clientName || '—'}</p>
+                              </div>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Outstanding</span>
+                                  <span className="font-semibold text-red-600">
+                                    {showUsdView
+                                      ? formatCurrency(row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency), 'USD')
+                                      : formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}
+                                  </span>
+                                </div>
+                                {!showUsdView && (
+                                  <div className="flex justify-between text-gray-500">
+                                    <span>Currency</span>
+                                    <span>{row.currency}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Issue Date</span>
+                                  <span>{new Date(row.issueDate).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Due Date</span>
+                                  <span>{new Date(row.dueDate).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="hidden lg:block">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    {showUsdView ? 'Outstanding (USD)' : 'Outstanding'}
+                                  </th>
+                                  {!showUsdView && (
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                  )}
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Issue Date</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {receivablesDetails.map((row: any) => (
+                                  <tr key={String(row.invoiceId)} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.invoiceNumber || '—'}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600">
+                                      {showUsdView ? formatCurrency(row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency), 'USD') : formatCurrency(row.outstandingBalance, row.currency as SupportedCurrency)}
+                                    </td>
+                                    {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.issueDate).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.dueDate).toLocaleDateString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {showUsdView && (
+                            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                                <span className="text-lg font-bold text-gray-900">
+                                  {formatCurrency(
+                                    receivablesDetails.reduce((sum: number, row: any) => sum + (row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency)), 0),
+                                    'USD'
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {showUsdView && (
-                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                          <div className="lg:hidden bg-gray-50 px-4 py-4 border border-gray-200 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-700">Total USD</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
                                   receivablesDetails.reduce((sum: number, row: any) => sum + (row.outstandingBalanceUSD || convertToUsd(row.outstandingBalance, row.currency)), 0),
@@ -905,41 +1084,99 @@ function DashboardPageContent() {
                         <p className="text-gray-600">No revenue payments found.</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                          <thead className="bg-gray-50 border-b border-gray-200">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                {showUsdView ? 'Amount (USD)' : 'Amount'}
-                              </th>
-                              {!showUsdView && <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>}
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {revenueDetails.map((row: any) => (
-                              <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
-                                <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                                  {showUsdView ? formatCurrency(row.amountUSD || convertToUsd(row.amount, row.currency), 'USD') : formatCurrency(row.amount, row.currency as SupportedCurrency)}
-                                </td>
-                                {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.method}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                      <div className="space-y-4">
+                        <div className="lg:hidden space-y-3">
+                          {revenueDetails.map((row: any) => (
+                            <div key={String(row.paymentId)} className="border border-gray-200 rounded-lg p-4 space-y-3 bg-white">
+                              <div className="stack-between sm:items-start">
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">Invoice {row.invoiceNumber || '—'}</p>
+                                  <p className="text-xs text-gray-500" title={row.clientName || '—'}>{row.clientName || '—'}</p>
+                                </div>
+                                <span className="text-xs text-gray-500">{new Date(row.paymentDate).toLocaleDateString()}</span>
+                              </div>
+                              <div className="space-y-2 text-sm">
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Amount</span>
+                                  <span className="font-semibold text-green-600">
+                                    {showUsdView
+                                      ? formatCurrency(row.amountUSD || convertToUsd(row.amount, row.currency), 'USD')
+                                      : formatCurrency(row.amount, row.currency as SupportedCurrency)}
+                                  </span>
+                                </div>
+                                {!showUsdView && (
+                                  <div className="flex justify-between text-gray-500">
+                                    <span>Currency</span>
+                                    <span>{row.currency}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Method</span>
+                                  <span>{(row.method || '').replace('_', ' ') || '—'}</span>
+                                </div>
+                                <div className="flex justify-between text-gray-600">
+                                  <span>Reference</span>
+                                  <span>{row.reference || '—'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="hidden lg:block">
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                              <thead className="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice No</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    {showUsdView ? 'Amount (USD)' : 'Amount'}
+                                  </th>
+                                  {!showUsdView && (
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</th>
+                                  )}
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reference</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {revenueDetails.map((row: any) => (
+                                  <tr key={String(row.paymentId)} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{new Date(row.paymentDate).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-sm text-gray-900 max-w-[150px] truncate" title={row.clientName || '—'}>{row.clientName || '—'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.invoiceNumber || '—'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                                      {showUsdView ? formatCurrency(row.amountUSD || convertToUsd(row.amount, row.currency), 'USD') : formatCurrency(row.amount, row.currency as SupportedCurrency)}
+                                    </td>
+                                    {!showUsdView && <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.currency}</td>}
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{(row.method || '').replace('_', ' ') || '—'}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{row.reference || '—'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {showUsdView && (
+                            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                                <span className="text-lg font-bold text-gray-900">
+                                  {formatCurrency(
+                                    revenueDetails.reduce((sum: number, row: any) => sum + (row.amountUSD || convertToUsd(row.amount, row.currency)), 0),
+                                    'USD'
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {showUsdView && (
-                          <div className="bg-gray-50 px-6 py-4 border-t border-gray-200">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm font-medium text-gray-700">Total USD:</span>
+                          <div className="lg:hidden bg-gray-50 px-4 py-4 border border-gray-200 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-gray-700">Total USD</span>
                               <span className="text-lg font-bold text-gray-900">
                                 {formatCurrency(
                                   revenueDetails.reduce((sum: number, row: any) => sum + (row.amountUSD || convertToUsd(row.amount, row.currency)), 0),

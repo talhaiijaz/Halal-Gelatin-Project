@@ -383,7 +383,7 @@ function ShipmentsPageContent() {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="stack-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Shipment Scheduler</h1>
           <p className="text-gray-600 mt-1">Monthly shipment quantities by bloom range and company</p>
@@ -424,7 +424,7 @@ function ShipmentsPageContent() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
+          <div className="stack-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Shipments</p>
               <p className="text-2xl font-bold text-gray-900">{getFiscalMonthData(selectedFiscalYear, selectedFiscalMonth).length}</p>
@@ -434,7 +434,7 @@ function ShipmentsPageContent() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
+          <div className="stack-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Quantity</p>
               <p className={`text-2xl font-bold ${exceedsLimit(getGrandTotal(selectedFiscalYear, selectedFiscalMonth)) ? 'text-red-600' : 'text-blue-600'}`}>
@@ -456,7 +456,67 @@ function ShipmentsPageContent() {
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold">Shipment Schedule for {selectedFiscalMonth} {getFiscalYearLabel(selectedFiscalYear)}</h2>
         </div>
-        <div className="overflow-x-auto">
+
+        <div className="p-4 lg:hidden space-y-4">
+          {activeBloomRanges.map((bloom) => {
+            const isRowDelivered = isBloomDelivered(bloom, selectedFiscalYear, selectedFiscalMonth);
+            const totalForBloom = getBloomTotal(bloom, selectedFiscalYear, selectedFiscalMonth);
+            const companyEntries = activeCompanies
+              .map((company) => {
+                const entries = getIndividualEntries(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                if (entries.length === 0) return null;
+
+                const isCellDelivered = isBloomCompanyDelivered(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                const hasAdvancePayment = isBloomCompanyWithAdvancePayment(bloom, company, selectedFiscalYear, selectedFiscalMonth);
+                const quantity = entries.reduce((sum, entry) => sum + entry.quantity, 0);
+
+                let colorClass = 'text-blue-600';
+                if (isCellDelivered) {
+                  colorClass = 'text-green-700';
+                } else if (hasAdvancePayment) {
+                  colorClass = 'text-yellow-700';
+                }
+
+                return (
+                  <div key={company} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                    <span className="text-sm font-medium text-gray-900">{company}</span>
+                    <span className={`text-sm font-semibold ${colorClass}`}>{quantity.toLocaleString()} kg</span>
+                  </div>
+                );
+              })
+              .filter((entry): entry is JSX.Element => entry !== null);
+
+            return (
+              <div
+                key={bloom}
+                className={`border rounded-lg p-4 space-y-3 ${isRowDelivered ? 'border-green-200 bg-green-50/70' : 'border-gray-200 bg-white'}`}
+              >
+                <div className="stack-between sm:items-start">
+                  <div>
+                    <p className="text-sm text-gray-500 uppercase tracking-wide">Bloom</p>
+                    <p className="text-lg font-semibold text-gray-900">{bloom}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase tracking-wide">Total</p>
+                    <p className={`text-base font-semibold ${isRowDelivered ? 'text-green-700' : 'text-blue-700'}`}>
+                      {totalForBloom.toLocaleString()} kg
+                    </p>
+                  </div>
+                </div>
+
+                {companyEntries.length > 0 ? (
+                  <div className="space-y-2">
+                    {companyEntries}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No shipments recorded.</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b">
@@ -656,7 +716,7 @@ function ShipmentsPageContent() {
           
           return (
             <div key={`${monthData.fiscalYear}-${monthData.fiscalMonth}`} className={`rounded-lg shadow p-6 ${isOverLimit ? 'bg-red-50 border-2 border-red-200' : 'bg-white'}`}>
-              <div className="flex items-center justify-between">
+              <div className="stack-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{monthData.displayName} Shipments</p>
                   <p className={`text-2xl font-bold ${isOverLimit ? 'text-red-600' : 'text-blue-600'}`}>

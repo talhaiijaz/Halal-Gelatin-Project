@@ -36,7 +36,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
       <div className="absolute right-0 top-0 h-full w-full max-w-2xl bg-white shadow-xl">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between" style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}>
+          <div className="border-b border-gray-200 px-6 py-4 stack-between" style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}>
             <div>
               <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                 <Building2 className="h-5 w-5 mr-2" /> Bank Account Details
@@ -207,11 +207,11 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
 
           {/* Footer */}
           {bankAccount && (
-            <div className="border-t px-6 py-4 flex items-center justify-between">
+            <div className="border-t px-6 py-4 stack-between">
               <div className="text-sm text-gray-600">
                 Account: <span className="font-semibold text-gray-900">{bankAccount.accountName}</span>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   className="btn-secondary"
                   onClick={() => setIsEditModalOpen(true)}

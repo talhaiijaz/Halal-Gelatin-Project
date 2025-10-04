@@ -97,6 +97,13 @@ function FinancePageContent() {
     status: invoicesStatusFilter !== "all" ? invoicesStatusFilter : undefined,
     paginationOpts: invoicesPagination.paginationOpts
   });
+  const invoicesList = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
+  const invoicesTotalCount = Array.isArray(invoicesData)
+    ? invoicesList.length
+    : invoicesData?.totalCount ?? invoicesList.length;
+  const invoicesTotalPages = invoicesTotalCount > 0
+    ? Math.ceil(invoicesTotalCount / invoicesPagination.pageSize)
+    : 0;
 
   // Fetch all invoices for Pakistan transfer filtering (needed for the Invoices tab)
   const allInvoicesForPakistanFilter = useQuery(api.invoices.list, {
@@ -111,6 +118,13 @@ function FinancePageContent() {
     searchTerm: paymentsSearchTerm || undefined,
     paginationOpts: paymentsPagination.paginationOpts
   });
+  const paymentsList = Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || [];
+  const paymentsTotalCount = Array.isArray(paymentsData)
+    ? paymentsList.length
+    : paymentsData?.totalCount ?? paymentsList.length;
+  const paymentsTotalPages = paymentsTotalCount > 0
+    ? Math.ceil(paymentsTotalCount / paymentsPagination.pageSize)
+    : 0;
   // const paymentStats = useQuery(api.payments.getStats, { 
   //   fiscalYear: paymentFiscalYearFilter === "all" ? undefined : paymentFiscalYearFilter 
   // });
@@ -126,9 +140,7 @@ function FinancePageContent() {
   });
   
   // Get invoice IDs for batch transfer status check
-  const invoiceIds = Array.isArray(invoicesData) ? 
-    invoicesData.map(invoice => invoice._id) : 
-    invoicesData?.page?.map(invoice => invoice._id) || [];
+  const invoiceIds = invoicesList.map(invoice => invoice._id);
   const batchTransferStatus = useQuery(api.interBankTransfers.getBatchTransferStatus, 
     invoiceIds.length > 0 ? { invoiceIds } : "skip"
   );
@@ -299,15 +311,15 @@ function FinancePageContent() {
     };
   } else {
     // When Pakistan filter is not active, use regular server-side pagination
-    const regularInvoices = Array.isArray(invoicesData) ? invoicesData : invoicesData?.page || [];
+    const regularInvoices = invoicesList;
     // Note: Server-side sorting is already handled by convex/invoices.ts
     baseInvoices = regularInvoices || [];
     
     // Use server-side pagination info
     paginationInfo = {
       currentPage: invoicesPagination.currentPage,
-      totalPages: Math.ceil((invoicesData && !Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0) / invoicesPagination.pageSize),
-      totalCount: invoicesData && !Array.isArray(invoicesData) ? invoicesData.totalCount || 0 : 0
+      totalPages: invoicesTotalPages,
+      totalCount: invoicesTotalCount
     };
   }
 
@@ -379,7 +391,7 @@ function FinancePageContent() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 stack-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Finance</h1>
           <p className="mt-1 text-sm text-gray-600">
@@ -416,7 +428,7 @@ function FinancePageContent() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="card p-6">
-                <div className="flex items-center justify-between mb-2">
+                <div className="stack-between mb-2">
                   <Package className="h-8 w-8 text-primary" />
                   {dashboardStats && (
                     <span className="text-xs text-gray-500">
@@ -431,7 +443,7 @@ function FinancePageContent() {
               </div>
 
               <div className="card p-6">
-                <div className="flex items-center justify-between mb-2">
+                <div className="stack-between mb-2">
                   <Package className="h-8 w-8 text-blue-600" />
                 </div>
                 <p className="text-sm text-gray-500">Total Quantity (KG)</p>
@@ -517,7 +529,7 @@ function FinancePageContent() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Need to Come to Pakistan */}
             <div className="card p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="stack-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <Clock className="h-5 w-5 mr-2 text-orange-600" />
                   Payment Need to Come to Pakistan
@@ -623,7 +635,7 @@ function FinancePageContent() {
 
             {/* Came to Pakistan */}
             <div className="card p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="stack-between mb-4">
                 <h2 className="text-lg font-semibold text-gray-900 flex items-center">
                   <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
                   Payment Came to Pakistan
@@ -808,7 +820,7 @@ function FinancePageContent() {
         {!invoicesData ? (
           [...Array(6)].map((_, i) => (
             <div key={i} className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between">
+              <div className="stack-between">
                 <div className="h-4 w-28 bg-gray-200 rounded animate-pulse" />
                 <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse" />
               </div>
@@ -1042,7 +1054,7 @@ function FinancePageContent() {
                 </tbody>
               </table>
             </div>
-            {(invoicesData || (isPakistanFilterActive && allInvoicesForPakistanFilter)) && baseInvoices.length > 0 && (
+            {(invoicesData || (isPakistanFilterActive && allInvoicesForPakistanFilter)) && baseInvoices.length > 0 && paginationInfo.totalPages > 1 && (
               <Pagination
                 currentPage={paginationInfo.currentPage}
                 totalPages={paginationInfo.totalPages}
@@ -1133,7 +1145,7 @@ function FinancePageContent() {
 
           {/* Payments - Mobile Cards */}
           <div className="lg:hidden space-y-3">
-            {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).map((payment) => (
+            {paymentsList.map((payment) => (
               <button
                 key={payment._id}
                 className="w-full text-left bg-white rounded-lg shadow p-4 active:bg-gray-50"
@@ -1158,7 +1170,7 @@ function FinancePageContent() {
                 )}
               </button>
             ))}
-            {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length === 0 && (
+            {paymentsList.length === 0 && (
               <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">No payments recorded yet</div>
             )}
             {/* Mobile FAB to record payment */}
@@ -1193,7 +1205,7 @@ function FinancePageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).map((payment) => (
+                  {paymentsList.map((payment) => (
                     <tr 
                       key={payment._id} 
                       className="hover:bg-gray-50 cursor-pointer transition-colors"
@@ -1292,14 +1304,14 @@ function FinancePageContent() {
                   ))}
                 </tbody>
               </table>
-              {(Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length === 0 && (
+              {paymentsList.length === 0 && (
                 <div className="text-center py-8 text-gray-500">No payments recorded yet</div>
               )}
             </div>
-            {paymentsData && (Array.isArray(paymentsData) ? paymentsData : paymentsData?.page || []).length > 0 && (
+            {paymentsData && paymentsList.length > 0 && paymentsTotalPages > 1 && (
               <Pagination
                 currentPage={paymentsPagination.currentPage}
-              totalPages={Math.ceil((!Array.isArray(paymentsData) ? paymentsData.totalCount || 0 : 0) / paymentsPagination.pageSize)}
+                totalPages={paymentsTotalPages}
                 onPageChange={paymentsPagination.goToPage}
                 isLoading={!paymentsData}
               />
@@ -1317,7 +1329,7 @@ function FinancePageContent() {
       {activeTab === "banks" && (
         <div className="space-y-6">
           {/* Banking System Header */}
-          <div className="flex items-center justify-between">
+          <div className="stack-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Banking System</h2>
               <p className="text-sm text-gray-600 mt-1">
@@ -1394,7 +1406,7 @@ function FinancePageContent() {
                         : "border-gray-200 hover:border-gray-300"
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="stack-between mb-2">
                       <div 
                         className="flex-1 cursor-pointer"
                         onClick={() => setSelectedBankAccountId(account._id)}
@@ -1481,7 +1493,7 @@ function FinancePageContent() {
           <div className="hidden">
             <div className="card overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
+              <div className="stack-between">
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">
                     Bank Accounts

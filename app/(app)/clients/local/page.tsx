@@ -121,6 +121,13 @@ function LocalClientsPageContent() {
     search: searchQuery || undefined,
     paginationOpts: clientsPagination.paginationOpts,
   });
+  const clientsList = Array.isArray(clientsData) ? clientsData : clientsData?.page || [];
+  const clientsTotalCount = Array.isArray(clientsData)
+    ? clientsList.length
+    : clientsData?.totalCount ?? clientsList.length;
+  const clientsTotalPages = clientsTotalCount > 0
+    ? Math.ceil(clientsTotalCount / clientsPagination.pageSize)
+    : 0;
 
   // Pagination for orders
   const ordersPagination = usePagination({ pageSize: 10 });
@@ -134,6 +141,12 @@ function LocalClientsPageContent() {
   
   // Extract orders array (handle both paginated and non-paginated responses)
   const orders = Array.isArray(ordersData) ? ordersData : ordersData?.page || [];
+  const ordersTotalCount = Array.isArray(ordersData)
+    ? orders.length
+    : ordersData?.totalCount ?? orders.length;
+  const ordersTotalPages = ordersTotalCount > 0
+    ? Math.ceil(ordersTotalCount / ordersPagination.pageSize)
+    : 0;
 
   const stats = useQuery(api.clients.getStats, { 
     type: "local",
@@ -328,7 +341,7 @@ function LocalClientsPageContent() {
         <div className="space-y-8">
           {/* Overview Summary */}
           <div className="card p-8">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
               <h2 className="text-2xl font-bold text-gray-900">Overview</h2>
               <div className={`text-sm px-3 py-1 rounded-full ${
                 isCustomFiscalYear 
@@ -350,7 +363,7 @@ function LocalClientsPageContent() {
                 role="button"
                 onClick={() => setExpandedMetric({ metric: 'total_quantity', audience: 'local' })}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <div className="p-2 bg-indigo-200 rounded-lg">
                     <Package className="h-6 w-6 text-indigo-700" />
                   </div>
@@ -373,7 +386,7 @@ function LocalClientsPageContent() {
                 role="button"
                 onClick={() => setExpandedMetric({ metric: 'pending_quantity', audience: 'local' })}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <div className="p-2 bg-orange-200 rounded-lg">
                     <AlertCircle className="h-6 w-6 text-orange-700" />
                   </div>
@@ -396,7 +409,7 @@ function LocalClientsPageContent() {
                 role="button"
                 onClick={() => setExpandedMetric({ metric: 'processed_quantity', audience: 'local' })}
               >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <div className="p-2 bg-green-200 rounded-lg">
                     <CheckCircle className="h-6 w-6 text-green-700" />
                   </div>
@@ -420,7 +433,7 @@ function LocalClientsPageContent() {
 
           {/* Financial Performance Summary */}
           <div className="card p-8">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
               <h2 className="text-2xl font-bold text-gray-900">Financial Performance</h2>
               <div className={`text-sm px-3 py-1 rounded-full ${
                 isCustomFiscalYear 
@@ -442,7 +455,7 @@ function LocalClientsPageContent() {
                   role="button"
                   onClick={() => setExpandedMetric({ metric: 'revenue', audience: 'local' })}
                 >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <div className="p-2 bg-green-200 rounded-lg">
                     <DollarSign className="h-6 w-6 text-green-700" />
                   </div>
@@ -465,7 +478,7 @@ function LocalClientsPageContent() {
                   role="button"
                   onClick={() => setExpandedMetric({ metric: 'pending', audience: 'local' })}
                 >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <div className="p-2 bg-blue-200 rounded-lg">
                     <Package className="h-6 w-6 text-blue-700" />
                   </div>
@@ -488,7 +501,7 @@ function LocalClientsPageContent() {
                   role="button"
                   onClick={() => setExpandedMetric({ metric: 'advance', audience: 'local' })}
                 >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <div className="p-2 bg-purple-200 rounded-lg">
                     <TrendingUp className="h-6 w-6 text-purple-700" />
                   </div>
@@ -511,7 +524,7 @@ function LocalClientsPageContent() {
                   role="button"
                   onClick={() => setExpandedMetric({ metric: 'receivables', audience: 'local' })}
                 >
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <div className="p-2 bg-red-200 rounded-lg">
                     <AlertCircle className="h-6 w-6 text-red-700" />
                   </div>
@@ -537,7 +550,7 @@ function LocalClientsPageContent() {
           {/* Client Summary - Mobile */}
           <div className="lg:hidden space-y-3">
             <div className="card p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h2 className="text-base font-semibold text-gray-900">Client Summary</h2>
                   <p className="text-xs text-gray-500">Receivables and total quantities</p>
@@ -564,7 +577,7 @@ function LocalClientsPageContent() {
             ) : (
               clientSummary.map((client) => (
                 <div key={client.clientId} className="card p-4 space-y-3">
-                  <div className="flex items-start justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex items-center">
                       <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
                         {client.clientName?.charAt(0).toUpperCase() || "?"}
@@ -581,7 +594,7 @@ function LocalClientsPageContent() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs text-gray-500">
                     <span>Total Quantity</span>
                     <span>{(client.totalQuantity || 0).toLocaleString()} kg</span>
                   </div>
@@ -594,7 +607,7 @@ function LocalClientsPageContent() {
           <div className="hidden lg:block">
             <div className="card overflow-hidden">
               <div className="px-6 py-4 border-b border-gray-200">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-gray-900">
                       Client Summary
@@ -705,17 +718,17 @@ function LocalClientsPageContent() {
       {activeTab === "orders" && (
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Local Orders</h2>
               <p className="text-gray-600 mt-1">
                 Manage and track all local customer orders
               </p>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-3 w-full sm:w-auto">
               <button
                 onClick={() => setIsCreateOrderOpen(true)}
-                className="btn-primary flex items-center"
+                className="btn-primary flex items-center justify-center w-full sm:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Create Order
@@ -930,11 +943,11 @@ function LocalClientsPageContent() {
             </div>
             
             {/* Pagination for orders */}
-            {ordersData && !Array.isArray(ordersData) && ordersData.page && ordersData.page.length > 0 && (
+            {ordersData && orders.length > 0 && ordersTotalPages > 1 && (
               <div className="mt-6">
                 <Pagination
                   currentPage={ordersPagination.currentPage}
-                  totalPages={Math.ceil((!Array.isArray(ordersData) ? ordersData.totalCount || 0 : 0) / ordersPagination.pageSize)}
+                  totalPages={ordersTotalPages}
                   onPageChange={ordersPagination.goToPage}
                   isLoading={!ordersData}
                 />
@@ -948,14 +961,14 @@ function LocalClientsPageContent() {
       {activeTab === "customers" && (
         <div className="space-y-4">
           {/* Header with Add Customer Button */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-900">Customers</h2>
               <p className="text-sm text-gray-600 mt-1">Manage your local customers</p>
             </div>
             <button
               onClick={() => setIsAddCustomerOpen(true)}
-              className="btn-primary flex items-center"
+              className="btn-primary flex items-center justify-center w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Customer
@@ -976,7 +989,7 @@ function LocalClientsPageContent() {
 
           {/* Customer Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(Array.isArray(clientsData) ? clientsData : clientsData?.page || []).map((client) => (
+            {clientsList.map((client) => (
               <div key={client._id} className="card-hover p-6 flex flex-col h-full">
                 {/* Header with profile picture, name and status */}
                 <div className="flex items-start justify-between mb-4">
@@ -1045,7 +1058,7 @@ function LocalClientsPageContent() {
                 {/* Action Buttons */}
                 <div className="space-y-2 mt-auto">
                   {/* Primary Actions */}
-                  <div className="flex space-x-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 gap-2">
                     <button
                       onClick={() => {
                         setSelectedClientForOrder(client._id);
@@ -1069,16 +1082,18 @@ function LocalClientsPageContent() {
             ))}
           </div>
 
-          {clientsData && !Array.isArray(clientsData) && clientsData.page && clientsData.page.length > 0 && (
-            <Pagination
-              currentPage={clientsPagination.currentPage}
-              totalPages={Math.ceil((!Array.isArray(clientsData) ? clientsData.totalCount || 0 : 0) / clientsPagination.pageSize)}
-              onPageChange={clientsPagination.goToPage}
-              isLoading={!clientsData}
-            />
+          {clientsData && clientsList.length > 0 && clientsTotalPages > 1 && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={clientsPagination.currentPage}
+                totalPages={clientsTotalPages}
+                onPageChange={clientsPagination.goToPage}
+                isLoading={!clientsData}
+              />
+            </div>
           )}
 
-          {(Array.isArray(clientsData) ? clientsData : clientsData?.page || []).length === 0 && (
+          {clientsList.length === 0 && (
             <div className="text-center py-12 card">
               <p className="text-gray-500 mb-4">No customers found</p>
               <button
@@ -1126,7 +1141,7 @@ function LocalClientsPageContent() {
           <div className="relative bg-white sm:rounded-2xl rounded-none shadow-2xl w-full max-w-6xl h-[100vh] sm:h-[calc(100vh-2rem)] mx-0 sm:mx-4 overflow-hidden border border-gray-200">
             {/* Header */}
             <div className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4 sticky top-0" style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)' }}>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                       <h2 className="text-xl font-bold text-gray-900 mb-1">
                         {expandedMetric.metric === 'pending' && 'Current Pending Orders'}

@@ -37,12 +37,12 @@ export default function AllTransactions() {
   return (
     <div className="space-y-4">
       <div className="card p-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="stack-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
             <Calendar className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-700 font-medium">All Transactions</span>
+            <span>All Transactions</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
             <input
               type="date"
               value={timestampToDateString(selectedDateMs || Date.now())}
@@ -54,12 +54,15 @@ export default function AllTransactions() {
                 setSelectedDateMs(ts);
                 pagination.goToPage(1);
               }}
-              className="h-9 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="h-9 w-full sm:w-auto px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Filter className="h-4 w-4" />
+                <span className="sm:hidden">Bank Filter</span>
+              </div>
               <select
-                className="h-9 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="h-9 w-full sm:w-auto px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={(selectedBankId as any) || "all"}
                 onChange={(e) => {
                   const v = e.target.value;
@@ -76,64 +79,110 @@ export default function AllTransactions() {
           </div>
         </div>
 
-        <div className="mt-4">
-          <table className="w-full table-fixed divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">Bank</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[45%]">Description</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Type</th>
-                <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {!page ? (
-                [...Array(6)].map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-4 py-3"><div className="h-4 w-40 bg-gray-200 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-56 bg-gray-200 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse" /></td>
-                    <td className="px-4 py-3 text-right"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse ml-auto" /></td>
-                  </tr>
-                ))
-              ) : transactions.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center">
-                    <Building2 className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions for this day</h3>
-                    <p className="mt-1 text-sm text-gray-500">Pick another day or change the bank filter</p>
-                  </td>
-                </tr>
-              ) : (
-                transactions.map((tx: any) => {
-                  const bank = banks?.find((b: any) => b._id === tx.bankAccountId);
-                  return (
-                    <tr key={tx._id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {bank ? `${bank.accountName} - ${bank.bankName} (${bank.currency})` : "-"}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-700 break-words" title={tx.description}>{tx.description}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{tx.transactionType.replace("_", " ")}</td>
-                      <td className={`px-4 py-3 text-sm font-medium text-right ${tx.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+        <div className="mt-4 space-y-4">
+          <div className="lg:hidden space-y-3">
+            {!page ? (
+              [...Array(4)].map((_, i) => (
+                <div key={i} className="card p-4 animate-pulse space-y-3">
+                  <div className="h-4 w-48 bg-gray-200 rounded" />
+                  <div className="h-3 w-40 bg-gray-200 rounded" />
+                  <div className="h-3 w-24 bg-gray-200 rounded" />
+                </div>
+              ))
+            ) : transactions.length === 0 ? (
+              <div className="card p-6 text-center text-gray-500">
+                <Building2 className="mx-auto h-10 w-10 text-gray-300" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions for this day</h3>
+                <p className="mt-1 text-sm text-gray-500">Pick another day or change the bank filter.</p>
+              </div>
+            ) : (
+              transactions.map((tx: any) => {
+                const bank = banks?.find((b: any) => b._id === tx.bankAccountId);
+                return (
+                  <div key={tx._id} className="card p-4 space-y-2">
+                    <div className="stack-between sm:items-start">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {bank ? `${bank.accountName} - ${bank.bankName}` : "Unknown Bank"}
+                        </p>
+                        <p className="text-xs text-gray-500">{bank?.currency || tx.currency}</p>
+                      </div>
+                      <p className={`text-sm font-semibold ${tx.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
                         {formatCurrency(tx.amount, tx.currency)}
+                      </p>
+                    </div>
+                    <p className="text-sm text-gray-700 break-words" title={tx.description}>{tx.description}</p>
+                    <div className="text-xs uppercase text-gray-500">
+                      {tx.transactionType.replace("_", " ")}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="hidden lg:block">
+            <div className="overflow-x-auto">
+              <table className="w-full table-fixed divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">Bank</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[45%]">Description</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Type</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-[15%]">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {!page ? (
+                    [...Array(6)].map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-4 py-3"><div className="h-4 w-40 bg-gray-200 rounded animate-pulse" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-56 bg-gray-200 rounded animate-pulse" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse" /></td>
+                        <td className="px-4 py-3 text-right"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse ml-auto" /></td>
+                      </tr>
+                    ))
+                  ) : transactions.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center">
+                        <Building2 className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No transactions for this day</h3>
+                        <p className="mt-1 text-sm text-gray-500">Pick another day or change the bank filter</p>
                       </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          {page && transactions.length > 0 && !Array.isArray(page) && (
-            <div className="mt-3">
-              <Pagination
-                currentPage={pagination.currentPage}
-                totalPages={pagination.currentPage + (page.isDone ? 0 : 1)}
-                onPageChange={pagination.goToPage}
-                isLoading={!page}
-              />
+                  ) : (
+                    transactions.map((tx: any) => {
+                      const bank = banks?.find((b: any) => b._id === tx.bankAccountId);
+                      return (
+                        <tr key={tx._id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {bank ? `${bank.accountName} - ${bank.bankName} (${bank.currency})` : "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 break-words" title={tx.description}>{tx.description}</td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{tx.transactionType.replace("_", " ")}</td>
+                          <td className={`px-4 py-3 text-sm font-medium text-right ${tx.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                            {formatCurrency(tx.amount, tx.currency)}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </div>
+
+        {page && transactions.length > 0 && !Array.isArray(page) && (
+          <div className="mt-4">
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.currentPage + (page.isDone ? 0 : 1)}
+              onPageChange={pagination.goToPage}
+              isLoading={!page}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
