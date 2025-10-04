@@ -97,7 +97,7 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
                   <div className="text-xs text-gray-500">You are editing an advance payment.</div>
                 </div>
               ) : invoice ? (
-                <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                   <div>
                     <div className="text-gray-600">Invoice Total</div>
                     <div className="font-semibold">{formatCurrency((invoice as any).amount, (invoice as any).currency as SupportedCurrency)}</div>
@@ -321,5 +321,4 @@ export default function EditPaymentModal({ isOpen, onClose, payment }: EditPayme
     </Modal>
   );
 }
-
 

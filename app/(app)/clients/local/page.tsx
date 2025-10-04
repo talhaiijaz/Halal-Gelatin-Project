@@ -534,28 +534,85 @@ function LocalClientsPageContent() {
 
 
 
-          {/* Client Summary Table */}
-          <div className="card overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
+          {/* Client Summary - Mobile */}
+          <div className="lg:hidden space-y-3">
+            <div className="card p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    Client Summary
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Receivables amounts and total quantities by client
-                  </p>
+                  <h2 className="text-base font-semibold text-gray-900">Client Summary</h2>
+                  <p className="text-xs text-gray-500">Receivables and total quantities</p>
                 </div>
-                <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                  {formatFiscalYear(dashboardFiscalYear)} Fiscal Year
-                </div>
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                  {formatFiscalYear(dashboardFiscalYear)}
+                </span>
               </div>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full table-fixed divide-y divide-gray-200">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[50%]">
+
+            {!clientSummary ? (
+              [...Array(4)].map((_, index) => (
+                <div key={index} className="card p-4 animate-pulse space-y-3">
+                  <div className="h-4 w-32 bg-gray-200 rounded" />
+                  <div className="h-3 w-24 bg-gray-200 rounded" />
+                  <div className="h-3 w-16 bg-gray-200 rounded" />
+                </div>
+              ))
+            ) : clientSummary.length === 0 ? (
+              <div className="card p-6 text-center text-gray-500">
+                <Building2 className="mx-auto mb-2 h-10 w-10 text-gray-300" />
+                <p>No clients with data for {formatFiscalYear(dashboardFiscalYear)}</p>
+              </div>
+            ) : (
+              clientSummary.map((client) => (
+                <div key={client.clientId} className="card p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center">
+                      <div className="mr-3 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-white">
+                        {client.clientName?.charAt(0).toUpperCase() || "?"}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{client.clientName}</p>
+                        <p className="text-xs text-gray-500 truncate" title={client.clientEmail}>{client.clientEmail}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs uppercase tracking-wide text-gray-500">Receivables</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {formatCurrency(client.totalOutstandingAmount || 0)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <span>Total Quantity</span>
+                    <span>{(client.totalQuantity || 0).toLocaleString()} kg</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Client Summary Table */}
+          <div className="hidden lg:block">
+            <div className="card overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Client Summary
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Receivables amounts and total quantities by client
+                    </p>
+                  </div>
+                  <div className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    {formatFiscalYear(dashboardFiscalYear)} Fiscal Year
+                  </div>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full table-fixed divide-y divide-gray-200">
+                  <thead className="bg-gray-50 border-b">
+                    <tr>
+                      <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[50%]">
                       Client
                     </th>
                     <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-[25%]">
@@ -637,7 +694,8 @@ function LocalClientsPageContent() {
                     ))
                   )}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           </div>
         </div>

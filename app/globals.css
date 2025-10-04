@@ -78,3 +78,22 @@
     }
   }
 }
+
+@layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pt-safe-header {
+    padding-top: calc(4rem + env(safe-area-inset-top, 0px));
+  }
+
+  .pb-safe-area {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  }
+}

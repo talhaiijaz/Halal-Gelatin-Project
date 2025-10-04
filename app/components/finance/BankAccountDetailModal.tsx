@@ -116,7 +116,7 @@ export default function BankAccountDetailModal({ bankAccountId, isOpen, onClose 
                 </div>
 
                 {/* Account Details */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="card p-4">
                     <h3 className="font-medium text-gray-900 mb-2 flex items-center">
                       <Calendar className="h-4 w-4 mr-2" /> Created Date

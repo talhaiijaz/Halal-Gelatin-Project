@@ -193,7 +193,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                 {/* Order Info Section */}
                 <div className="card p-4">
                   <h3 className="font-medium text-gray-900 mb-3">Order Information</h3>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm text-gray-500">Invoice Number</p>
                       <p className="font-medium text-gray-900">{order.invoiceNumber}</p>
@@ -637,7 +637,7 @@ export default function OrderDetailModal({ orderId, isOpen, onClose }: OrderDeta
                         return (
                           <div className="space-y-4">
                             {/* Main financial summary */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div className="rounded-lg border border-gray-200 bg-white p-3">
                                 <p className="text-xs text-gray-500">Order Value</p>
                                 <p className="mt-1 text-lg font-semibold text-gray-900">{formatCurrency(order.invoice.amount, order.currency as SupportedCurrency)}</p>

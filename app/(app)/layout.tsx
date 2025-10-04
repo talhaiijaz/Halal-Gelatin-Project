@@ -19,9 +19,9 @@ export default function AppLayout({
         
         {/* Main content area */}
         <div className="lg:pl-64">
-          {/* Mobile top padding to account for mobile header */}
-          <div className="pt-16 lg:pt-0">
-            <main className="p-3 sm:p-4 lg:p-6 xl:p-8">
+          {/* Mobile top padding accounts for header + safe areas */}
+          <div className="pt-safe-header lg:pt-0">
+            <main className="p-3 sm:p-4 lg:p-6 xl:p-8 pb-safe-area">
               {children}
             </main>
           </div>

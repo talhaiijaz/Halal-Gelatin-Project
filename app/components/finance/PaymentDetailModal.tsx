@@ -92,7 +92,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
             ) : (
               <>
                 {/* Payment Summary */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Amount</p>
                     <p className={`text-xl font-bold ${((payment as any).isReversed ? 'line-through opacity-60' : 'text-gray-900')}`}>{formatCurrency(payment.amount, payment.currency as any)}</p>
@@ -109,7 +109,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                     <DollarSign className="h-4 w-4 mr-2" /> Payment Information
                   </h3>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-xs font-medium text-gray-500">Type</label>
                       <div className="mt-1">
@@ -267,7 +267,7 @@ export default function PaymentDetailModal({ paymentId, isOpen, onClose }: Payme
                 {payment.withheldTaxAmount && (
                   <div className="card p-4">
                     <h3 className="font-medium text-gray-900 mb-4">Withholding Information</h3>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-medium text-gray-500">Cash Received</label>
                         <p className="mt-1 text-sm text-gray-900">

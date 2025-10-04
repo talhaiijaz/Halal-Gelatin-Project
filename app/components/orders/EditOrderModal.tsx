@@ -711,7 +711,7 @@ export default function EditOrderModal({
                         />
                       </div>
                       {/* Product specs: Bloom, Mesh */}
-                      <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Bloom</label>
                           <input
@@ -765,7 +765,7 @@ export default function EditOrderModal({
                       </div>
 
                       {/* Quantity and Rate */}
-                      <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Quantity (kg)
@@ -797,7 +797,7 @@ export default function EditOrderModal({
                       </div>
 
                       {/* Calculations */}
-                      <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             Ex. Value (Before GST)
@@ -826,7 +826,7 @@ export default function EditOrderModal({
                       <div className="border-t pt-4 mt-4">
                         <h4 className="text-sm font-medium text-gray-700 mb-3">Discount (Optional)</h4>
                         
-                        <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Discount Type
@@ -880,7 +880,7 @@ export default function EditOrderModal({
                       </div>
 
                       {/* GST Amount and Total */}
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
                             GST Amount
@@ -905,7 +905,7 @@ export default function EditOrderModal({
                 {/* Freight Cost */}
                 <div className="mt-4 pt-4 border-t">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Freight Cost</h4>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Freight Cost ({order?.currency || 'USD'})

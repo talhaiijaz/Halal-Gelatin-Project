@@ -338,7 +338,7 @@ export default function RecordPaymentModal({
                     const receivablesAmount = shouldShowOutstanding ? invoice.outstandingBalance : 0;
                     
                     return (
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         <div>
                           <span className="font-medium text-gray-700">Total Amount:</span>
                           <div className="font-semibold text-gray-900">
@@ -521,7 +521,7 @@ export default function RecordPaymentModal({
                   
                   {/* Preview - Show gross amount in both currencies for international payments */}
                   {formData.applyWithholding && (
-                    <div className="bg-gray-50 rounded-md p-3 text-sm grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-gray-50 rounded-md p-3 text-sm">
                       <div>
                         <div className="text-gray-600">Gross Amount</div>
                         <div className="font-semibold">{formatCurrency(gross, getCurrencyForDisplay())}</div>

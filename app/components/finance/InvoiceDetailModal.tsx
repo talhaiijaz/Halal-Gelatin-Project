@@ -68,7 +68,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
             ) : (
               <>
                 {/* Top Summary */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="card p-4">
                     <p className="text-sm text-gray-500">Amount</p>
                     <p className="text-xl font-bold text-gray-900">{formatCurrency(invoice.amount, invoice.currency as SupportedCurrency)}</p>
@@ -95,7 +95,7 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
                 </div>
 
                 {/* Meta */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="card p-4">
                     <h3 className="font-medium text-gray-900 mb-2 flex items-center"><User className="h-4 w-4 mr-2"/>Customer</h3>
                     <p
@@ -428,5 +428,4 @@ export default function InvoiceDetailModal({ invoiceId, isOpen, onClose, onRecor
   // Use portal to render modal directly to document.body
   return createPortal(modalContent, document.body);
 }
-
 

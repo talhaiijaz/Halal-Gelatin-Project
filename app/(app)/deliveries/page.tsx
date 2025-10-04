@@ -256,12 +256,102 @@ function DeliveriesPageContent() {
         </div>
       </div>
 
+      {/* Deliveries List - Mobile */}
+      <div className="lg:hidden space-y-3">
+        {!filteredDeliveries ? (
+          [...Array(4)].map((_, index) => (
+            <div key={index} className="card p-4 animate-pulse space-y-3">
+              <div className="h-4 w-32 bg-gray-200 rounded" />
+              <div className="h-3 w-24 bg-gray-200 rounded" />
+              <div className="h-3 w-20 bg-gray-200 rounded" />
+            </div>
+          ))
+        ) : filteredDeliveries.length === 0 ? (
+          <div className="card p-6 text-center text-gray-500">
+            <Truck className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+            <p>No deliveries found</p>
+            <p className="text-sm text-gray-400">
+              {searchTerm || statusFilter !== "all" || dateFilter !== "all"
+                ? "Try adjusting your filters"
+                : "No deliveries have been scheduled yet."}
+            </p>
+          </div>
+        ) : (
+          filteredDeliveries.map((delivery) => (
+            <div key={delivery._id} className="card p-4 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {delivery.order?.invoiceNumber || "Unassigned"}
+                  </p>
+                  <p className="text-xs text-gray-500 capitalize">
+                    {delivery.client?.name || "Unknown client"}
+                  </p>
+                </div>
+                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(delivery.status)}`}>
+                  {getStatusIcon(delivery.status)}
+                  <span className="ml-1 capitalize">
+                    {delivery.status.replace("_", " ")}
+                  </span>
+                </span>
+              </div>
+
+              <div className="text-sm text-gray-700">
+                <p className="flex items-center">
+                  <Truck className="mr-2 h-4 w-4 text-gray-400" />
+                  {delivery.trackingNumber || "Tracking pending"}
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {delivery.carrier || "Carrier not assigned"}
+                </p>
+              </div>
+
+              <div className="text-sm text-gray-700">
+                <p className="flex items-start">
+                  <MapPin className="mr-2 h-4 w-4 text-gray-400 flex-shrink-0" />
+                  <span className="leading-snug">
+                    {delivery.address || "Delivery address pending"}
+                  </span>
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div>
+                  <p className="text-gray-500 text-xs uppercase tracking-wide">Scheduled</p>
+                  <p className="font-medium text-gray-900">
+                    {delivery.scheduledDate
+                      ? new Date(delivery.scheduledDate).toLocaleDateString()
+                      : "-"}
+                  </p>
+                  {delivery.deliveredDate && (
+                    <p className="text-xs text-green-600">
+                      Delivered: {new Date(delivery.deliveredDate).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <select
+                  value={delivery.status}
+                  onChange={(e) => handleStatusUpdate(delivery._id, e.target.value)}
+                  className="w-full sm:w-auto rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="in_transit">In Transit</option>
+                  <option value="delivered">Delivered</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Deliveries Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b">
-              <tr>
+      <div className="hidden lg:block">
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Order
                 </th>
@@ -371,7 +461,8 @@ function DeliveriesPageContent() {
                 ))
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       </div>
     </div>
