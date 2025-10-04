@@ -343,31 +343,110 @@ export const optimizeBatchSelection = query({
       }
     }
     
-    // PRIORITY 2: Check if current selection can achieve target bloom range
-    const currentAvg = selected.length > 0 ? sum / (selected.length * 10) : 0;
-    const canAchieveTarget = selected.length === 0 || 
-      (currentAvg >= args.targetBloomMin && currentAvg <= args.targetBloomMax) ||
-      remaining.length > 0; // Can add more batches to adjust average
+    // PRIORITY 2: Greedy optimization for manual selections
+    // Try to include as many manual selections as possible while achieving target average
+    let bestSelection: any[] = [];
+    let bestSum = 0;
+    let bestPreSelectedCount = 0;
+    let bestAttrSums = { ...attrSums };
+    let bestStringFieldValues = { ...stringFieldValues };
+    let excludedManualBatches: string[] = [];
     
-    // If manual selections prevent reaching target, replace them with compatible batches
-    if (!canAchieveTarget && preSelectedCount > 0) {
-      // Reset and try without manual selections
-      selected.length = 0;
-      sum = 0;
-      preSelectedCount = 0;
-      attrSums.viscosity = 0;
-      attrSums.percentage = 0;
-      attrSums.ph = 0;
-      attrSums.conductivity = 0;
-      attrSums.moisture = 0;
-      attrSums.h2o2 = 0;
-      attrSums.so2 = 0;
-      stringFieldValues.color = [];
-      stringFieldValues.odour = [];
-      stringFieldValues.clarity = [];
+    if (preSelectedCount > 0) {
+      // Get all manually selected batches
+      const manualBatches = selected.slice(0, preSelectedCount);
+      const manualBatchIds = manualBatches.map(b => b._id);
       
-      // Add warning about replacing manual selections
-      incompatibleManualBatches.push(`Manual selections were replaced to achieve target bloom range (${args.targetBloomMin}-${args.targetBloomMax})`);
+      // Try all possible combinations of manual batches (greedy approach)
+      // Start with all, then try removing one by one
+      for (let i = 0; i <= manualBatches.length; i++) {
+        // Try different combinations by removing batches one by one
+        const currentManualBatches = manualBatches.slice(0, manualBatches.length - i);
+        const currentSum = currentManualBatches.reduce((s, b) => s + (b.bloom || 0) * 10, 0);
+        const currentAvg = currentManualBatches.length > 0 ? currentSum / (currentManualBatches.length * 10) : 0;
+        
+        // Check if this combination can achieve target with additional batches
+        const canAchieveWithThis = currentManualBatches.length === 0 || 
+          (currentAvg >= args.targetBloomMin && currentAvg <= args.targetBloomMax) ||
+          remaining.length > 0; // Can add more batches to adjust average
+        
+        if (canAchieveWithThis) {
+          // This combination works - use it
+          bestSelection = [...currentManualBatches];
+          bestSum = currentSum;
+          bestPreSelectedCount = currentManualBatches.length;
+          
+          // Update attribute sums for the selected manual batches
+          bestAttrSums = {
+            viscosity: 0,
+            percentage: 0,
+            ph: 0,
+            conductivity: 0,
+            moisture: 0,
+            h2o2: 0,
+            so2: 0,
+            clarity: 0,
+          };
+          bestStringFieldValues = { color: [], odour: [], clarity: [] };
+          
+          currentManualBatches.forEach(batch => {
+            bestAttrSums.viscosity += (batch.viscosity ?? 0) * 10;
+            bestAttrSums.percentage += (batch.percentage ?? 0) * 10;
+            bestAttrSums.ph += (batch.ph ?? 0) * 10;
+            bestAttrSums.conductivity += (batch.conductivity ?? 0) * 10;
+            bestAttrSums.moisture += (batch.moisture ?? 0) * 10;
+            bestAttrSums.h2o2 += (batch.h2o2 ?? 0) * 10;
+            bestAttrSums.so2 += (batch.so2 ?? 0) * 10;
+            bestAttrSums.clarity += (batch.clarity ?? 0) * 10;
+            
+            if (batch.color) bestStringFieldValues.color.push(batch.color);
+            if (batch.odour) bestStringFieldValues.odour.push(batch.odour);
+          });
+          
+          // Track excluded batches
+          const excludedIds = manualBatchIds.filter(id => 
+            !currentManualBatches.some(b => b._id === id)
+          );
+          excludedManualBatches = excludedIds.map(id => {
+            const batch = manualBatches.find(b => b._id === id);
+            return batch ? `Batch #${batch.batchNumber} (bloom: ${batch.bloom})` : `Unknown batch ${id}`;
+          });
+          
+          break; // Found a working combination, use it
+        }
+      }
+      
+      // Update the selection with the best combination
+      selected.length = 0;
+      selected.push(...bestSelection);
+      sum = bestSum;
+      preSelectedCount = bestPreSelectedCount;
+      // Update attrSums properties
+      attrSums.viscosity = bestAttrSums.viscosity;
+      attrSums.percentage = bestAttrSums.percentage;
+      attrSums.ph = bestAttrSums.ph;
+      attrSums.conductivity = bestAttrSums.conductivity;
+      attrSums.moisture = bestAttrSums.moisture;
+      attrSums.h2o2 = bestAttrSums.h2o2;
+      attrSums.so2 = bestAttrSums.so2;
+      attrSums.clarity = bestAttrSums.clarity;
+      // Update stringFieldValues properties
+      stringFieldValues.color = bestStringFieldValues.color;
+      stringFieldValues.odour = bestStringFieldValues.odour;
+      stringFieldValues.clarity = bestStringFieldValues.clarity;
+      
+      // Add warnings for excluded batches
+      if (excludedManualBatches.length > 0) {
+        incompatibleManualBatches.push(
+          `The following manually selected batches were excluded to achieve target bloom range (${args.targetBloomMin}-${args.targetBloomMax}): ${excludedManualBatches.join(', ')}`
+        );
+      }
+      
+      // Update remaining batches (remove the selected manual batches)
+      const selectedIds = new Set(bestSelection.map(b => b._id));
+      const updatedRemaining = remaining.filter(b => !selectedIds.has(b._id));
+      remaining.length = 0;
+      remaining.push(...updatedRemaining);
     }
     
     // Adjust batches needed based on current pre-selected batches
