@@ -343,111 +343,133 @@ export const optimizeBatchSelection = query({
       }
     }
     
-    // PRIORITY 2: Greedy optimization for manual selections
-    // Try to include as many manual selections as possible while achieving target average
-    let bestSelection: any[] = [];
-    let bestSum = 0;
-    let bestPreSelectedCount = 0;
-    let bestAttrSums = { ...attrSums };
-    let bestStringFieldValues = { ...stringFieldValues };
-    let excludedManualBatches: string[] = [];
+    // PRIORITY 2: Smart manual selection optimization
+    console.log(`Manual batch processing completed. Selected: ${selected.length}, preSelectedCount: ${preSelectedCount}`);
+    console.log(`Manual batch numbers: ${selected.slice(0, preSelectedCount).map(b => b.batchNumber).join(', ')}`);
     
-    if (preSelectedCount > 0) {
-      // Get all manually selected batches
-      const manualBatches = selected.slice(0, preSelectedCount);
-      const manualBatchIds = manualBatches.map(b => b._id);
+    // Helper function to generate combinations
+    const getCombinations = (arr: any[], size: number): any[][] => {
+      if (size === 0) return [[]];
+      if (size > arr.length) return [];
+      if (size === arr.length) return [arr];
       
-      // Try all possible combinations of manual batches (greedy approach)
-      // Start with all, then try removing one by one
-      for (let i = 0; i <= manualBatches.length; i++) {
-        // Try different combinations by removing batches one by one
-        const currentManualBatches = manualBatches.slice(0, manualBatches.length - i);
-        const currentSum = currentManualBatches.reduce((s, b) => s + (b.bloom || 0) * 10, 0);
-        const currentAvg = currentManualBatches.length > 0 ? currentSum / (currentManualBatches.length * 10) : 0;
+      const result: any[][] = [];
+      for (let i = 0; i <= arr.length - size; i++) {
+        const head = arr[i];
+        const tailCombinations = getCombinations(arr.slice(i + 1), size - 1);
+        for (const tail of tailCombinations) {
+          result.push([head, ...tail]);
+        }
+      }
+      return result;
+    };
+
+    // Check if manual selections can achieve target average with additional batches
+    if (preSelectedCount > 0) {
+      const manualBatches = selected.slice(0, preSelectedCount);
+      const manualAvg = sum / (preSelectedCount * 10);
+      const targetAvg = (args.targetBloomMin + args.targetBloomMax) / 2;
+      
+      console.log(`Manual selection average: ${manualAvg}, target average: ${targetAvg}`);
+      
+      // If manual selections are too low, try to find a better combination
+      if (manualAvg < args.targetBloomMin) {
+        console.log(`Manual selections too low (${manualAvg}), looking for better combination...`);
         
-        // Check if this combination can achieve target with additional batches
-        const canAchieveWithThis = currentManualBatches.length === 0 || 
-          (currentAvg >= args.targetBloomMin && currentAvg <= args.targetBloomMax) ||
-          remaining.length > 0; // Can add more batches to adjust average
+        // Get all available batches including the ones we haven't processed yet
+        const allAvailableBatches = [...remaining, ...selected.slice(preSelectedCount)];
         
-        if (canAchieveWithThis) {
-          // This combination works - use it
-          bestSelection = [...currentManualBatches];
-          bestSum = currentSum;
-          bestPreSelectedCount = currentManualBatches.length;
+        // Try different combinations of manual selections to see if we can achieve target
+        let bestCombination: any[] = [];
+        let bestScore = Number.POSITIVE_INFINITY;
+        
+        // Try combinations of 1 to all manual batches
+        for (let comboSize = 1; comboSize <= preSelectedCount; comboSize++) {
+          // Generate combinations (simplified - just try different sizes)
+          const combinations = getCombinations(manualBatches, comboSize);
           
-          // Update attribute sums for the selected manual batches
-          bestAttrSums = {
-            viscosity: 0,
-            percentage: 0,
-            ph: 0,
-            conductivity: 0,
-            moisture: 0,
-            h2o2: 0,
-            so2: 0,
-            clarity: 0,
-          };
-          bestStringFieldValues = { color: [], odour: [], clarity: [] };
-          
-          currentManualBatches.forEach(batch => {
-            bestAttrSums.viscosity += (batch.viscosity ?? 0) * 10;
-            bestAttrSums.percentage += (batch.percentage ?? 0) * 10;
-            bestAttrSums.ph += (batch.ph ?? 0) * 10;
-            bestAttrSums.conductivity += (batch.conductivity ?? 0) * 10;
-            bestAttrSums.moisture += (batch.moisture ?? 0) * 10;
-            bestAttrSums.h2o2 += (batch.h2o2 ?? 0) * 10;
-            bestAttrSums.so2 += (batch.so2 ?? 0) * 10;
-            bestAttrSums.clarity += (batch.clarity ?? 0) * 10;
+          for (const combination of combinations) {
+            const comboSum = combination.reduce((s, b) => s + (b.bloom || 0) * 10, 0);
+            const comboAvg = comboSum / (combination.length * 10);
             
-            if (batch.color) bestStringFieldValues.color.push(batch.color);
-            if (batch.odour) bestStringFieldValues.odour.push(batch.odour);
+            // Check if this combination can reach target with additional batches
+            const remainingBagsNeeded = (batchesNeeded - combination.length) * 10;
+            const targetTotal = targetAvg * batchesNeeded * 10;
+            const additionalNeeded = targetTotal - comboSum;
+            
+            // Check if we can achieve this with remaining batches
+            const highBatches = allAvailableBatches.filter(b => 
+              !combination.some(c => c._id === b._id) && 
+              (b.bloom || 0) >= args.targetBloomMin
+            );
+            
+            if (highBatches.length > 0 && additionalNeeded > 0) {
+              const score = Math.abs(comboAvg - targetAvg);
+              if (score < bestScore) {
+                bestScore = score;
+                bestCombination = combination;
+              }
+            }
+          }
+        }
+        
+        // If we found a better combination, update the selection
+        if (bestCombination.length > 0 && bestCombination.length !== preSelectedCount) {
+          console.log(`Found better combination with ${bestCombination.length} batches instead of ${preSelectedCount}`);
+          
+          // Update selection with better combination
+          selected.length = 0;
+          selected.push(...bestCombination);
+          sum = bestCombination.reduce((s, b) => s + (b.bloom || 0) * 10, 0);
+          preSelectedCount = bestCombination.length;
+          
+          // Update attribute sums
+          attrSums.viscosity = 0;
+          attrSums.percentage = 0;
+          attrSums.ph = 0;
+          attrSums.conductivity = 0;
+          attrSums.moisture = 0;
+          attrSums.h2o2 = 0;
+          attrSums.so2 = 0;
+          attrSums.clarity = 0;
+          stringFieldValues.color = [];
+          stringFieldValues.odour = [];
+          stringFieldValues.clarity = [];
+          
+          bestCombination.forEach(batch => {
+            attrSums.viscosity += (batch.viscosity ?? 0) * 10;
+            attrSums.percentage += (batch.percentage ?? 0) * 10;
+            attrSums.ph += (batch.ph ?? 0) * 10;
+            attrSums.conductivity += (batch.conductivity ?? 0) * 10;
+            attrSums.moisture += (batch.moisture ?? 0) * 10;
+            attrSums.h2o2 += (batch.h2o2 ?? 0) * 10;
+            attrSums.so2 += (batch.so2 ?? 0) * 10;
+            attrSums.clarity += (batch.clarity ?? 0) * 10;
+            
+            if (batch.color) stringFieldValues.color.push(batch.color);
+            if (batch.odour) stringFieldValues.odour.push(batch.odour);
           });
           
-          // Track excluded batches
-          const excludedIds = manualBatchIds.filter(id => 
-            !currentManualBatches.some(b => b._id === id)
+          // Add warning about the optimization
+          const excludedBatches = manualBatches.filter(b => 
+            !bestCombination.some(c => c._id === b._id)
           );
-          excludedManualBatches = excludedIds.map(id => {
-            const batch = manualBatches.find(b => b._id === id);
-            return batch ? `Batch #${batch.batchNumber} (bloom: ${batch.bloom})` : `Unknown batch ${id}`;
-          });
-          
-          break; // Found a working combination, use it
+          if (excludedBatches.length > 0) {
+            incompatibleManualBatches.push(
+              `Smart optimization: Used ${bestCombination.length} of ${manualBatches.length} manually selected batches to achieve target average (${targetAvg}). Excluded batches that prevented reaching target: ${excludedBatches.map(b => `Batch #${b.batchNumber} (bloom: ${b.bloom})`).join(', ')}`
+            );
+          }
         }
       }
       
-      // Update the selection with the best combination
-      selected.length = 0;
-      selected.push(...bestSelection);
-      sum = bestSum;
-      preSelectedCount = bestPreSelectedCount;
-      // Update attrSums properties
-      attrSums.viscosity = bestAttrSums.viscosity;
-      attrSums.percentage = bestAttrSums.percentage;
-      attrSums.ph = bestAttrSums.ph;
-      attrSums.conductivity = bestAttrSums.conductivity;
-      attrSums.moisture = bestAttrSums.moisture;
-      attrSums.h2o2 = bestAttrSums.h2o2;
-      attrSums.so2 = bestAttrSums.so2;
-      attrSums.clarity = bestAttrSums.clarity;
-      // Update stringFieldValues properties
-      stringFieldValues.color = bestStringFieldValues.color;
-      stringFieldValues.odour = bestStringFieldValues.odour;
-      stringFieldValues.clarity = bestStringFieldValues.clarity;
-      
-      // Add warnings for excluded batches
-      if (excludedManualBatches.length > 0) {
-        incompatibleManualBatches.push(
-          `The following manually selected batches were excluded to achieve target bloom range (${args.targetBloomMin}-${args.targetBloomMax}): ${excludedManualBatches.join(', ')}`
-        );
-      }
-      
-      // Update remaining batches (remove the selected manual batches)
-      const selectedIds = new Set(bestSelection.map(b => b._id));
-      const updatedRemaining = remaining.filter(b => !selectedIds.has(b._id));
-      remaining.length = 0;
-      remaining.push(...updatedRemaining);
+      // This warning logic will be moved to after the final optimization is complete
     }
+    
+    // Update remaining batches (remove the selected manual batches)
+    const selectedIds = new Set(selected.map(b => b._id));
+    const updatedRemaining = remaining.filter(b => !selectedIds.has(b._id));
+    remaining.length = 0;
+    remaining.push(...updatedRemaining);
     
     // Adjust batches needed based on current pre-selected batches
     const remainingBatchesNeeded = Math.max(0, batchesNeeded - preSelectedCount);
@@ -460,83 +482,71 @@ export const optimizeBatchSelection = query({
       }
       return shuffled;
     };
-
+    
     if (mode === 'random-average') {
-      // Random Average Mode: Use weighted random selection with target range validation
-      const shuffled = shuffleArray([...remaining]);
-      const maxAttempts = 1000; // Prevent infinite loops
-      let attempts = 0;
+      // Smart Random Average Mode: Intelligently select batches to achieve target average
+      console.log(`Starting smart random average selection. Manual: ${preSelectedCount}, needed: ${remainingBatchesNeeded}`);
       
-      while (selected.length < preSelectedCount + remainingBatchesNeeded && shuffled.length > 0 && attempts < maxAttempts) {
-        attempts++;
+      // Calculate current average from manual selections
+      const currentAvg = preSelectedCount > 0 ? sum / (preSelectedCount * 10) : 0;
+      const targetAvg = (args.targetBloomMin + args.targetBloomMax) / 2;
+      console.log(`Current average: ${currentAvg}, target average: ${targetAvg}`);
+      
+      // Strategy: Add batches that will bring us closer to target average
+      while (selected.length < preSelectedCount + remainingBatchesNeeded && remaining.length > 0) {
+        let bestCandidate = null;
+        let bestScore = Number.POSITIVE_INFINITY;
+        let bestIndex = -1;
         
-        // Select a random candidate
-        const randomIndex = Math.floor(Math.random() * shuffled.length);
-        const candidate = shuffled.splice(randomIndex, 1)[0];
+        // Find the batch that would bring us closest to target average
+        for (let i = 0; i < remaining.length; i++) {
+          const candidate = remaining[i];
+          const nextCountBatches = selected.length + 1;
+          const nextBags = nextCountBatches * 10;
+          const nextAvg = (sum + (candidate.bloom || 0) * 10) / nextBags;
+          
+          // Calculate how close this gets us to target average
+          const distanceFromTarget = Math.abs(nextAvg - targetAvg);
+          
+          // Prefer batches that keep us within the target range
+          const withinRange = nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax;
+          const score = withinRange ? distanceFromTarget : distanceFromTarget + 1000;
+          
+          if (score < bestScore) {
+            bestScore = score;
+            bestCandidate = candidate;
+            bestIndex = i;
+          }
+        }
         
-        // Calculate what the average would be if we add this candidate
-        const nextCountBatches = selected.length + 1;
-        const nextBags = nextCountBatches * 10;
-        const nextAvg = (sum + (candidate.bloom || 0) * 10) / nextBags;
-        
-        // Only add if the new average would be within target range
-        if (nextAvg >= args.targetBloomMin && nextAvg <= args.targetBloomMax) {
-          selected.push(candidate);
-          sum += (candidate.bloom || 0) * 10;
-          attrSums.viscosity += (candidate.viscosity ?? 0) * 10;
-          attrSums.percentage += (candidate.percentage ?? 0) * 10;
-          attrSums.ph += (candidate.ph ?? 0) * 10;
-          attrSums.conductivity += (candidate.conductivity ?? 0) * 10;
-          attrSums.moisture += (candidate.moisture ?? 0) * 10;
-          attrSums.h2o2 += (candidate.h2o2 ?? 0) * 10;
-          attrSums.so2 += (candidate.so2 ?? 0) * 10;
+        if (bestCandidate && bestIndex !== -1) {
+          // Add the best candidate
+          selected.push(bestCandidate);
+          sum += (bestCandidate.bloom || 0) * 10;
+          attrSums.viscosity += (bestCandidate.viscosity ?? 0) * 10;
+          attrSums.percentage += (bestCandidate.percentage ?? 0) * 10;
+          attrSums.ph += (bestCandidate.ph ?? 0) * 10;
+          attrSums.conductivity += (bestCandidate.conductivity ?? 0) * 10;
+          attrSums.moisture += (bestCandidate.moisture ?? 0) * 10;
+          attrSums.h2o2 += (bestCandidate.h2o2 ?? 0) * 10;
+          attrSums.so2 += (bestCandidate.so2 ?? 0) * 10;
           
           // Track field values for chosen batches
-          if (candidate.color) stringFieldValues.color.push(candidate.color);
-          if (candidate.odour) stringFieldValues.odour.push(candidate.odour);
-          if (candidate.clarity) attrSums.clarity += (candidate.clarity ?? 0) * 10;
+          if (bestCandidate.color) stringFieldValues.color.push(bestCandidate.color);
+          if (bestCandidate.odour) stringFieldValues.odour.push(bestCandidate.odour);
+          if (bestCandidate.clarity) attrSums.clarity += (bestCandidate.clarity ?? 0) * 10;
           
-          // Reset attempts counter when we successfully add a batch
-          attempts = 0;
+          // Remove from remaining
+          remaining.splice(bestIndex, 1);
+          
+          const newAvg = sum / (selected.length * 10);
+          console.log(`Added batch #${bestCandidate.batchNumber} (bloom: ${bestCandidate.bloom}), new average: ${newAvg}`);
+        } else {
+          break; // No more candidates
         }
       }
       
-      // If we couldn't find enough batches within range, try a more flexible approach
-      if (selected.length < preSelectedCount + remainingBatchesNeeded) {
-        // Reset and try with a more permissive approach
-        selected.length = 0;
-        sum = 0;
-        attrSums.viscosity = 0;
-        attrSums.percentage = 0;
-        attrSums.ph = 0;
-        attrSums.conductivity = 0;
-        attrSums.moisture = 0;
-        attrSums.h2o2 = 0;
-        attrSums.so2 = 0;
-        stringFieldValues.color = [];
-        stringFieldValues.odour = [];
-        
-        const reshuffled = shuffleArray([...remaining]);
-        
-        // Try to find a combination that works
-        for (let i = 0; i < Math.min(preSelectedCount + remainingBatchesNeeded, reshuffled.length); i++) {
-          const candidate = reshuffled[i];
-          selected.push(candidate);
-          sum += (candidate.bloom || 0) * 10;
-          attrSums.viscosity += (candidate.viscosity ?? 0) * 10;
-          attrSums.percentage += (candidate.percentage ?? 0) * 10;
-          attrSums.ph += (candidate.ph ?? 0) * 10;
-          attrSums.conductivity += (candidate.conductivity ?? 0) * 10;
-          attrSums.moisture += (candidate.moisture ?? 0) * 10;
-          attrSums.h2o2 += (candidate.h2o2 ?? 0) * 10;
-          attrSums.so2 += (candidate.so2 ?? 0) * 10;
-          
-          // Track field values for chosen batches
-          if (candidate.color) stringFieldValues.color.push(candidate.color);
-          if (candidate.odour) stringFieldValues.odour.push(candidate.odour);
-          if (candidate.clarity) attrSums.clarity += (candidate.clarity ?? 0) * 10;
-        }
-      }
+      console.log(`Smart selection completed. Final selection: ${selected.length}, manual: ${preSelectedCount}`);
     } else if (mode === 'high-low') {
       // High and Low Mode: Random selection from low and high batches
       const lowBatches = remaining.filter(b => (b.bloom || 0) < args.targetBloomMin);
@@ -741,11 +751,18 @@ export const optimizeBatchSelection = query({
       });
       batchesSelected += 1;
     }
+    
+    console.log(`Final selection: ${selected.length} batches, preSelected: ${preSelectedCount}, output: ${selectedBatches.length}`);
+    console.log(`Selected batch numbers: ${selected.map(b => b.batchNumber).join(', ')}`);
+    console.log(`Output batch numbers: ${selectedBatches.map(b => b.batchNumber).join(', ')}`);
+    console.log(`Output bloom values: ${selectedBatches.map(b => b.bloom).join(', ')}`);
 
     // Calculate results (totalBags is batches * 10)
     const totalBags = selectedBatches.length * 10;
     const totalBloom = selectedBatches.reduce((sum, batch) => sum + ((batch.bloom || 0) * batch.bags), 0);
     let averageBloom = totalBags > 0 ? Math.round(totalBloom / totalBags) : 0;
+    
+    console.log(`Total bloom: ${totalBloom}, total bags: ${totalBags}, average bloom: ${averageBloom}`);
     const totalViscosity = selectedBatches.reduce((sum, batch) => sum + ((batch.viscosity || 0) * batch.bags), 0);
     const averageViscosity = totalBags > 0 ? Math.round((totalViscosity / totalBags) * 100) / 100 : 0;
     
@@ -808,6 +825,15 @@ export const optimizeBatchSelection = query({
     // Check bloom range compliance
     if (!withinRange(averageBloom)) {
       warnings.push(`⚠️ Bloom average (${averageBloom}) is outside target range (${args.targetBloomMin}-${args.targetBloomMax})`);
+      
+      // If target is not met and we have manual selections, warn about them
+      if (preSelectedCount > 0) {
+        const manualBatches = selected.slice(0, preSelectedCount);
+        const targetAvg = (args.targetBloomMin + args.targetBloomMax) / 2;
+        warnings.push(
+          `Your manual selections (${manualBatches.map(b => `Batch #${b.batchNumber} (bloom: ${b.bloom})`).join(', ')}) contributed to not achieving the target average bloom (${targetAvg}). Consider selecting batches with higher bloom values like 267, 252, etc.`
+        );
+      }
     } else {
       const modeText = mode === 'target-range' ? 'Target Range Mode' : 
                       mode === 'high-low' ? 'High & Low Mode' : 'Random Average Mode';
